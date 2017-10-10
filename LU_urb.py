@@ -4,8 +4,8 @@ Judith Verstegen, 2012-08-03
 """
 import random
 random.seed(10)
-from PCRaster import *
-from PCRaster.Framework import *
+from pcraster import *
+from pcraster.framework import *
 setrandomseed(10)
 import parameters
 import uncertainty
@@ -32,8 +32,7 @@ class LandUseType:
     variableDict -- dictionary in which inputs for factors are found
     noise -- very small random noise to ensure cells can't get same suitability
     nullMask -- map with value 0 for study area and No Data outside
-    yieldFrac -- fraction of maximum yield a cell can deliver
-    forestYieldFrac -- fraction of maximum forest biomass a cell can deliver
+    windowLengthRealization -- window length for neighborhood function (stoch)
     
     """
     
@@ -48,25 +47,14 @@ class LandUseType:
     self.noise = noise
     self.toMeters = parameters.getConversionUnit()
     self.windowLengthRealization = windowLengthRealization
-    # This new yieldmap approach is a problem for the stochastic mode
-    yieldMapName = parameters.getYieldMapName(typeNr)
-    self.yieldFrac = scalar(readmap(yieldMapName))
-##    self.yieldFrac = yieldFrac / 10000
-    if self.typeNr == parameters.getForestNr():
-      self.forest = True
-    else:
-      self.forest = False
     
   def setEnvironment(self, environment):
     """Update the environment (land use map)."""
     self.environment = environment
 
-  def createInitialMask(self, globalMapNoGo, privateMapsNoGo):
-    """Combine the global no-go map with areas unsuitable for this land use."""
+  def createInitialMask(self, globalMapNoGo):
+    """Now just the global no-go map."""
     self.mask = globalMapNoGo
-    if privateMapsNoGo is not None:
-      self.mask = pcror(self.mask, privateMapsNoGo)
-##        report(self.mask, 'privMask')
 
   def normalizeMap(self, aMap):
     """Return a normalized version of the input map."""
@@ -110,41 +98,20 @@ class LandUseType:
     return neighborSuitability
 
   ## 2
-  def getDistanceRoadSuitability(self, spreadMapRoads):
+  def getDistanceSuitability(self, spreadMap):
     """Return suitability map based on distance to roads."""
     variableList = self.variableDict.get(2)
     a = variableList[0]
-    normalized = self.normalizeMap(spreadMapRoads)
+    normalized = self.normalizeMap(spreadMap)
     roadSuitability = 1 - (normalized ** a)  
 ##    report(roadSuitability, 'roadSuit' + str(self.typeNr))
     return roadSuitability
 
   ## 3
-  def getDistanceWaterSuitability(self, spreadMapWater):
-    """Return suitability map based on distance to water."""
-    print 'check', self.variableDict
-    variableList = self.variableDict.get(3)
-    a = variableList[0]
-    normalized = self.normalizeMap(spreadMapWater)
-    waterSuitability = 1 - (normalized ** a)  
-##    report(waterSuitability, 'waterSuit' + str(self.typeNr))
-    return waterSuitability
-
-  ## 4
-  def getDistanceCitySuitability(self, spreadMapCities):
-    """Return suitability map based on distance to large cities."""
-    variableList = self.variableDict.get(4)
-    a = variableList[0]
-    normalized = self.normalizeMap(spreadMapCities)
-    citySuitability = 1 - (normalized ** a)  
-##    report(citySuitability, 'citySuit' + str(self.typeNr))
-    return citySuitability
-
-  ## 5
   def getYieldSuitability(self, yieldMap):
     """Return suitability map based on yield for crops or cattle."""
     #LOADED HERE BECAUSE OF ONEMAP
-    variableList = self.variableDict.get(5)
+    variableList = self.variableDict.get(3)
     a = variableList[0]
     yieldSuitability = yieldMap ** a
 ##    yieldRelation = yexp(yieldFrac)
@@ -152,10 +119,10 @@ class LandUseType:
 ##    report(yieldSuitability, 'yieldSuit')
     return yieldSuitability
 
-  ## 6
+  ## 4
   def getCurrentLandUseSuitability(self):
     """Return suitability map based on current land use type."""
-    variableDict = self.variableDict.get(6) 
+    variableDict = self.variableDict.get(4)
     current = self.nullMask
     for aKey in variableDict.keys():
       current = ifthenelse(pcreq(self.environment, aKey), \
@@ -165,36 +132,14 @@ class LandUseType:
 ##    report(currentLandUseSuitbaility, 'autoSuit')
     return currentLandUseSuitbaility
 
-  ## 7
-  def getSlopeSuitability(self, slope):
-    """Return suitability map based on slope."""
-    variableList = self.variableDict.get(7)
-    a = variableList[0]
-    slopeSuitability = 1 - (slope ** a)
-##    slopeRelation = -1 * ln(slope + 0.001)
-##    slopeSuitability = self.normalizeMap(slopeRelation)
-##    report(slope, 'slope')
-##    report(slopeSuitability, 'slopeSuit')
-    return slopeSuitability
-
-  ## 8
+  ## 5
   def getRandomSuitability(self):
     """Return suitability that is completely random."""
     randomSuitability = uniform(boolean(self.yieldFrac))
     return randomSuitability
 
-  ## 9
-  def getDistanceMillsSuitability(self, spreadMapMills):
-    """Return suitability map based on distance to sugar cane mills."""
-    variableList = self.variableDict.get(9)
-    a = variableList[0]
-    normalized = self.normalizeMap(spreadMapMills)
-    millSuitability = 1 - (normalized ** a)  
-##    report(millSuitability, 'millSuit' + str(self.typeNr))
-    return millSuitability
-  
-  def createInitialSuitabilityMap(self, distRoads, distWater, distCities, \
-                                  yieldFrac, slope, distMills):
+ 
+  def createInitialSuitabilityMap(self, distRoads, yieldFrac):
     """Return the initial suitability map, i.e. for static factors.
 
     Given the maps:
@@ -214,6 +159,7 @@ class LandUseType:
 
     self.weightInitialSuitabilityMap = 0
     self.initialSuitabilityMap = spatial(scalar(0))
+    self.yieldFrac = yieldFrac
     i = 0
     # For every number in the suitability factor list
     # that belongs to a STATIC factor
@@ -223,29 +169,13 @@ class LandUseType:
     for aFactor in self.suitFactorList:
       if aFactor == 2:
         self.initialSuitabilityMap += self.weightList[i] * \
-                                 self.getDistanceRoadSuitability(distRoads)
-        self.weightInitialSuitabilityMap += self.weightList[i]
+                                 self.getDistanceSuitability(distRoads)
+        self.weightInitialSuitabilityMap += self.weightList[i]      
       elif aFactor == 3:
-        self.initialSuitabilityMap += self.weightList[i] * \
-                                 self.getDistanceWaterSuitability(distWater)
-        self.weightInitialSuitabilityMap += self.weightList[i]
-      elif aFactor == 4:
-        self.initialSuitabilityMap += self.weightList[i] * \
-                                 self.getDistanceCitySuitability(distCities)
-        self.weightInitialSuitabilityMap += self.weightList[i]
-      elif aFactor == 5:
         self.initialSuitabilityMap += self.weightList[i] * \
                                       self.getYieldSuitability(yieldFrac)
         self.weightInitialSuitabilityMap += self.weightList[i]
-      elif aFactor == 7:
-        self.initialSuitabilityMap += self.weightList[i] * \
-                                 self.getSlopeSuitability(slope)
-        self.weightInitialSuitabilityMap += self.weightList[i]
-      elif aFactor == 9:
-        self.initialSuitabilityMap += self.weightList[i] * \
-                                 self.getDistanceMillsSuitability(distMills)
-        self.weightInitialSuitabilityMap += self.weightList[i]
-      elif aFactor in (1, 6, 8):
+      elif aFactor in (1, 4, 5):
         ## Dynamic factors are captured in the total suitability map
         pass
       else:
@@ -276,13 +206,13 @@ class LandUseType:
     for aFactor in self.suitFactorList:
       if aFactor == 1:
         suitabilityMap += self.weightList[i] * self.getNeighborSuitability()
-      elif aFactor == 6:
+      elif aFactor == 4:
         suitabilityMap += self.weightList[i] * \
                           self.getCurrentLandUseSuitability()
-      elif aFactor == 8:
+      elif aFactor == 5:
         suitabilityMap += self.weightList[i] * \
                           self.getRandomSuitability()
-      elif aFactor in (2, 3, 4, 5, 7, 9):
+      elif aFactor in (2, 3):
         # Static factors already captured in the initial suitability map
         pass
       else:
@@ -321,19 +251,15 @@ class LandUseType:
       self.demand = float(0.0)
     print '\nland use type', self.typeNr
     print 'demand is:', self.demand
-    if self.forest:
-      print 'forest,', self.typeNr,'so remove'
-      self.removeForest()
+    print 'total yield is:', self.totalYield
+    if self.totalYield > self.demand:
+      print 'remove'
+      self.remove()
+    elif self.totalYield < self.demand:
+      print 'add'
+      self.add(immutables)
     else:
-      print 'total yield is:', self.totalYield
-      if self.totalYield > self.demand:
-        print 'remove'
-        self.remove()
-      elif self.totalYield < self.demand:
-        print 'add'
-        self.add(immutables)
-      else:
-        print 'do nothing'
+      print 'do nothing'
     newImmutables = ifthenelse(self.environment == self.typeNr, boolean(1),\
                                immutables)
     return self.environment, newImmutables
@@ -411,43 +337,6 @@ class LandUseType:
     print 'iterations', i, 'end yield is', self.totalYield
 ##    report(self.environment, 'newEnv' + str(self.typeNr))
 
-  def removeForest(self):
-    """Remove area of forest indicated in time series."""
-    if self.demand < 0.01:
-      print 'nothing to remove'
-    else:
-      # Only cells already occupied by this land use can be removed
-      self.totalSuitabilityMap = ifthen(self.environment == self.typeNr, \
-                                        self.totalSuitabilityMap)
-      ordered = order(self.totalSuitabilityMap)
-      mapMin = mapminimum(self.totalSuitabilityMap)
-      removedBiomass = self.nullMask
-      diff = 1
-      tempEnv = self.environment
-      print 'start mapMin =', float(mapMin)
-      x = int(self.demand / self.maxYield * 0.8)
-      xPrev = 0
-      i = 0
-      while diff > 0 and xPrev < x and i < 100:
-        print 'cells to remove', x
-        # The key: cells with minimum suitability are turned into 'abandoned'
-        tempEnvironment = ifthen(ordered < x, nominal(98))
-        tempEnv = cover(tempEnvironment, self.environment)
-        removed = ifthen(tempEnvironment == 98, nominal(self.typeNr))
-        # Check the yield of the land use type now that less land is occupied
-        self.updateYield(removed)
-        i += 1
-        xPrev = x
-        diff = float(self.demand - self.totalYield)
-        if math.fmod(i, 40) == 0:
-          print 'NOT getting there...'
-          # Number of cells to be allocated
-          x = 2 * (x + int(diff / self.maxYield))      
-        else:
-          # Number of cells to be allocated
-          x += int(diff / self.maxYield)
-      self.setEnvironment(tempEnv)
-      print 'iterations', i, 'removed biomass is', self.totalYield
 
 #######################################
 
@@ -461,12 +350,6 @@ class LandUse:
     # Map with 0 in study area and No Data outside, used for cover() functions
     self.nullMask = nullMask
     self.toMeters = parameters.getConversionUnit()
-    self.yearsDeforestated = nullMask
-    self.forest = parameters.getForestNr()
-
-    # maps for which no distance is needed now
-    self.distWater = nullMask
-    self.distRoads = nullMask
 
   def setInitialEnvironment(self, environment):
     """Update environment of the 'overall' class ONLY."""
@@ -511,27 +394,18 @@ class LandUse:
                                            self.nullMask, \
                                            windowLengthRealization))
       
-  def determineNoGoAreas(self, noGoMap, noGoLanduseList, privateNoGoSlopeDict,\
-                         dem):
+  def determineNoGoAreas(self, noGoMap, noGoLanduseList):
     """Create global no-go map, pass it to the types that add own no-go areas."""
-    self.slopeMap = slope(dem)
     self.excluded = noGoMap
-    privateNoGoAreas = None
     # Check the list with immutable land uses
     if noGoLanduseList is not None:
       for aNumber in noGoLanduseList:
         booleanNoGo = pcreq(self.environment, aNumber)
         self.excluded = pcror(self.excluded, booleanNoGo)
-    report(scalar(self.excluded), 'excluded')
+    ##report(scalar(self.excluded), 'excluded')
     i = 0
     for aType in self.types:
-      # Get land use type specific no-go areas based on slope from dictionary
-      # If not present the variable privateNoGoAreas is 'None'
-      aSlope = privateNoGoSlopeDict.get(aType)
-      #TURN THIS PART ON WHEN SRTM DATA PRESENT
-##      if aSlope is not None:
-##        privateNoGoAreas = pcrgt(self.slopeMap, aSlope)
-      self.landUseTypes[i].createInitialMask(self.excluded, privateNoGoAreas)
+      self.landUseTypes[i].createInitialMask(self.excluded)
       i += 1
 
   def determineDistanceToRoads(self, booleanMapRoads):
@@ -539,47 +413,18 @@ class LandUse:
     self.distRoads = spread(booleanMapRoads, 0, 1)
     report(self.distRoads, 'distRoads.map')
     
-  def determineDistanceToWater(self, booleanMapWater):
-    """Create map with distance to water, given a boolean map with water."""
-    self.distWater = spread(booleanMapWater, 0, 1)
-    report(self.distWater, 'distWater.map')
-
-  def determineDistanceToLargeCities(self, booleanMapCities, booleanMapRoads):
-    """Create map with distance to cities, using a boolean map with cities."""
-    # By using the part below one can make a map of relative time to
-    # reach a city, giving roads a lower friction
-    relativeSpeed = ifthenelse(booleanMapRoads, scalar(1), scalar(6))
-    self.distCities = spread(booleanMapCities, 0, relativeSpeed)
-    # The usual way
-##    self.distCities = spread(booleanMapCities, 0, 1)
-    report(self.distCities, 'distCities.map')
-
-  def determineDistanceToRails(self, booleanMapRails):
-    """Create map with distance to rails, given a boolean map with rails."""
-    self.distRails = spread(booleanMapRails, 0, 1)
-##    report(self.distRails, 'distRails')
-
-  def determineDistanceToMills(self, booleanMapMills):
-    """Create map with distance to rails, given a boolean map with mills."""
-    self.distMills = spread(booleanMapMills, 0, 1)
-    report(self.distMills, 'distMills.map')
     
   def loadDistanceMaps(self):
     """load the distance maps, when they cannot be kept in memory (fork)"""
 ##    print os.getcwd()
     self.distRoads = readmap('distRoads')
-    self.distWater = readmap('distWater')
-    self.distCities = readmap('distCities')
-    self.distMills = readmap('distMills')
   
   def calculateStaticSuitabilityMaps(self, stochYieldMap):
     """Get the part of the suitability maps that remains the same."""
     for aType in self.landUseTypes:
       # Check whether the type has static suitability factors
       # Those have to be calculated only once (in initial)
-      aType.createInitialSuitabilityMap(self.distRoads, self.distWater, \
-                                        self.distCities, stochYieldMap, \
-                                        self.slopeMap, self.distMills)
+      aType.createInitialSuitabilityMap(self.distRoads, stochYieldMap)
 
   def calculateSuitabilityMaps(self):      
     """Get the total suitability maps (static plus dynamic part)."""
@@ -598,22 +443,6 @@ class LandUse:
                                                    immutables)
     self.setEnvironment(tempEnvironment)    
 
-  def growForest(self):
-    """Regrow forest at deforestated areas after 10 years."""
-    # Get all cells that are abandoned in the timestep
-    deforestated = pcreq(self.environment, 98)
-    # Update map that counts the years a cell is deforestated
-    increment = ifthen(deforestated, self.yearsDeforestated + 1)
-    self.yearsDeforestated = cover(increment, self.yearsDeforestated)
-    # Regrow forest after 9 years of abandonement, so it's available
-    # again after 10 years
-    regrown = ifthen(self.yearsDeforestated == 9, nominal(self.forest))
-    reset = ifthen(regrown == nominal(self.forest), scalar(0))
-    self.yearsDeforestated = cover(reset, self.yearsDeforestated)
-    # Update environment
-    filledEnvironment = cover(regrown, self.environment)
-    self.setEnvironment(filledEnvironment)
-    
   def getEnvironment(self):
     """Return the current land use map."""
     return self.environment
@@ -630,39 +459,25 @@ class LandUseChangeModel(DynamicModel, MonteCarloModel, \
     DynamicModel.__init__(self)
     MonteCarloModel.__init__(self)
     ParticleFilterModel.__init__(self)
-    setclone('nullMask')
+    setclone('input_data/nullmask')
 ##    setglobaloption('nondiagonal')
 
   def premcloop(self):
     # create sample points
-    self.nullMask = self.readmap('nullMask')
-    self.oneMask = self.readmap('oneMask')
-    unique = uniqueid(self.oneMask)
-    self.zones = self.readmap('zones150')
-    self.samplePoints = pcreq(areamaximum(unique, self.zones) - 50, unique)
-    self.noGoMap = cover(self.readmap('noGo'), boolean(self.nullMask))
-    self.samplePoints = pcrand(self.samplePoints, pcrnot(self.noGoMap))
-    self.samplePoints = ifthen(self.samplePoints == 1, boolean(1))
-    self.samplePoints = uniqueid(self.samplePoints)
-    self.report(self.samplePoints, 'sampPoint')
+    self.nullMask = self.readmap('input_data/nullmask')
+    self.oneMask = self.readmap('input_data/onemask')   
+    # AT SOME POINT WITH STOCHASTIC INPUT
+    # in that case land use should not include urban
+    self.landuse = self.readmap('input_data/init_lu')
+    self.initialUrb = self.readmap('input_data/urb90')
+    roads = self.readmap('input_data/roads')
+    self.noGoMap = cover(self.landuse == 2, boolean(self.nullMask))
+    self.zones = readmap('input_data/zones')
+    self.samplePoints = self.readmap('input_data/sampPoint')
     self.sumStats = parameters.getSumStats()
-
-    # attributes
-    self.landuse = self.readmap('landuse2')
-    self.initialSc = self.readmap('initialSc')
-    roads = self.readmap('roads')
-    cities = self.readmap('sp_city')
-##    rails = self.readmap('railways')
-    mills = readmap('mills')
-
-    self.dem = self.readmap('dem1')
-    self.yieldMap = self.readmap('rainhightechSuit1')
-    
-    self.roads = cover(roads, boolean(self.nullMask))
-    # water map constructed from land use map
-    self.water = cover(self.landuse == 5, boolean(self.nullMask))
-    self.cities = cover(cities, boolean(self.nullMask))
-    self.mills = cover(mills, boolean(self.nullMask))
+    self.yieldMap = scalar(self.oneMask)
+    # roads now as boolean
+    self.roads = pcrne(roads, 0)
 
     # List of landuse types in order of 'who gets to choose first'
     self.landUseList = parameters.getLandUseList()
@@ -674,22 +489,14 @@ class LandUseChangeModel(DynamicModel, MonteCarloModel, \
 ##    self.weightDict = Parameters.getWeightDict()
 ##    self.variableSuperDict = parameters.getVariableSuperDict()
     self.noGoLanduseList = parameters.getNoGoLanduseTypes()
-    self.privateNoGoSlopeDict = parameters.getPrivateNoGoSlopeDict()
 
     # Uniform map of very small numbers, used to avoid equal suitabilities
     self.noise = uniform(1)/10000
     
     self.preMCLandUse = LandUse(self.landUseList, self.nullMask)
     self.preMCLandUse.determineDistanceToRoads(self.roads)
-    self.preMCLandUse.determineDistanceToWater(self.water)
-    self.preMCLandUse.determineDistanceToLargeCities(self.cities, self.roads)
-    self.preMCLandUse.determineDistanceToMills(self.mills)
 
   def initial(self):
-    # Temporary piece of code becuase of problem random seed
-##    random.seed()
-##    numpy.random.seed()
-##    PCRaster.setrandomseed(0)
     random.seed(self.currentSampleNumber())
     np.random.seed(self.currentSampleNumber())
     setrandomseed(self.currentSampleNumber())
@@ -697,16 +504,13 @@ class LandUseChangeModel(DynamicModel, MonteCarloModel, \
     self.uniqueNumber = self.currentSampleNumber()
     # Create the 'overall' landuse class
 ##    self.environment = uncertainty.getInitialLandUseMap(self.landuse)
-    self.environment = cover(ifthen(self.initialSc == 1, nominal(6)),\
-		      self.landuse)
+    self.environment = self.landuse
     
     self.landUse = LandUse(self.landUseList, self.nullMask)
     self.landUse.setInitialEnvironment(self.environment)
 
-    # Uncertainty that is static over time same for all lu types
-    self.stochDem = uncertainty.getDem(self.dem)
     # Uncertainty that is static over time different per lu types
-    self.stochYieldMap = uncertainty.getYieldMap(self.yieldMap)
+    self.stochYieldMap = scalar(self.oneMask) #uncertainty.getYieldMap(self.yieldMap)
     self.weightDict = uncertainty.getWeights2(self.suitFactorDict)
     self.variableSuperDict = uncertainty.getSuitabilityParameters(self.suitFactorDict)
 
@@ -718,21 +522,14 @@ class LandUseChangeModel(DynamicModel, MonteCarloModel, \
                                           self.noise)
 
     # Static suitability factors
-    self.landUse.determineNoGoAreas(self.noGoMap, self.noGoLanduseList, \
-                                    self.privateNoGoSlopeDict, self.stochDem)
-
-    # population, cattle etc taken away
-##    self.landUse.determineDistanceToRoads(self.roads)
-##    self.landUse.determineDistanceToWater(self.water)
-##    self.landUse.determineDistanceToLargeCities(self.cities, self.roads)
-##    self.landUse.determineDistanceToMills(self.mills)
+    self.landUse.determineNoGoAreas(self.noGoMap, self.noGoLanduseList)
     self.landUse.loadDistanceMaps()
     self.landUse.calculateStaticSuitabilityMaps(self.stochYieldMap)
 
           
     # Draw random numbers between zero and one
     # To determine yield and demand
-    self.demandStoch = round(float(mapnormal()),2)
+    self.demandStoch = round(float(mapuniform()),2)
     print 'FRACTION DEMAND IS',self.demandStoch,'\n'
     self.maxYieldStoch = mapuniform()
     self.bioMaxYieldStoch = mapuniform()
@@ -743,19 +540,14 @@ class LandUseChangeModel(DynamicModel, MonteCarloModel, \
     
     # NEW: report the state of the previous time step
     sugarCane = pcreq(self.environment, 6)
-#    self.report(sugarCane, 's_prev')
     
     # Get max yield and demand per land use type
-    # But for Brazil we don't use it, so 1
-##    maxYieldUp = timeinputscalar('maxYieldUp.tss', self.environment)
-##    maxYieldLow = timeinputscalar('maxYieldLow.tss', self.environment)
-##    maxYieldDiff = (maxYieldUp - maxYieldLow)
-##    maxYield = maxYieldDiff * self.maxYieldStoch + maxYieldLow
+    # But for urban we don't use it now (perhaps later with pop), so 1
     maxYield = 1.0
     
 ##    demandUp = timeinputscalar('demandUp.tss', self.environment)
 ##    demandLow = timeinputscalar('demandLow.tss', self.environment)
-    demandAv = timeinputscalar('demand_av.tss', self.environment)
+    demandAv = timeinputscalar('input_data/demand_av.tss', self.environment)
     demandSd = spatial(scalar(0))#timeinputscalar('demand_sd.tss', self.environment)
     demand = demandAv + self.demandStoch * demandSd
     
@@ -764,22 +556,18 @@ class LandUseChangeModel(DynamicModel, MonteCarloModel, \
 
     # Allocate new land use using demands of current time step
     self.landUse.allocate(maxYield, demand)
-    self.landUse.growForest()
     self.environment = self.landUse.getEnvironment()
 
     # reporitings
 ##    self.report(self.environment, 'landUse')
 ##    os.system('legend --clone landuse.map -f \"legendLU.txt\" %s ' \
 ##              %generateNameST('landUse', self.currentSampleNumber(),timeStep))
-    sugarCane = pcreq(self.environment, 6)
-##    if not timeStep in [9,11,13,15,17,19]:
-    self.report(sugarCane, 'sSc')
-##      self.report(scalar(sugarCane), 'sSc')
+    urban = pcreq(self.environment, 1)
+    self.report(urban, 'urb')
 
     # Objects with pickle or marshal
     name1 = 'weights' + str(timeStep) + '.obj'
     path1 = os.path.join(str(self.currentSampleNumber()), name1)
-##    path = str(self.currentSampleNumber()) + '\stateVar' + '\\weights.obj'
     file_object1 = open(path1, 'w')
     pickle.dump(self.weightDict, file_object1)
     file_object1.close()
@@ -803,7 +591,7 @@ class LandUseChangeModel(DynamicModel, MonteCarloModel, \
     file_object4.close()
     
     # save the sum stats of the calibration blocks
-    listOfSumStats = covarMatrix.calculateSumStats(scalar(sugarCane), \
+    listOfSumStats = covarMatrix.calculateSumStats(scalar(urban), \
                                             self.sumStats, self.zones)
     modelledAverageMap = listOfSumStats[0]
     modelledPatchNumber = listOfSumStats[1]
@@ -815,9 +603,11 @@ class LandUseChangeModel(DynamicModel, MonteCarloModel, \
     for aStat in self.sumStats:
       path = generateNameST(aStat, self.currentSampleNumber(),timeStep)
       if aStat == 'av':
-        modelledAverageArray = covarMatrix.map2Array(path, 'sampPointAvSelection.col')
+        modelledAverageArray = covarMatrix.map2Array(path, \
+                              'input_data/sampPointAvSelection.col')
       else:
-        modelledAverageArray = covarMatrix.map2Array(path, 'sampPointNrSelection.col')
+        modelledAverageArray = covarMatrix.map2Array(path, \
+                              'input_data/sampPointNrSelection.col')
       name1 = aStat + str(timeStep) + '.obj'
       path1 = os.path.join(str(self.currentSampleNumber()), name1)
       file_object1 = open(path1, 'w')
@@ -826,21 +616,25 @@ class LandUseChangeModel(DynamicModel, MonteCarloModel, \
       os.remove(generateNameST(aStat,self.currentSampleNumber(), timeStep))
 
     # save the sumstats of the validation blocks
-    listOfSumStats = covarMatrix.calculateSumStats(scalar(sugarCane), \
+    listOfSumStats = covarMatrix.calculateSumStats(scalar(urban), \
                                           self.sumStats, self.zones, True)
     modelledAverageMap = listOfSumStats[0]
     modelledPatchNumber = listOfSumStats[1]
     modelledLS = listOfSumStats[2]
+    #aguila(modelledAverageMap)
     self.report(modelledAverageMap, 'av')
     self.report(modelledPatchNumber, 'nr')
+    #aguila(modelledLS)
     self.report(modelledLS, 'ls')
 
     for aStat in self.sumStats:
       path = generateNameST(aStat, self.currentSampleNumber(),timeStep)
       if aStat == 'av':
-        modelledAverageArray = covarMatrix.map2Array(path, 'sampPointAvValidation.col')
+        modelledAverageArray = covarMatrix.map2Array(path,
+                              'input_data/sampPointAvValidation.col')
       else:
-        modelledAverageArray = covarMatrix.map2Array(path, 'sampPointNrValidation.col')
+        modelledAverageArray = covarMatrix.map2Array(path,
+                              'input_data/sampPointNrValidation.col')
       name1 = aStat + '_val' + str(timeStep) + '.obj'
       path1 = os.path.join(str(self.currentSampleNumber()), name1)
       file_object1 = open(path1, 'w')
@@ -873,7 +667,7 @@ class LandUseChangeModel(DynamicModel, MonteCarloModel, \
 
     
   def updateWeight(self):
-    modelledData = self.readmap('sSc')
+    modelledData = self.readmap('urb')
     listOfSumStats = covarMatrix.calculateSumStats(modelledData, \
                                                     self.sumStats, self.zones)
     modelledAverageMap = listOfSumStats[0]
@@ -887,14 +681,8 @@ class LandUseChangeModel(DynamicModel, MonteCarloModel, \
       observedAverageMap = self.readDeterministic('av_ave')
       observedNumberMap = self.readDeterministic('nr_ave')
       observedPatchMap = self.readDeterministic('ls_ave')
-##      observedAverageMap = self.readDeterministic('obs')  
-      #sc = scalar(self.readDeterministic('sc'))
-      #listOfSumStats = covarMatrix.calculateSumStats(sc, self.sumStats,\
-                                                      #self.zones)
-      #observedAverageMap = listOfSumStats[0]
-      #observedPatchNumber = listOfSumStats[1]
-      #observedPatchMap = listOfSumStats[2]
-      
+
+      # TO CHECK
       observedAveragePoints = ifthen(self.samplePoints, observedAverageMap)
 
       observedStdDevPoints1 = ifthenelse(observedAveragePoints > 0, \
@@ -975,9 +763,7 @@ class LandUseChangeModel(DynamicModel, MonteCarloModel, \
   def suspend(self):
     print 'SUSPEND', str(self.currentSampleNumber()), '\n'
     # Maps
-    self.reportState(self.stochYieldMap, 'yield')
     self.reportState(self.environment, 'env')
-    self.reportState(self.stochDem, 'dem')
     
     # Objects with pickle or marshal
     path1 = os.path.join(str(self.currentSampleNumber()), 'stateVar', \
@@ -1010,9 +796,7 @@ class LandUseChangeModel(DynamicModel, MonteCarloModel, \
     self.maxYieldStoch = 1
     
     # Maps
-    self.stochYieldMap = self.readState('yield')
     self.environment = self.readState('env')
-    self.stochDem = self.readState('dem')
     
     print '\n...', float(maptotal(self.stochYieldMap))
     
@@ -1064,7 +848,7 @@ nrOfSamples = parameters.getNrSamples()
 myModel = LandUseChangeModel()
 dynamicModel = DynamicFramework(myModel, nrOfTimeSteps)
 mcModel = MonteCarloFramework(dynamicModel, nrOfSamples)
-mcModel.setForkSamples(True,16)
+#mcModel.setForkSamples(True,16)
 ##mcModel.run()
 pfModel = SequentialImportanceResamplingFramework(mcModel)
 ##pfModel = ResidualResamplingFramework(mcModel)

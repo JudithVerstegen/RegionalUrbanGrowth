@@ -16,6 +16,8 @@ data_dir = os.path.join('C:\\', 'Users', 'verstege', \
 # in ERST 1989 (Corine projection) as [x0, y0, x1, y1]
 # current: Madrid
 coords = [3127009, 1979498, 3215656, 2064791]
+# zone size as a factor of the cell size
+zone_size = 100 # 100 x 100 m = 10 000 m = 10x10 km
 
 #################
 ### functions ###
@@ -115,13 +117,14 @@ for a_name in os.listdir(corine_dir):
         report(lu, 'input_data/' + a_name[5:10] + '.map')
         # 2. urban map
         urban = select_urban(lu)
+        print a_name[8:10], float(maptotal(scalar(urban)))
         report(urban, 'input_data/urb' + a_name[8:10] + '.map')
         ##aguila(urban)
         # 3. make simpler initial land use map only for 1990
         if a_name[8:10] == '90':
             simple_lu = simplify_lu_map(lu)
             report(simple_lu, 'input_data/init_lu.map')
-            aguila(simple_lu)
+            #aguila(simple_lu)
         
 # 4. road map outside loop
 road_dir = os.path.join(data_dir, 'roads')
@@ -130,4 +133,29 @@ roads = clip_and_convert(in_fn, coords, 255)
 nullmask = spatial(nominal(0))
 report(cover(roads, nullmask), 'input_data/roads.map')
 
+# 5. other input data sets
+# Masks with 0 and 1 for the study area and NoData elsewhere
+null_mask = spatial(scalar(0))
+report(null_mask, 'input_data/nullmask.map')
+one_mask = boolean(null_mask + 1)
+report(one_mask, 'input_data/onemask.map')
+# Blocks (zones) for the calibration
+command = 'resample -r ' + str(zone_size) + ' input_data\onemask.map resamp.map'
+os.system(command)
+os.system('pcrcalc unique.map = uniqueid(resamp.map)')
+os.system('resample unique.map zones.map --clone input_data\onemask.map')
+os.system('pcrcalc input_data\zones.map = nominal(zones.map)')
+os.remove('zones.map')
+os.remove('resamp.map')
+os.remove('unique.map')
 
+# 6. calibration blocks and covariance matrices
+import covarMatrix
+unique = uniqueid(one_mask)
+zones = readmap('input_data/zones.map')
+samplePoints = pcreq(areamaximum(unique, zones) - 50, unique)
+samplePoints = ifthen(samplePoints == 1, boolean(1))
+samplePoints = uniqueid(samplePoints)
+report(samplePoints, 'input_data/sampPoint.map')
+os.system('map2col --unitcell input_data/sampPoint.map input_data/sampPoint.col')
+covarMatrix.makeCalibrationMask('input_data/sampPoint.col', zones)
