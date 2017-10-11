@@ -144,9 +144,9 @@ def getSuitabilityParameters(suitFactorsPerLUType):
         # elasticity suitability
         sigma = 0.2
         realization2 = round(float(mapnormal()),2)
-        print realization2
-        elasticity2 = 0.5 + realization2 * sigma
-        variableDict[aFactor] = {2:elasticity2}
+        print realization4
+        elasticity4 = 0.5 + realization4 * sigma
+        variableDict[aFactor] = {4:elasticity2}
       else:
         print 'PROBLEMO suit factor number'
       variableSuperDict[aType] = variableDict
