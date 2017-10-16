@@ -13,6 +13,7 @@ import os
 import osr
 from pcraster import *
 from pcraster.framework import *
+from matplotlib import pyplot as plt
 
 
 ##############
@@ -28,6 +29,12 @@ data_dir = os.path.join('C:\\', 'Users', 'verstege', \
 coords = [3127009, 1979498, 3215656, 2064791]
 # zone size as a factor of the cell size
 zone_size = 100 # 100 x 100 m = 10 000 m = 10x10 km
+# for creating observations
+realizations = 1
+# window size as a factor of the cell size
+corr_window_size = 10
+omission = 3#52
+commission = 3#58
 
 #################
 ### functions ###
@@ -102,7 +109,16 @@ def simplify_lu_map(amap):
     ag = pcrand(scalar(amap) > 11, scalar(amap) < 23)
     landuse = ifthenelse(ag, nominal(4), landuse)
     return landuse
-    
+
+def omiss_commiss_map(bool_map, randmap, z_omiss, z_commiss):
+    # commission error
+    to_remove = pcrand(bool_map, randmap >= z_commiss)
+    print 'frac remove', \
+          float(maptotal(scalar(to_remove))/maptotal(scalar(bool_map)))
+    # omission error
+    to_add = pcrand(pcrnot(bool_map), randmap >= z_omiss)
+    new_map = pcrand(pcrnot(to_remove), pcror(bool_map, to_add))
+    return new_map
 
 ############
 ### main ###
@@ -115,7 +131,8 @@ for f in files:
         os.remove(os.path.join(os.getcwd(), 'input_data', f))
 files = os.listdir(os.path.join(os.getcwd(), 'observations'))
 for f in files:
-    os.remove(os.path.join(os.getcwd(), 'observations', f))
+    if not os.path.isdir(os.path.join(os.getcwd(), 'observations', f)):
+        os.remove(os.path.join(os.getcwd(), 'observations', f))
 
 corine_dir = os.path.join(data_dir, 'Corine')
 for a_name in os.listdir(corine_dir):
@@ -181,32 +198,69 @@ report(samplePoints, 'input_data/sampPoint.map')
 os.system('map2col --unitcell input_data/sampPoint.map input_data/sampPoint.col')
 covarMatrix.makeCalibrationMask('input_data/sampPoint.col', zones)
 
-# 7. and covariance matrices
+# 7. realizations and their summary statistics
 # list of pairs of actual year and time step
-for year in [('90', 0), ('00', 10), ('06', 16), ('12', 22)]:
-    amap = readmap('observations/urb' + year[0] + '.map')
-    # for calibration AND validation
-    for i in (True, False):
-        listOfSumStats = covarMatrix.calculateSumStats(amap, \
-                                                        ['av', 'nr', 'ls'],\
-                                                        zones, i)
-        observedAverageMap = listOfSumStats[0]
-        observedNumberMap = listOfSumStats[1] 
-        observedPatchMap = listOfSumStats[2]
+if not os.path.exists(os.path.join(os.getcwd(), 'observations', \
+                                   'realizations')):
+    os.mkdir(os.path.join(os.getcwd(), 'observations', 'realizations'))
+for i in range(1, realizations + 1):
+    if not os.path.exists(os.path.join(os.getcwd(), 'observations', \
+                                       'realizations', str(i))):
+        os.mkdir(os.path.join(os.getcwd(), 'observations', 'realizations', str(i)))
+    randmap = windowaverage(uniform(1), corr_window_size * celllength())
+    arr = pcr2numpy(randmap, np.nan)
+    ##plt.hist(arr.flatten())
+    ##plt.show()
+    z_comm = np.percentile(arr, 100 - commission)
+    ##print z_comm
+    for year in [('90', 0), ('00', 10), ('06', 16), ('12', 22)]:
+        amap = readmap('observations/urb' + year[0] + '.map')
+        # omission needs to be corrected for class occurance
+        x = float(maptotal(scalar(amap))/maptotal(scalar(pcrnot(amap))))
+        ##print x
+        z_om = np.percentile(arr, 100 - (omission * x))
+        ##print z_om
+        new_map = omiss_commiss_map(amap, randmap, z_om, z_comm)
+        report(new_map, generateNameT('observations/realizations/' + \
+                                     str(i) + '/urb', year[1]))
+        print year[0], float(maptotal(scalar(new_map)))
+        # for calibration AND validation
+        for cal in (True, False):
+            listOfSumStats = covarMatrix.calculateSumStats(new_map, \
+                                                            ['av', 'nr', 'ls'],\
+                                                            zones, cal)
+            observedAverageMap = listOfSumStats[0]
+            observedNumberMap = listOfSumStats[1] 
+            observedPatchMap = listOfSumStats[2]
 
-        if i:
-            report(observedAverageMap, \
-                   generateNameT('observations/av_c', year[1]))
-            report(observedNumberMap, \
-                   generateNameT('observations/nr_c', year[1]))
-            report(observedPatchMap, \
-                   generateNameT('observations/ls_c', year[1]))
-        else:
-            report(observedAverageMap, \
-                   generateNameT('observations/av_v', year[1]))
-            report(observedNumberMap, \
-                   generateNameT('observations/nr_v', year[1]))
-            report(observedPatchMap, \
-                   generateNameT('observations/ls_v', year[1]))            
+            if cal:
+                report(observedAverageMap, \
+                       generateNameT('observations/realizations/' + \
+                                     str(i) + '/av_c', year[1]))
+                report(observedNumberMap, \
+                       generateNameT('observations/realizations/' + \
+                                     str(i) + '/nr_c', year[1]))
+                report(observedPatchMap, \
+                       generateNameT('observations/realizations/' + \
+                                     str(i) + '/ls_c', year[1]))
+            else: # val
+                report(observedAverageMap, \
+                       generateNameT('observations/realizations/' + \
+                                     str(i) + '/av_v', year[1]))
+                report(observedNumberMap, \
+                       generateNameT('observations/realizations/' + \
+                                     str(i) + '/nr_v', year[1]))
+                report(observedPatchMap, \
+                       generateNameT('observations/realizations/' + \
+                                     str(i) + '/ls_v', year[1]))            
         
-    
+# 8. covar matrices
+sample_numbers=range(1, realizations+1, 1)
+time_steps = [0, 10, 16, 22]
+covarMatrix.mcCovarMatrix(["av", "nr", "ls"],sample_numbers, \
+          time_steps, ['input_data/sampPointAvSelection.col', \
+                       'input_data/sampPointNrSelection.col',\
+                     'input_data/sampPointNrSelection.col'], "covar","corr")
+names = ['av', 'nr', 'ls']
+percentiles = [0.0, 0.05, 0.25, 0.5, 0.75, 0.95, 1.0]
+mcaveragevariance(names, sample_numbers, time_steps)
