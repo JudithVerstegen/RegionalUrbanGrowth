@@ -227,13 +227,16 @@ def makeCalibrationMask(rowColFile, zoneMap):
 ###createTimeseries("jan", [1,2,3],[1,2], 1, 1,"test.pdf")
 ###createTimeseriesConfInt("1/jan", "1/piet","2/jan", [1,2,3,4,5,6,7,8,9], 1, 1,"test.pdf")
 ##
-##setclone('nullMask.map')
+  
+##setclone('input_data/nullmask.map')
 ##sampleNumbers=range(3,51,1)
 ##timeSteps=range(2,6,1)
 ##mcCovarMatrix(['av'],sampleNumbers,timeSteps,\
-##                           'sampPoint.col',"covar","corr")
-##array = mySelectSArray('nr000000.002', range(1,51), 'sampPoint.col')
+##                           'input_data/sampPoint.col',"input_data/covar",\
+##              "input_data/corr")
+##array = mySelectSArray('nr000000.002', range(1,51), \
+##                       'input_data/sampPoint.col')
 ##print '\n'
-##matrix2 = map2Array('test', 'sampPoint.col')
-##zones = readmap('zones150')
-##makeCalibrationMask('sampPointAv.col', zones)
+##matrix2 = map2Array('test', 'input_data/sampPoint.col')
+##zones = readmap('zones')
+##makeCalibrationMask('input_data/sampPointAv.col', zones)

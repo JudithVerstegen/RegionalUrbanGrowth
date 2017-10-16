@@ -8,7 +8,7 @@ def getNrTimesteps():
 
   e.g. 2005 to 2030 is 26 time steps."""
 
-  timesteps = 4
+  timesteps = 12
   return timesteps
 
 def getNrSamples():

@@ -1,8 +1,18 @@
+'''
+Judith Verstegen, October 2017
+
+This script takes 1) Corine data ('90, '00, '06 and '12) and
+2) a map of roads to create all datasets necessary
+to run and calibrate PLUC as an urban growth model.
+
+'''
+
 import gdal
 import numpy as np
 import os
 import osr
 from pcraster import *
+from pcraster.framework import *
 
 
 ##############
@@ -98,6 +108,15 @@ def simplify_lu_map(amap):
 ### main ###
 ############
 
+# 0. clean the two directories (input_data and observations)
+files = os.listdir(os.path.join(os.getcwd(), 'input_data'))
+for f in files:
+    if f not in ['make_demand_manual.xlsx', 'demand_av.tss']:
+        os.remove(os.path.join(os.getcwd(), 'input_data', f))
+files = os.listdir(os.path.join(os.getcwd(), 'observations'))
+for f in files:
+    os.remove(os.path.join(os.getcwd(), 'observations', f))
+
 corine_dir = os.path.join(data_dir, 'Corine')
 for a_name in os.listdir(corine_dir):
     # Corine maps are tiffs in folders with same name
@@ -114,12 +133,14 @@ for a_name in os.listdir(corine_dir):
         print in_fn
         setclone('clone')
         lu = clip_and_convert(in_fn, coords, 48)
-        report(lu, 'input_data/' + a_name[5:10] + '.map')
+        report(lu, 'observations/' + a_name[5:10] + '.map')
+
         # 2. urban map
         urban = select_urban(lu)
         print a_name[8:10], float(maptotal(scalar(urban)))
-        report(urban, 'input_data/urb' + a_name[8:10] + '.map')
+        report(urban, 'observations/urb' + a_name[8:10] + '.map')
         ##aguila(urban)
+        
         # 3. make simpler initial land use map only for 1990
         if a_name[8:10] == '90':
             simple_lu = simplify_lu_map(lu)
@@ -149,7 +170,7 @@ os.remove('zones.map')
 os.remove('resamp.map')
 os.remove('unique.map')
 
-# 6. calibration blocks and covariance matrices
+# 6. calibration and validation blocks 
 import covarMatrix
 unique = uniqueid(one_mask)
 zones = readmap('input_data/zones.map')
@@ -159,3 +180,33 @@ samplePoints = uniqueid(samplePoints)
 report(samplePoints, 'input_data/sampPoint.map')
 os.system('map2col --unitcell input_data/sampPoint.map input_data/sampPoint.col')
 covarMatrix.makeCalibrationMask('input_data/sampPoint.col', zones)
+
+# 7. and covariance matrices
+# list of pairs of actual year and time step
+for year in [('90', 0), ('00', 10), ('06', 16), ('12', 22)]:
+    amap = readmap('observations/urb' + year[0] + '.map')
+    # for calibration AND validation
+    for i in (True, False):
+        listOfSumStats = covarMatrix.calculateSumStats(amap, \
+                                                        ['av', 'nr', 'ls'],\
+                                                        zones, i)
+        observedAverageMap = listOfSumStats[0]
+        observedNumberMap = listOfSumStats[1] 
+        observedPatchMap = listOfSumStats[2]
+
+        if i:
+            report(observedAverageMap, \
+                   generateNameT('observations/av_c', year[1]))
+            report(observedNumberMap, \
+                   generateNameT('observations/nr_c', year[1]))
+            report(observedPatchMap, \
+                   generateNameT('observations/ls_c', year[1]))
+        else:
+            report(observedAverageMap, \
+                   generateNameT('observations/av_v', year[1]))
+            report(observedNumberMap, \
+                   generateNameT('observations/nr_v', year[1]))
+            report(observedPatchMap, \
+                   generateNameT('observations/ls_v', year[1]))            
+        
+    

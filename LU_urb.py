@@ -1,5 +1,5 @@
 """Land use change model of Brazil
-Judith Verstegen, 2012-08-03
+Judith Verstegen, 2017-10-16
 
 """
 import random
@@ -852,6 +852,5 @@ mcModel = MonteCarloFramework(dynamicModel, nrOfSamples)
 ##mcModel.run()
 pfModel = SequentialImportanceResamplingFramework(mcModel)
 ##pfModel = ResidualResamplingFramework(mcModel)
-pfModel.setFilterTimesteps([3,4])
-##pfModel.setFilterTimesteps([3,4,5])
+pfModel.setFilterTimesteps([10]) # 10, 16, maybe 22 (=2000, 2006 & 2012)
 pfModel.run()
