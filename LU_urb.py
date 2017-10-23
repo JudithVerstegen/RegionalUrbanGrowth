@@ -82,7 +82,6 @@ class LandUseType:
     nrNeighborsSameLU = windowtotal(scalarSelf, windowLength) - scalarSelf
     # The nr of neighbors are turned into suitability values between 0 and 1
     maxNr = windowtotal(self.nullMask + 1, windowLength) - 1
-    print 'max is', float(mapmaximum(maxNr))
   
     # NEW
     # f [0,1]
@@ -469,7 +468,7 @@ class LandUseChangeModel(DynamicModel, MonteCarloModel, \
     # AT SOME POINT WITH STOCHASTIC INPUT
     # in that case land use should not include urban
     self.landuse = self.readmap('input_data/init_lu')
-    self.initialUrb = self.readmap('input_data/urb90')
+    self.initialUrb = self.landuse == 1
     roads = self.readmap('input_data/roads')
     self.noGoMap = cover(self.landuse == 2, boolean(self.nullMask))
     self.zones = readmap('input_data/zones')
@@ -512,7 +511,8 @@ class LandUseChangeModel(DynamicModel, MonteCarloModel, \
     # Uncertainty that is static over time different per lu types
     self.stochYieldMap = scalar(self.oneMask) #uncertainty.getYieldMap(self.yieldMap)
     self.weightDict = uncertainty.getWeights2(self.suitFactorDict)
-    self.variableSuperDict = uncertainty.getSuitabilityParameters(self.suitFactorDict)
+    ##self.variableSuperDict = uncertainty.getSuitabilityParameters(self.suitFactorDict)
+    self.variableSuperDict = parameters.getVariableSuperDict()
 
     # Create an object for every landuse type in the list    
     self.landUse.createLandUseTypeObjects(self.relatedTypeDict, \
@@ -604,10 +604,10 @@ class LandUseChangeModel(DynamicModel, MonteCarloModel, \
       path = generateNameST(aStat, self.currentSampleNumber(),timeStep)
       if aStat == 'av':
         modelledAverageArray = covarMatrix.map2Array(path, \
-                              'input_data/sampPointAvSelection.col')
+                              'input_data/sampPoint.col')
       else:
         modelledAverageArray = covarMatrix.map2Array(path, \
-                              'input_data/sampPointNrSelection.col')
+                              'input_data/sampPointNr.col')
       name1 = aStat + str(timeStep) + '.obj'
       path1 = os.path.join(str(self.currentSampleNumber()), name1)
       file_object1 = open(path1, 'w')
@@ -615,32 +615,32 @@ class LandUseChangeModel(DynamicModel, MonteCarloModel, \
       file_object1.close()
       os.remove(generateNameST(aStat,self.currentSampleNumber(), timeStep))
 
-    # save the sumstats of the validation blocks
-    listOfSumStats = covarMatrix.calculateSumStats(scalar(urban), \
-                                          self.sumStats, self.zones, True)
-    modelledAverageMap = listOfSumStats[0]
-    modelledPatchNumber = listOfSumStats[1]
-    modelledLS = listOfSumStats[2]
-    #aguila(modelledAverageMap)
-    self.report(modelledAverageMap, 'av')
-    self.report(modelledPatchNumber, 'nr')
-    #aguila(modelledLS)
-    self.report(modelledLS, 'ls')
-
-    for aStat in self.sumStats:
-      path = generateNameST(aStat, self.currentSampleNumber(),timeStep)
-      if aStat == 'av':
-        modelledAverageArray = covarMatrix.map2Array(path,
-                              'input_data/sampPointAvValidation.col')
-      else:
-        modelledAverageArray = covarMatrix.map2Array(path,
-                              'input_data/sampPointNrValidation.col')
-      name1 = aStat + '_val' + str(timeStep) + '.obj'
-      path1 = os.path.join(str(self.currentSampleNumber()), name1)
-      file_object1 = open(path1, 'w')
-      pickle.dump(modelledAverageArray, file_object1)
-      file_object1.close()
-      os.remove(generateNameST(aStat,self.currentSampleNumber(), timeStep))
+##    # save the sumstats of the validation blocks
+##    listOfSumStats = covarMatrix.calculateSumStats(scalar(urban), \
+##                                          self.sumStats, self.zones, True)
+##    modelledAverageMap = listOfSumStats[0]
+##    modelledPatchNumber = listOfSumStats[1]
+##    modelledLS = listOfSumStats[2]
+##    #aguila(modelledAverageMap)
+##    self.report(modelledAverageMap, 'av')
+##    self.report(modelledPatchNumber, 'nr')
+##    #aguila(modelledLS)
+##    self.report(modelledLS, 'ls')
+##
+##    for aStat in self.sumStats:
+##      path = generateNameST(aStat, self.currentSampleNumber(),timeStep)
+##      if aStat == 'av':
+##        modelledAverageArray = covarMatrix.map2Array(path,
+##                              'input_data/sampPoint.col')
+##      else:
+##        modelledAverageArray = covarMatrix.map2Array(path,
+##                              'input_data/sampPointNr.col')
+##      name1 = aStat + '_val' + str(timeStep) + '.obj'
+##      path1 = os.path.join(str(self.currentSampleNumber()), name1)
+##      file_object1 = open(path1, 'w')
+##      pickle.dump(modelledAverageArray, file_object1)
+##      file_object1.close()
+##      os.remove(generateNameST(aStat,self.currentSampleNumber(), timeStep))
       
   def postmcloop(self):
     print '\nrunning postmcloop...'
@@ -668,6 +668,7 @@ class LandUseChangeModel(DynamicModel, MonteCarloModel, \
     
   def updateWeight(self):
     modelledData = self.readmap('urb')
+    base = os.path.join('observations', 'realizations')
     listOfSumStats = covarMatrix.calculateSumStats(modelledData, \
                                                     self.sumStats, self.zones)
     modelledAverageMap = listOfSumStats[0]
@@ -678,9 +679,9 @@ class LandUseChangeModel(DynamicModel, MonteCarloModel, \
     # Be aware, without covar matrix has not been tested anymore since long!
     if parameters.getCovarOn() == 0:
       # Read sum stats from file
-      observedAverageMap = self.readDeterministic('av_ave')
-      observedNumberMap = self.readDeterministic('nr_ave')
-      observedPatchMap = self.readDeterministic('ls_ave')
+      observedAverageMap = self.readDeterministic(os.path.join(base, 'av-ave'))
+      observedNumberMap = self.readDeterministic(os.path.join(base, 'nr-ave'))
+      observedPatchMap = self.readDeterministic(os.path.join(base, 'ls-ave'))
 
       # TO CHECK
       observedAveragePoints = ifthen(self.samplePoints, observedAverageMap)
@@ -700,9 +701,9 @@ class LandUseChangeModel(DynamicModel, MonteCarloModel, \
     
     else:
       # Read sum stats from file
-      observedAverageMap = self.readDeterministic('av_ave_c')
-      observedNumberMap = self.readDeterministic('nr_ave_c')
-      observedPatchMap = self.readDeterministic('ls_ave_c')      
+      observedAverageMap = self.readDeterministic(os.path.join(base, 'av-ave'))
+      observedNumberMap = self.readDeterministic(os.path.join(base, 'nr-ave'))
+      observedPatchMap = self.readDeterministic(os.path.join(base, 'ls-ave'))      
       
       # or calculate sum stats from original (system state) maps
       #sc = scalar(self.readDeterministic('sc'))
@@ -713,7 +714,7 @@ class LandUseChangeModel(DynamicModel, MonteCarloModel, \
       #observedPatchMap = listOfSumStats[2]
 
       # Here selection
-      path = 'covar000.00' + str(self.currentTimeStep())
+      path = os.path.join(base, generateNameT('covar', self.currentTimeStep()))
       covarObsErr = numpy.loadtxt(path)
 ##      print covarObsErr * 100
 ##      print covarObsErr.shape[0]
@@ -725,16 +726,19 @@ class LandUseChangeModel(DynamicModel, MonteCarloModel, \
       # Difference observations and model output
       obsMinusModel1 = observedAverageMap - modelledAverageMap
       report(obsMinusModel1, 'test')
-      matrix1 = covarMatrix.map2Array('test', 'sampPointAvSelection.col')
+      matrix1 = covarMatrix.map2Array('test', os.path.join('input_data', \
+                                                           'sampPoint.col'))
 ##      print matrix1.shape[1]
 
       obsMinusModel2 = observedNumberMap - modelledPatchNumber
       report(obsMinusModel2, 'test')
-      matrix2 = covarMatrix.map2Array('test', 'sampPointNrSelection.col')
+      matrix2 = covarMatrix.map2Array('test', os.path.join('input_data', \
+                                                           'sampPointNr.col'))
       
       obsMinusModel3 = observedPatchMap - modelledPatchMap
       report(obsMinusModel3, 'test')
-      matrix3 = covarMatrix.map2Array('test', 'sampPointNrSelection.col')
+      matrix3 = covarMatrix.map2Array('test', os.path.join('input_data', \
+                                                           'sampPointNr.col'))
 
 ##      obsMinusModel = numpy.concatenate((matrix1, matrix2))
       obsMinusModel = numpy.append(matrix1, matrix2)
@@ -743,12 +747,13 @@ class LandUseChangeModel(DynamicModel, MonteCarloModel, \
 ##      print obsMinusModel
       firstTerm = numpy.dot(obsMinusModel.T, inverseCovar)
       total = 0.0 - (numpy.dot(firstTerm, obsMinusModel) / 2.0)
-      
+
+      # HERE
+      total = total / 1e20
 
       weight = exp(total)
       weightFloatingPoint, valid = cellvalue(weight, 1, 1)
-      # dedented out because of python version
-      # I think it was for weight 0 all
+      # commented out because of python version
 ##      if math.isinf(weightFloatingPoint):
 ##        print 'inf'
 ##        weightFloatingPoint = 0.0
@@ -792,13 +797,9 @@ class LandUseChangeModel(DynamicModel, MonteCarloModel, \
 
   def resume(self):
     print 'RESUME', str(self.currentSampleNumber())
-    # max yield stoch does not matter now!
-    self.maxYieldStoch = 1
     
     # Maps
     self.environment = self.readState('env')
-    
-    print '\n...', float(maptotal(self.stochYieldMap))
     
     # Objects with pickle or marshal
     path1 = os.path.join(str(self.currentSampleNumber()), 'stateVar', \
@@ -829,19 +830,18 @@ class LandUseChangeModel(DynamicModel, MonteCarloModel, \
     self.uniqueNumber = pickle.load(filehandler4) 
     filehandler4.close()
    
-    self.landUse = LandUse(self.landUseList, self.nullMask)
-    self.landUse.setInitialEnvironment(self.environment)
-    self.landUse.loadDistanceMaps()
+    # Create an object for every landuse type in the list
+    # THINK ABOUT THE NOISE, NOT STATIC IS BETTER
     self.landUse.createLandUseTypeObjects(self.relatedTypeDict, \
-                                      self.suitFactorDict, \
-                                      self.weightDict, \
-                                      self.variableSuperDict, \
-                                      self.noise)
+                                          self.suitFactorDict, \
+                                          self.weightDict, \
+                                          self.variableSuperDict, \
+                                          self.noise)
     self.landUse.setEnvironment(self.environment)
-    self.landUse.determineNoGoAreas(self.noGoMap, self.noGoLanduseList, \
-                                    self.privateNoGoSlopeDict, self.stochDem)
-    self.landUse.calculateStaticSuitabilityMaps(self.stochYieldMap)
-    
+    # Static suitability factors
+    self.landUse.determineNoGoAreas(self.noGoMap, self.noGoLanduseList)
+    self.landUse.loadDistanceMaps()
+    self.landUse.calculateStaticSuitabilityMaps(self.stochYieldMap)    
 
 nrOfTimeSteps = parameters.getNrTimesteps()
 nrOfSamples = parameters.getNrSamples()
@@ -852,5 +852,5 @@ mcModel = MonteCarloFramework(dynamicModel, nrOfSamples)
 ##mcModel.run()
 pfModel = SequentialImportanceResamplingFramework(mcModel)
 ##pfModel = ResidualResamplingFramework(mcModel)
-pfModel.setFilterTimesteps([10]) # 10, 16, maybe 22 (=2000, 2006 & 2012)
+pfModel.setFilterTimesteps([10,16]) # 10, 16, maybe 22 (=2000, 2006 & 2012)
 pfModel.run()

@@ -36,7 +36,7 @@ def map2Array(aMap, rowColFile):
 #  print array
   return array
 
-def mySelectSArray(name, sampleNumbers, rowColFile):
+def mySelectSArray(name, sampleNumbers, rowColFile, base=None):
   """Selects values at row, col from raster name in Monte Carlo samples.
 
   name -- Name of raster.
@@ -50,45 +50,51 @@ def mySelectSArray(name, sampleNumbers, rowColFile):
   sampleFile = open(rowColFile, 'r')
   samplePoints = sampleFile.readlines()
   sampleFile.close()
-  print len(samplePoints)
   mask = numpy.zeros((len(samplePoints), len(sampleNumbers))).astype(numpy.bool_)
   array = numpy.zeros((len(samplePoints), len(sampleNumbers))).astype(numpy.float32)
   i = 0
-
   while i < len(sampleNumbers):
     filename = generateNameS(name, sampleNumbers[i])
+    if base is not None:
+      filename = os.path.join(base,filename)
+      #if i == 0: aguila(filename)
+    amap = readmap(filename)
     j = 0
     for point in samplePoints:
       attributes = string.split(point)
-##      print attributes
-      row = int(round(float(attributes[1])))
-      col = int(round(float(attributes[0])))
-      array[[j], [i]], mask[[j], [i]] = readFieldCell(filename, row, col)
+      col = int(round(float(attributes[1])))
+      row = int(round(float(attributes[0])))
+      array[[j], [i]], mask[[j], [i]] = cellvalue(amap, row, col)
       j += 1
     i += 1
 #  array = numpy.compress(mask, array)
-  print array
+  print 'array', array
   return array
 
-def selectSArrayMultipleRasters(names,sampleNumbers,rowColFiles):
+def selectSArrayMultipleRasters(names,sampleNumbers,rowColFiles, base=None):
   """Selects at row, col from each raster name
   Returned array is 'nested', i.e. each element contains
   an array with the values of a raster name"""
   a = []
   i = 0
   for name in names:
-    arrayOfRaster = mySelectSArray(name,sampleNumbers,rowColFiles[i])
+    arrayOfRaster = mySelectSArray(name,sampleNumbers,rowColFiles[i], base)
     a.append(arrayOfRaster)
     i += 1
   c = numpy.vstack(a)
   return c
 
-def covarMatrix(names,sampleNumbers,rowColFiles,covarMatrixName, corrMatrixName):
-  dataMatrix = selectSArrayMultipleRasters(names,sampleNumbers,rowColFiles)
+def covarMatrix(names,sampleNumbers,rowColFiles,covarMatrixName, \
+                corrMatrixName, base=None):
+  dataMatrix = selectSArrayMultipleRasters(names,sampleNumbers,rowColFiles,\
+                                           base)
   numpy.savetxt('dataMatrix',dataMatrix)
   covarMatrix = numpy.cov(dataMatrix)
   print 'covarMatrix', covarMatrix.shape[0]
   corrMatrix = numpy.corrcoef(dataMatrix)
+  if base is not None:
+    covarMatrixName = os.path.join(base, covarMatrixName)
+    corrMatrixName = os.path.join(base, corrMatrixName)
   # This part was because Derek uses only 1 obs/timestep, which makes 1x1 matrix
   if len(names) == 0:#1:
     covarMatrixDifferentType=numpy.array([float(covarMatrix)])
@@ -99,24 +105,23 @@ def covarMatrix(names,sampleNumbers,rowColFiles,covarMatrixName, corrMatrixName)
     numpy.savetxt(covarMatrixName,covarMatrix)
     numpy.savetxt(corrMatrixName,corrMatrix,fmt="%3.2f")
 
-def mcCovarMatrix(names,sampleNumbers,timeSteps,rowColFile,covarMatrixBaseName,corrMatrixBaseName):
+def mcCovarMatrix(names,sampleNumbers,timeSteps,rowColFile,\
+                  covarMatrixBaseName,corrMatrixBaseName, base=None):
   for step in timeSteps:
     namesForTimestep=[]
     for name in names:
       namesForTimestep.append(generateNameT(name,step)) 
     covarMatrixName=generateNameT(covarMatrixBaseName,step)
     corrMatrixName=generateNameT(corrMatrixBaseName,step)
-    covarMatrix(namesForTimestep, sampleNumbers, rowColFile, covarMatrixName,corrMatrixName)
+    covarMatrix(namesForTimestep, sampleNumbers, rowColFile, \
+                covarMatrixName,corrMatrixName, base)
 
 def calculateSumStats(systemState, listOfSumStats, zones, validation=False):
   """Return a list of sum stat maps for the sum stat"""
   listOfMaps = []
-  mask = readmap('input_data/zones_selection')
-  if validation == True:
-    allZones = ifthen(pcrne(zones,0), boolean(0))
-    systemState = ifthen(pcrnot(cover(mask,allZones)), systemState)
-  else:
-    systemState = ifthen(mask, systemState)
+##  mask = readmap('input_data/zones_selection')
+##  if validation == True: mask = readmap('input_data/zones_validation')
+##  systemState = ifthen(mask, systemState)
   unique = uniqueid(boolean(spatial(scalar(1))))
   clumps = ifthen(boolean(systemState) == 1, clump(boolean(systemState)))
   numberMap = areadiversity(clumps, spatial(nominal(1)))
@@ -125,7 +130,8 @@ def calculateSumStats(systemState, listOfSumStats, zones, validation=False):
       averageMap = areaaverage(scalar(systemState), zones)
       listOfMaps.append(averageMap)
     elif aStat == 'nr':
-      listOfMaps.append(numberMap)
+      #!!!!!!!
+      listOfMaps.append(numberMap/1000)
     elif aStat == 'ps':
       patchSizes = areaarea(clumps)/parameters.getConversionUnit()
       oneCellPerPatch = pcreq(areamaximum(unique, clumps), unique)
@@ -173,15 +179,16 @@ def makeCalibrationMask(rowColFile, zoneMap):
   # make a new row col file for the blocks
   newTextfile1 = open('input_data/sampPointAvSelection.col', 'w')
   newTextfile2 = open('input_data/sampPointNrSelection.col', 'w')
-  lookuptable = open('input_data/lookupTable.tbl', 'w')
+  lookuptable1 = open('input_data/lookupTable_cal.tbl', 'w')
   newTextfile3 = open('input_data/sampPointAvValidation.col', 'w')
   newTextfile4 = open('input_data/sampPointNrValidation.col', 'w')
+  lookuptable2 = open('input_data/lookupTable_val.tbl', 'w')
   i = 0
   j = 0
   for aNumber in listOfIndici:
     aBlock = listOfBlocks[aNumber]
     if aNumber in selection:
-      lookuptable.write(aBlock[-1] + ' ' + str(1) + '\n')
+      lookuptable1.write(aBlock[-1] + ' ' + str(1) + '\n')
       for anItem in aBlock:
         newTextfile1.write(anItem + ' ')
         if i == 0:
@@ -189,7 +196,7 @@ def makeCalibrationMask(rowColFile, zoneMap):
       newTextfile1.write('\n')
       i += 1
     else:
-      #lookuptable.write(aBlock[-1] + ' ' + str(1) + '\n')
+      lookuptable2.write(aBlock[-1] + ' ' + str(1) + '\n')
       for anItem in aBlock:
         newTextfile3.write(anItem + ' ')
         if i == 0:
@@ -198,30 +205,14 @@ def makeCalibrationMask(rowColFile, zoneMap):
       i += 1
   newTextfile1.close()
   newTextfile2.close()
-  lookuptable.close()
+  lookuptable1.close()
+  lookuptable2.close()
 
-  # Adapt the covar matrix
-  # 'Invert' the selection, to find out which elements should be deleted
-  # from the covar matrix
-##  toDelete = []
-##  for i in listOfIndici:
-##    if i in selection:
-##      pass
-##    else:
-##      toDelete.append(i)
-##  print toDelete
-##  for aTime in range(2,6):
-##    print aTime
-##    path = 'covar000.00' + str(aTime)
-##    covarObsErr = numpy.loadtxt(path)
-##    rowsRemoved = numpy.delete(covarObsErr, toDelete, 0)
-##    newMatrix = numpy.delete(rowsRemoved, toDelete, 1)
-##    numpy.savetxt('covarSelection.00' + str(aTime),newMatrix)
-
-  
   # Make the mask, i.e. blocks that are SELECTED
-  blocksTrue = lookupboolean('input_data/lookupTable.tbl', zoneMap)
+  blocksTrue = lookupboolean('input_data/lookupTable_cal.tbl', zoneMap)
   report(blocksTrue, 'input_data/zones_selection.map')
+  blocksTrue = lookupboolean('input_data/lookupTable_val.tbl', zoneMap)
+  report(blocksTrue, 'input_data/zones_validation.map')
 
 ### test
 ###createTimeseries("jan", [1,2,3],[1,2], 1, 1,"test.pdf")

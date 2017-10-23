@@ -8,7 +8,7 @@ def getNrTimesteps():
 
   e.g. 2005 to 2030 is 26 time steps."""
 
-  timesteps = 12
+  timesteps = 22
   return timesteps
 
 def getNrSamples():
@@ -16,7 +16,7 @@ def getNrSamples():
 
   If Monte Carlo isn't required fill in 1; no statistics will be calculated."""
   
-  samples = 10
+  samples = 4
   return samples
   
 def getCovarOn():
@@ -100,8 +100,8 @@ def getVariableSuperDict():
 
   variableSuperDict = {}
   variableDict1 = {}
-  variableDict1[1] = [5000, 0.3]
-  variableDict1[2] = [-1, 5000, 1, 2]
+  variableDict1[1] = [500, 0.7]
+  variableDict1[2] = [0.1]
   variableDict1[4] = {4:1, 99:0.5}
   variableSuperDict[1] = variableDict1
   return variableSuperDict

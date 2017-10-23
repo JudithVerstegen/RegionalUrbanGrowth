@@ -30,7 +30,7 @@ coords = [3127009, 1979498, 3215656, 2064791]
 # zone size as a factor of the cell size
 zone_size = 100 # 100 x 100 m = 10 000 m = 10x10 km
 # for creating observations
-realizations = 1
+realizations = 20
 # window size as a factor of the cell size
 corr_window_size = 10
 omission = 3#52
@@ -187,16 +187,22 @@ os.remove('zones.map')
 os.remove('resamp.map')
 os.remove('unique.map')
 
-# 6. calibration and validation blocks 
+# 6. blocks 
 import covarMatrix
 unique = uniqueid(one_mask)
 zones = readmap('input_data/zones.map')
-samplePoints = pcreq(areamaximum(unique, zones) - 50, unique)
+
+### remove zones with zero urban in 2000
+##urb2000 = readmap('observations\urb00')
+##av = areaaverage(scalar(urb2000), zones)
+##zones = ifthen(av > 0, zones)
+##report(zones, 'input_data\zones.map')
+
+samplePoints = pcreq(areaminimum(unique, zones), unique)
 samplePoints = ifthen(samplePoints == 1, boolean(1))
 samplePoints = uniqueid(samplePoints)
 report(samplePoints, 'input_data/sampPoint.map')
 os.system('map2col --unitcell input_data/sampPoint.map input_data/sampPoint.col')
-covarMatrix.makeCalibrationMask('input_data/sampPoint.col', zones)
 
 # 7. realizations and their summary statistics
 # list of pairs of actual year and time step
@@ -204,15 +210,18 @@ if not os.path.exists(os.path.join(os.getcwd(), 'observations', \
                                    'realizations')):
     os.mkdir(os.path.join(os.getcwd(), 'observations', 'realizations'))
 for i in range(1, realizations + 1):
+    # make directories for the realizations
     if not os.path.exists(os.path.join(os.getcwd(), 'observations', \
                                        'realizations', str(i))):
         os.mkdir(os.path.join(os.getcwd(), 'observations', 'realizations', str(i)))
+    # map with random numbers but with correlation by moving window
     randmap = windowaverage(uniform(1), corr_window_size * celllength())
     arr = pcr2numpy(randmap, np.nan)
     ##plt.hist(arr.flatten())
     ##plt.show()
     z_comm = np.percentile(arr, 100 - commission)
     ##print z_comm
+    base = os.path.join('observations', 'realizations')
     for year in [('90', 0), ('00', 10), ('06', 16), ('12', 22)]:
         amap = readmap('observations/urb' + year[0] + '.map')
         # omission needs to be corrected for class occurance
@@ -221,46 +230,44 @@ for i in range(1, realizations + 1):
         z_om = np.percentile(arr, 100 - (omission * x))
         ##print z_om
         new_map = omiss_commiss_map(amap, randmap, z_om, z_comm)
+        # TO_DO collect total area data for demand
         report(new_map, generateNameT('observations/realizations/' + \
                                      str(i) + '/urb', year[1]))
         print year[0], float(maptotal(scalar(new_map)))
-        # for calibration AND validation
-        for cal in (True, False):
-            listOfSumStats = covarMatrix.calculateSumStats(new_map, \
-                                                            ['av', 'nr', 'ls'],\
-                                                            zones, cal)
-            observedAverageMap = listOfSumStats[0]
-            observedNumberMap = listOfSumStats[1] 
-            observedPatchMap = listOfSumStats[2]
 
-            if cal:
-                report(observedAverageMap, \
-                       generateNameT('observations/realizations/' + \
-                                     str(i) + '/av_c', year[1]))
-                report(observedNumberMap, \
-                       generateNameT('observations/realizations/' + \
-                                     str(i) + '/nr_c', year[1]))
-                report(observedPatchMap, \
-                       generateNameT('observations/realizations/' + \
-                                     str(i) + '/ls_c', year[1]))
-            else: # val
-                report(observedAverageMap, \
-                       generateNameT('observations/realizations/' + \
-                                     str(i) + '/av_v', year[1]))
-                report(observedNumberMap, \
-                       generateNameT('observations/realizations/' + \
-                                     str(i) + '/nr_v', year[1]))
-                report(observedPatchMap, \
-                       generateNameT('observations/realizations/' + \
-                                     str(i) + '/ls_v', year[1]))            
+        listOfSumStats = covarMatrix.calculateSumStats(new_map, \
+                                                        ['av', 'nr', 'ls'],\
+                                                        zones)
+        observedAverageMap = listOfSumStats[0]
+        observedNumberMap = listOfSumStats[1] 
+        observedPatchMap = listOfSumStats[2]
+        
+        report(observedAverageMap, \
+               generateNameT(os.path.join(base, str(i), 'av'), \
+                             year[1]))
+        report(observedNumberMap, \
+               generateNameT(os.path.join(base, str(i), 'nr'), \
+                             year[1]))
+        report(observedPatchMap, \
+               generateNameT(os.path.join(base, str(i), 'ls'), \
+                             year[1]))
+        
         
 # 8. covar matrices
-sample_numbers=range(1, realizations+1, 1)
-time_steps = [0, 10, 16, 22]
-covarMatrix.mcCovarMatrix(["av", "nr", "ls"],sample_numbers, \
-          time_steps, ['input_data/sampPointAvSelection.col', \
-                       'input_data/sampPointNrSelection.col',\
-                     'input_data/sampPointNrSelection.col'], "covar","corr")
 names = ['av', 'nr', 'ls']
-percentiles = [0.0, 0.05, 0.25, 0.5, 0.75, 0.95, 1.0]
-mcaveragevariance(names, sample_numbers, time_steps)
+sample_nrs =range(1, realizations+1, 1)
+time_st = [10, 16] # for calibration, so not 0 (init) and 22 (val)!
+textfile = open('input_data/sampPoint.col', 'r')
+aline = textfile.readline()
+newTextfile = open('input_data/sampPointNr.col', 'w')
+newTextfile.write(aline)
+textfile.close()
+newTextfile.close()
+covarMatrix.mcCovarMatrix(names,sample_nrs, time_st,\
+                       ['input_data/sampPoint.col', \
+                        'input_data/sampPointNr.col',\
+                        'input_data/sampPointNr.col'], \
+                        'covar','corr', base)
+
+# 9. postloop over realizations to calculate average fragstats
+##os.system('python observations/realizations/postl.py')
