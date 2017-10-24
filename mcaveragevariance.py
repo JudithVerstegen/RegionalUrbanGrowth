@@ -5,9 +5,8 @@ import shutil
 import string
 import numpy
 import numpy.ma
-import pcraster
-#import pcraster.NumPy
 from pcraster import *
+from pcraster.framework import * 
 import sys
 #sys.path.insert(0, os.path.abspath("C:\Program Files\pcraster-4.1.0_x86-64\python\pcraster\framework"))
 #sftp://judith@fleet.geo.uu.nl/opt/PCRaster-3.0.0-beta-100504/Python/PCRaster/Framework

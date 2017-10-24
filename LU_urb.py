@@ -103,7 +103,7 @@ class LandUseType:
     a = variableList[0]
     normalized = self.normalizeMap(spreadMap)
     roadSuitability = 1 - (normalized ** a)  
-##    report(roadSuitability, 'roadSuit' + str(self.typeNr))
+    report(roadSuitability, 'roadSuit' + str(self.typeNr))
     return roadSuitability
 
   ## 3
@@ -645,20 +645,19 @@ class LandUseChangeModel(DynamicModel, MonteCarloModel, \
   def postmcloop(self):
     print '\nrunning postmcloop...'
     if int(self.nrSamples()) > 1:
-      print '...calculating weights...'
-      command = "python get2_extra.py"
-      os.system(command)
-      print '...calculating fragstats...'			
-      command = "python postloop_frst.py"
-      os.system(command)
-      command = "python postloop_frst_val.py"
-      os.system(command)
+##      print '...calculating weights...'
+##      command = "python get2_extra.py"
+##      os.system(command)
+##      print '...calculating fragstats...'			
+##      command = "python postloop_frst.py"
+##      os.system(command)
+##      command = "python postloop_frst_val.py"
+##      os.system(command)
       # Stochastic variables for which mean, var and percentiles are needed
       print '...calculating statistics...'
-##      names = ['sSc', 'nr', 'av']
-      names = ['sSc']
+      names = ['urb']
       sampleNumbers = self.sampleNumbers()
-      timeSteps = [1,2,3,4,5,6,7,8,9,10,11,12,13,14] #self.timeSteps()
+      timeSteps = self.timeSteps()
       percentiles = [0.0, 0.05, 0.1, 0.3, 0.5, 0.7, 0.9, 0.95, 1.0]
       mcaveragevariance.mcaveragevariance(names, sampleNumbers, timeSteps)
 ##      names = ['ps']

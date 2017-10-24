@@ -89,7 +89,7 @@ def clip_and_convert(in_fn, coords, nodata):
 
 def select_urban(land_use):
     '''Create a Boolean map of all urban land uses from Corine.'''
-    urban = scalar(land_use) < 12
+    urban = pcrand(scalar(land_use) < 12, pcrnot(scalar(land_use) == 4))
     return urban
 
 def simplify_lu_map(amap):
@@ -97,9 +97,9 @@ def simplify_lu_map(amap):
     # 1 = urban
     urban = select_urban(amap)
     landuse = nominal(urban)
-    # 2 = water and wetlands
-    water = pcror(pcrand(scalar(amap) > 34, scalar(amap) < 48),\
-                  scalar(amap) == 50)
+    # 2 = water, wetlands, AND ROADS
+    water = pcror(pcror(pcrand(scalar(amap) > 34, scalar(amap) < 48),\
+                  scalar(amap) == 50), scalar(amap) == 4)
     landuse = ifthenelse(water, nominal(2), landuse)
     # 3 = nature
     nature = pcror(pcrand(scalar(amap) > 22, scalar(amap) < 35),\

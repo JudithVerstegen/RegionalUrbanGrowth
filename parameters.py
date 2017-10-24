@@ -101,7 +101,7 @@ def getVariableSuperDict():
   variableSuperDict = {}
   variableDict1 = {}
   variableDict1[1] = [500, 0.7]
-  variableDict1[2] = [0.1]
+  variableDict1[2] = [0.3]
   variableDict1[4] = {4:1, 99:0.5}
   variableSuperDict[1] = variableDict1
   return variableSuperDict
