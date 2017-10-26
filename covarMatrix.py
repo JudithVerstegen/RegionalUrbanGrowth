@@ -130,8 +130,8 @@ def calculateSumStats(systemState, listOfSumStats, zones, validation=False):
       averageMap = areaaverage(scalar(systemState), zones)
       listOfMaps.append(averageMap)
     elif aStat == 'nr':
-      #!!!!!!!
-      listOfMaps.append(numberMap/1000)
+      average_nr = cover(areadiversity(clumps, zones), spatial(scalar(0)))
+      listOfMaps.append(average_nr)
     elif aStat == 'ps':
       patchSizes = areaarea(clumps)/parameters.getConversionUnit()
       oneCellPerPatch = pcreq(areamaximum(unique, clumps), unique)
