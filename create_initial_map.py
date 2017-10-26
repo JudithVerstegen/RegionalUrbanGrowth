@@ -28,17 +28,18 @@ data_dir = os.path.join('C:\\', 'Users', 'verstege', \
 # current: Madrid
 coords = [3127009, 1979498, 3215656, 2064791]
 # zone size as a factor of the cell size
-zone_size = 100 # 100 x 100 m = 10 000 m = 10x10 km
+zone_size = 300 # 100 x 100 m = 10 000 m = 10x10 km
 # for creating observations
 realizations = 20
 # window size as a factor of the cell size
-corr_window_size = 10
-omission = 3#52
-commission = 3#58
+corr_window_size = 50
+omission = 10#52
+##commission = 20#58
 
 #################
 ### functions ###
 #################
+
 def world2pixel(geoMatrix, x, y):
     """
     Uses a gdal geomatrix (gdal.GetGeoTransform()) to calculate
@@ -110,15 +111,29 @@ def simplify_lu_map(amap):
     landuse = ifthenelse(ag, nominal(4), landuse)
     return landuse
 
-def omiss_commiss_map(bool_map, randmap, z_omiss, z_commiss):
+def omiss_commiss_map(prev, bool_map, randmap, omiss, simple_lu):
     # commission error
-    to_remove = pcrand(bool_map, randmap >= z_commiss)
-    print 'frac remove', \
-          float(maptotal(scalar(to_remove))/maptotal(scalar(bool_map)))
+    arr = pcr2numpy(randmap, np.nan)
+    z_comm = np.percentile(arr, 100 - omiss)
+    to_remove = pcrand(bool_map, randmap >= z_comm)
+    ##print 'frac remove', \
+    float(maptotal(scalar(to_remove))/maptotal(scalar(bool_map)))
+    cells = float(maptotal(scalar(to_remove)))
+    ##print 'cells to remove', cells
+
+    # omission needs to be corrected for class occurance
+    where_can = pcrand(pcrand(pcrnot(bool_map), pcrnot(prev)), \
+                pcrne(simple_lu, 2))
+    x = float (cells / maptotal(scalar(where_can)))
+    ##print 'frac add', x
+    z_om = np.percentile(arr, 100 - (100 * x))
     # omission error
-    to_add = pcrand(pcrnot(bool_map), randmap >= z_omiss)
-    new_map = pcrand(pcrnot(to_remove), pcror(bool_map, to_add))
-    return new_map
+    to_add = pcrand(where_can, randmap >= z_om)
+    cells = float(maptotal(scalar(to_add)))
+    ##print 'cells to add', cells
+
+    ##new_map = pcrand(pcrnot(to_remove), pcror(bool_map, to_add))
+    return to_remove, to_add
 
 ############
 ### main ###
@@ -209,32 +224,47 @@ os.system('map2col --unitcell input_data/sampPoint.map input_data/sampPoint.col'
 if not os.path.exists(os.path.join(os.getcwd(), 'observations', \
                                    'realizations')):
     os.mkdir(os.path.join(os.getcwd(), 'observations', 'realizations'))
+
+avs = {}
+mins = {}
+maxs = {}
 for i in range(1, realizations + 1):
+    print i
     # make directories for the realizations
     if not os.path.exists(os.path.join(os.getcwd(), 'observations', \
                                        'realizations', str(i))):
         os.mkdir(os.path.join(os.getcwd(), 'observations', 'realizations', str(i)))
     # map with random numbers but with correlation by moving window
     randmap = windowaverage(uniform(1), corr_window_size * celllength())
-    arr = pcr2numpy(randmap, np.nan)
-    ##plt.hist(arr.flatten())
-    ##plt.show()
-    z_comm = np.percentile(arr, 100 - commission)
-    ##print z_comm
     base = os.path.join('observations', 'realizations')
+    prev = None
     for year in [('90', 0), ('00', 10), ('06', 16), ('12', 22)]:
         amap = readmap('observations/urb' + year[0] + '.map')
-        # omission needs to be corrected for class occurance
-        x = float(maptotal(scalar(amap))/maptotal(scalar(pcrnot(amap))))
-        ##print x
-        z_om = np.percentile(arr, 100 - (omission * x))
-        ##print z_om
-        new_map = omiss_commiss_map(amap, randmap, z_om, z_comm)
-        # TO_DO collect total area data for demand
-        report(new_map, generateNameT('observations/realizations/' + \
-                                     str(i) + '/urb', year[1]))
-        print year[0], float(maptotal(scalar(new_map)))
+        # change some of the NEW urban cells, not the existing ones
+        if prev is not None:
+            diff = pcrand(amap, pcrnot(prev))
+            ##aguila(diff)
+            to_remove, to_add = omiss_commiss_map(prev, diff, randmap, \
+                                                  omission, simple_lu)
+            new_map = pcrand(pcrnot(to_remove), pcror(amap, to_add))
+            ##aguila(new_map)
+        else:
+            new_map = amap
 
+        # TO_DO collect total area data for demand
+        cells = float(maptotal(scalar(new_map)))
+        if i == 1:
+            mins[year[0]] = cells
+            maxs[year[0]] = cells
+            avs[year[0]] = float(maptotal(scalar(amap)))
+        else:
+            if cells < mins[year[0]]: mins[year[0]] = cells
+            if cells > maxs[year[0]]: maxs[year[0]] = cells
+                         
+        
+        report(new_map, generateNameT('observations/realizations/' + \
+                                         str(i) + '/urb', year[1]))
+        print year[0], float(maptotal(scalar(new_map)))
         listOfSumStats = covarMatrix.calculateSumStats(new_map, \
                                                         ['av', 'nr', 'ls'],\
                                                         zones)
@@ -251,10 +281,12 @@ for i in range(1, realizations + 1):
         report(observedPatchMap, \
                generateNameT(os.path.join(base, str(i), 'ls'), \
                              year[1]))
+        prev = amap
         
         
 # 8. covar matrices
-names = ['av', 'nr', 'ls']
+names = ['nr']
+samplelocs =  ['input_data/sampPoint.col']
 sample_nrs =range(1, realizations+1, 1)
 time_st = [10, 16] # for calibration, so not 0 (init) and 22 (val)!
 textfile = open('input_data/sampPoint.col', 'r')
@@ -264,10 +296,11 @@ newTextfile.write(aline)
 textfile.close()
 newTextfile.close()
 covarMatrix.mcCovarMatrix(names,sample_nrs, time_st,\
-                       ['input_data/sampPoint.col', \
-                        'input_data/sampPointNr.col',\
-                        'input_data/sampPointNr.col'], \
-                        'covar','corr', base)
+                          samplelocs, 'cov_nrz','cor_nrz', base)
 
+
+print mins
+print maxs
+print avs
 # 9. postloop over realizations to calculate average fragstats
 ##os.system('python observations/realizations/postl.py')

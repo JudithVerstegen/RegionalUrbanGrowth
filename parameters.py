@@ -16,7 +16,7 @@ def getNrSamples():
 
   If Monte Carlo isn't required fill in 1; no statistics will be calculated."""
   
-  samples = 4
+  samples = 100
   return samples
   
 def getCovarOn():

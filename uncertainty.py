@@ -40,8 +40,8 @@ def getWeights1(suitFactorsPerLUType):
     for aWeight in range(0, nrWeights):
       weights[aWeight] = np.random.random()
     weightDict[aType] = weights
-  for aType in weightsPerLUType.keys():
-    nrWeights = len(weightsPerLUType.get(aType))
+  for aType in suitFactorsPerLUType.keys():
+    nrWeights = len(suitFactorsPerLUType.get(aType))
     normalized = [0.0] * nrWeights
     unNormalized = weightDict.get(aType)
     for aWeight in range(0, nrWeights):

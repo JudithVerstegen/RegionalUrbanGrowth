@@ -4,6 +4,7 @@ Judith Verstegen, 2017-10-16
 """
 import random
 random.seed(10)
+import math
 from pcraster import *
 from pcraster.framework import *
 setrandomseed(10)
@@ -134,7 +135,9 @@ class LandUseType:
   ## 5
   def getRandomSuitability(self):
     """Return suitability that is completely random."""
-    randomSuitability = uniform(boolean(self.yieldFrac))
+    randmap = windowaverage(uniform(boolean(self.yieldFrac)), \
+                            10 * celllength())
+    randomSuitability = self.normalizeMap(randmap)
     return randomSuitability
 
  
@@ -510,7 +513,7 @@ class LandUseChangeModel(DynamicModel, MonteCarloModel, \
 
     # Uncertainty that is static over time different per lu types
     self.stochYieldMap = scalar(self.oneMask) #uncertainty.getYieldMap(self.yieldMap)
-    self.weightDict = uncertainty.getWeights2(self.suitFactorDict)
+    self.weightDict = uncertainty.getWeights1(self.suitFactorDict)
     ##self.variableSuperDict = uncertainty.getSuitabilityParameters(self.suitFactorDict)
     self.variableSuperDict = parameters.getVariableSuperDict()
 
@@ -594,15 +597,15 @@ class LandUseChangeModel(DynamicModel, MonteCarloModel, \
     listOfSumStats = covarMatrix.calculateSumStats(scalar(urban), \
                                             self.sumStats, self.zones)
     modelledAverageMap = listOfSumStats[0]
-    modelledPatchNumber = listOfSumStats[1]
+    modelledNumber = listOfSumStats[1]
     modelledLS = listOfSumStats[2]
     self.report(modelledAverageMap, 'av')
-    self.report(modelledPatchNumber, 'nr')
+    self.report(modelledNumber, 'nr')
     self.report(modelledLS, 'ls')
 
     for aStat in self.sumStats:
       path = generateNameST(aStat, self.currentSampleNumber(),timeStep)
-      if aStat == 'av':
+      if aStat in ['av', 'nr']:
         modelledAverageArray = covarMatrix.map2Array(path, \
                               'input_data/sampPoint.col')
       else:
@@ -645,9 +648,9 @@ class LandUseChangeModel(DynamicModel, MonteCarloModel, \
   def postmcloop(self):
     print '\nrunning postmcloop...'
     if int(self.nrSamples()) > 1:
-##      print '...calculating weights...'
-##      command = "python get2_extra.py"
-##      os.system(command)
+      print '...calculating weights...'
+      command = "python output_figs.py"
+      os.system(command)
 ##      print '...calculating fragstats...'			
 ##      command = "python postloop_frst.py"
 ##      os.system(command)
@@ -657,7 +660,7 @@ class LandUseChangeModel(DynamicModel, MonteCarloModel, \
       print '...calculating statistics...'
       names = ['urb']
       sampleNumbers = self.sampleNumbers()
-      timeSteps = self.timeSteps()
+      timeSteps = range(1, nrOfTimeSteps)
       percentiles = [0.0, 0.05, 0.1, 0.3, 0.5, 0.7, 0.9, 0.95, 1.0]
       mcaveragevariance.mcaveragevariance(names, sampleNumbers, timeSteps)
 ##      names = ['ps']
@@ -672,7 +675,7 @@ class LandUseChangeModel(DynamicModel, MonteCarloModel, \
                                                     self.sumStats, self.zones)
     modelledAverageMap = listOfSumStats[0]
 ##    report(modelledAverageMap, 'test1')
-    modelledPatchNumber = listOfSumStats[1]
+    modelledNumber = listOfSumStats[1]
     modelledPatchMap = listOfSumStats[2]
 
     # Be aware, without covar matrix has not been tested anymore since long!
@@ -703,23 +706,14 @@ class LandUseChangeModel(DynamicModel, MonteCarloModel, \
       observedAverageMap = self.readDeterministic(os.path.join(base, 'av-ave'))
       observedNumberMap = self.readDeterministic(os.path.join(base, 'nr-ave'))
       observedPatchMap = self.readDeterministic(os.path.join(base, 'ls-ave'))      
-      
-      # or calculate sum stats from original (system state) maps
-      #sc = scalar(self.readDeterministic('sc'))
-      #listOfSumStats = covarMatrix.calculateSumStats(sc, self.sumStats,\
-                                                      #self.zones)
-      #observedAverageMap = listOfSumStats[0]
-      #observedNumberMap = listOfSumStats[1] 
-      #observedPatchMap = listOfSumStats[2]
 
       # Here selection
-      path = os.path.join(base, generateNameT('covar', self.currentTimeStep()))
+      path = os.path.join(base, generateNameT('cov_nrz', self.currentTimeStep()))
       covarObsErr = numpy.loadtxt(path)
 ##      print covarObsErr * 100
 ##      print covarObsErr.shape[0]
 ##      print covarObsErr.shape[1]
       b = np.matrix(covarObsErr*1).I
-##      b = np.invert(np.matrix(covarObsErr))
       inverseCovar = np.array(b)
       
       # Difference observations and model output
@@ -727,37 +721,35 @@ class LandUseChangeModel(DynamicModel, MonteCarloModel, \
       report(obsMinusModel1, 'test')
       matrix1 = covarMatrix.map2Array('test', os.path.join('input_data', \
                                                            'sampPoint.col'))
-##      print matrix1.shape[1]
 
-      obsMinusModel2 = observedNumberMap - modelledPatchNumber
+      obsMinusModel2 = observedNumberMap - modelledNumber
       report(obsMinusModel2, 'test')
       matrix2 = covarMatrix.map2Array('test', os.path.join('input_data', \
-                                                           'sampPointNr.col'))
+                                                           'sampPoint.col'))
       
       obsMinusModel3 = observedPatchMap - modelledPatchMap
       report(obsMinusModel3, 'test')
       matrix3 = covarMatrix.map2Array('test', os.path.join('input_data', \
                                                            'sampPointNr.col'))
 
-##      obsMinusModel = numpy.concatenate((matrix1, matrix2))
-      obsMinusModel = numpy.append(matrix1, matrix2)
-      obsMinusModel = numpy.append(obsMinusModel, matrix3)
-##      obsMinusModel = matrix1
-##      print obsMinusModel
+      ##obsMinusModel = numpy.append(matrix1, matrix2)
+      ##obsMinusModel = numpy.append(obsMinusModel, matrix3)
+      obsMinusModel = matrix2
+      
+      print obsMinusModel
       firstTerm = numpy.dot(obsMinusModel.T, inverseCovar)
+      print firstTerm
       total = 0.0 - (numpy.dot(firstTerm, obsMinusModel) / 2.0)
 
       # HERE
-      total = total / 1e20
+      total = total
 
       weight = exp(total)
       weightFloatingPoint, valid = cellvalue(weight, 1, 1)
-      # commented out because of python version
-##      if math.isinf(weightFloatingPoint):
-##        print 'inf'
-##        weightFloatingPoint = 0.0
+      if math.isinf(weightFloatingPoint):
+        print 'inf'
+        weightFloatingPoint = 0.0
 
-##      weightFloatingPoint = float(weight)
       print 'TOTAL is', float(total), \
            'WEIGHT is', weightFloatingPoint
       
