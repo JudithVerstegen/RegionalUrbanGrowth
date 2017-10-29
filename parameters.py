@@ -25,8 +25,12 @@ def getCovarOn():
   return on
 
 def getSumStats():
-  sumStats = ['av', 'nr', 'ls']
+  sumStats = ['nr']
   return sumStats
+
+def getCovarName():
+  name = 'cov_nrz'
+  return name
 
 def getConversionUnit():
   """Return conversion unit for max yield unit to square meters.
@@ -60,7 +64,7 @@ def getSuitFactorDict():
   land use type 1 uses suitability factors 1, 2, 4, 5, 6 and 9."""
   
   suitFactorDict = {}
-  suitFactorDict[1] = [1, 2, 4, 5]
+  suitFactorDict[1] = [1, 6, 4, 5]
   return suitFactorDict
 
 def getWeightDict():
@@ -103,6 +107,7 @@ def getVariableSuperDict():
   variableDict1[1] = [500, 0.7]
   variableDict1[2] = [0.3]
   variableDict1[4] = {4:1, 99:0.5}
+  variableDict1[6] = [1]
   variableSuperDict[1] = variableDict1
   return variableSuperDict
 
@@ -118,7 +123,7 @@ def getNoGoLanduseTypes():
 def getYieldMapName(typeNr):
   """Return the name of the yield map for this land use type (mandatory)."""
   yieldMapNameDict = {}
-  yieldMapNameDict[6] = 'input_data/onemask'
+  yieldMapNameDict[1] = 'input_data/onemask'
 
   needed = yieldMapNameDict.get(typeNr)
   return needed

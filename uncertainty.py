@@ -86,10 +86,7 @@ def getWeights2(suitFactorsPerLUType):
       
     sumWeights = float(sum(weights))
 ##    print sumWeights
-    if sum(weights) != 1.0: print 'ERROR', sum(weights)
-      # Below the final weight list for a land use type
-      # Shuffle is necessary so that the last one isn't always dependent
-##      print "HEREEEEEEEEEEE", slope_weight
+##    if sum(weights) != 1.0: print 'ERROR', sum(weights)
     weightDict[aType] = weights
   print weightDict
   return weightDict

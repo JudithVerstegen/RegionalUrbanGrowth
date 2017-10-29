@@ -34,7 +34,8 @@ realizations = 20
 # window size as a factor of the cell size
 corr_window_size = 50
 omission = 10#52
-##commission = 20#58
+names = ['nr', 'ls']
+cov_corr_name = 'nrl'
 
 #################
 ### functions ###
@@ -266,27 +267,21 @@ for i in range(1, realizations + 1):
                                          str(i) + '/urb', year[1]))
         print year[0], float(maptotal(scalar(new_map)))
         listOfSumStats = covarMatrix.calculateSumStats(new_map, \
-                                                        ['av', 'nr', 'ls'],\
+                                                        names,\
                                                         zones)
-        observedAverageMap = listOfSumStats[0]
-        observedNumberMap = listOfSumStats[1] 
-        observedPatchMap = listOfSumStats[2]
-        
-        report(observedAverageMap, \
-               generateNameT(os.path.join(base, str(i), 'av'), \
-                             year[1]))
-        report(observedNumberMap, \
-               generateNameT(os.path.join(base, str(i), 'nr'), \
-                             year[1]))
-        report(observedPatchMap, \
-               generateNameT(os.path.join(base, str(i), 'ls'), \
-                             year[1]))
+
+        j=0
+        for aname in names:
+            observedmap = listOfSumStats[j]
+            report(observedmap, \
+               generateNameT(os.path.join(base, str(i), aname), \
+                            year[1]))
+            j+=1
         prev = amap
         
         
 # 8. covar matrices
-names = ['nr']
-samplelocs =  ['input_data/sampPoint.col']
+samplelocs =  ['input_data/sampPoint.col', 'input_data/sampPointNr.col']
 sample_nrs =range(1, realizations+1, 1)
 time_st = [10, 16] # for calibration, so not 0 (init) and 22 (val)!
 textfile = open('input_data/sampPoint.col', 'r')
@@ -296,7 +291,8 @@ newTextfile.write(aline)
 textfile.close()
 newTextfile.close()
 covarMatrix.mcCovarMatrix(names,sample_nrs, time_st,\
-                          samplelocs, 'cov_nrz','cor_nrz', base)
+                          samplelocs, 'cov_' + cov_corr_name,
+                          'cor_' + cov_corr_name, base)
 
 
 print mins

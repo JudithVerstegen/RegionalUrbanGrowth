@@ -104,7 +104,7 @@ class LandUseType:
     a = variableList[0]
     normalized = self.normalizeMap(spreadMap)
     roadSuitability = 1 - (normalized ** a)  
-    report(roadSuitability, 'roadSuit' + str(self.typeNr))
+    ##report(roadSuitability, 'roadSuit' + str(self.typeNr))
     return roadSuitability
 
   ## 3
@@ -140,8 +140,24 @@ class LandUseType:
     randomSuitability = self.normalizeMap(randmap)
     return randomSuitability
 
+  ## 6
+  def getTravelTimeMadrid(self):
+    """Return suitability map based on distance to large cities."""
+    booleanSelf = pcreq(self.environment, self.typeNr)
+    clumps = clump(ifthen(booleanSelf == 1, boolean(1)))
+    sizes = areaarea(clumps)
+    madrid = cover(sizes == mapmaximum(sizes), boolean(0))
+
+    dist = spread(madrid, 0, self.friction)
+    # The usual way
+    variableList = self.variableDict.get(6)
+    a = variableList[0]
+    normalized = self.normalizeMap(dist)
+    travelSuitability = 1 - (normalized ** a)  
+    report(travelSuitability, 'travelSuit' + str(self.typeNr))
+    return travelSuitability
  
-  def createInitialSuitabilityMap(self, distRoads, yieldFrac):
+  def createInitialSuitabilityMap(self, distRoads, yieldFrac, friction):
     """Return the initial suitability map, i.e. for static factors.
 
     Given the maps:
@@ -162,6 +178,7 @@ class LandUseType:
     self.weightInitialSuitabilityMap = 0
     self.initialSuitabilityMap = spatial(scalar(0))
     self.yieldFrac = yieldFrac
+    self.friction = friction
     i = 0
     # For every number in the suitability factor list
     # that belongs to a STATIC factor
@@ -177,7 +194,10 @@ class LandUseType:
         self.initialSuitabilityMap += self.weightList[i] * \
                                       self.getYieldSuitability(yieldFrac)
         self.weightInitialSuitabilityMap += self.weightList[i]
-      elif aFactor in (1, 4, 5):
+##      elif  aFactor == 6:
+##        self.initialSuitabilityMap += self.weightList[i] * \
+##                                      self.getTravelTimeMadrid()
+      elif aFactor in (1, 4, 5, 6):
         ## Dynamic factors are captured in the total suitability map
         pass
       else:
@@ -214,7 +234,9 @@ class LandUseType:
       elif aFactor == 5:
         suitabilityMap += self.weightList[i] * \
                           self.getRandomSuitability()
-      elif aFactor in (2, 3):
+      elif  aFactor == 6:
+        suitabilityMap += self.weightList[i] * self.getTravelTimeMadrid()
+      elif aFactor in (2, 3):#, 6):
         # Static factors already captured in the initial suitability map
         pass
       else:
@@ -410,23 +432,35 @@ class LandUse:
       self.landUseTypes[i].createInitialMask(self.excluded)
       i += 1
 
-  def determineDistanceToRoads(self, booleanMapRoads):
+  def determineDistanceToRoads(self, mapRoads):
     """Create map with distance to roads, given a boolean map with roads."""
-    self.distRoads = spread(booleanMapRoads, 0, 1)
+    # roads now as boolean
+    roads = pcrne(mapRoads, 0)
+    self.distRoads = spread(roads, 0, 1)
     report(self.distRoads, 'distRoads.map')
-    
     
   def loadDistanceMaps(self):
     """load the distance maps, when they cannot be kept in memory (fork)"""
 ##    print os.getcwd()
     self.distRoads = readmap('distRoads')
+    self.relativeFriction = readmap('relativeFriction')
+
+  def determineSpeedRoads(self, nominalMapRoads):
+    """Create map with relative speed on raods, using boolean map with roads."""
+    # By using the part below one can make a map of relative time to
+    # reach a hub, giving roads a lower friction
+    speed = cover(lookupscalar('speed.txt', nominalMapRoads), \
+                  self.nullMask + 5)
+    self.relativeFriction = 1.0/speed
+    report(self.relativeFriction, 'relativeFriction.map')
   
   def calculateStaticSuitabilityMaps(self, stochYieldMap):
     """Get the part of the suitability maps that remains the same."""
     for aType in self.landUseTypes:
       # Check whether the type has static suitability factors
       # Those have to be calculated only once (in initial)
-      aType.createInitialSuitabilityMap(self.distRoads, stochYieldMap)
+      aType.createInitialSuitabilityMap(self.distRoads, stochYieldMap,\
+                                        self.relativeFriction)
 
   def calculateSuitabilityMaps(self):      
     """Get the total suitability maps (static plus dynamic part)."""
@@ -472,14 +506,12 @@ class LandUseChangeModel(DynamicModel, MonteCarloModel, \
     # in that case land use should not include urban
     self.landuse = self.readmap('input_data/init_lu')
     self.initialUrb = self.landuse == 1
-    roads = self.readmap('input_data/roads')
+    self.roads = self.readmap('input_data/roads')
     self.noGoMap = cover(self.landuse == 2, boolean(self.nullMask))
     self.zones = readmap('input_data/zones')
     self.samplePoints = self.readmap('input_data/sampPoint')
     self.sumStats = parameters.getSumStats()
     self.yieldMap = scalar(self.oneMask)
-    # roads now as boolean
-    self.roads = pcrne(roads, 0)
 
     # List of landuse types in order of 'who gets to choose first'
     self.landUseList = parameters.getLandUseList()
@@ -497,6 +529,7 @@ class LandUseChangeModel(DynamicModel, MonteCarloModel, \
     
     self.preMCLandUse = LandUse(self.landUseList, self.nullMask)
     self.preMCLandUse.determineDistanceToRoads(self.roads)
+    self.preMCLandUse.determineSpeedRoads(self.roads)
 
   def initial(self):
     random.seed(self.currentSampleNumber())
@@ -513,7 +546,7 @@ class LandUseChangeModel(DynamicModel, MonteCarloModel, \
 
     # Uncertainty that is static over time different per lu types
     self.stochYieldMap = scalar(self.oneMask) #uncertainty.getYieldMap(self.yieldMap)
-    self.weightDict = uncertainty.getWeights1(self.suitFactorDict)
+    self.weightDict = uncertainty.getWeights2(self.suitFactorDict)
     ##self.variableSuperDict = uncertainty.getSuitabilityParameters(self.suitFactorDict)
     self.variableSuperDict = parameters.getVariableSuperDict()
 
@@ -596,16 +629,15 @@ class LandUseChangeModel(DynamicModel, MonteCarloModel, \
     # save the sum stats of the calibration blocks
     listOfSumStats = covarMatrix.calculateSumStats(scalar(urban), \
                                             self.sumStats, self.zones)
-    modelledAverageMap = listOfSumStats[0]
-    modelledNumber = listOfSumStats[1]
-    modelledLS = listOfSumStats[2]
-    self.report(modelledAverageMap, 'av')
-    self.report(modelledNumber, 'nr')
-    self.report(modelledLS, 'ls')
+
+    j=0
+    for aname in self.sumStats:
+        modelledmap = listOfSumStats[j]
+        self.report(modelledmap, aname)
 
     for aStat in self.sumStats:
       path = generateNameST(aStat, self.currentSampleNumber(),timeStep)
-      if aStat in ['av', 'nr']:
+      if aStat in ['nr', 'av', 'ps']:
         modelledAverageArray = covarMatrix.map2Array(path, \
                               'input_data/sampPoint.col')
       else:
@@ -671,21 +703,29 @@ class LandUseChangeModel(DynamicModel, MonteCarloModel, \
   def updateWeight(self):
     modelledData = self.readmap('urb')
     base = os.path.join('observations', 'realizations')
-    listOfSumStats = covarMatrix.calculateSumStats(modelledData, \
+    listOfModelled = covarMatrix.calculateSumStats(modelledData, \
                                                     self.sumStats, self.zones)
-    modelledAverageMap = listOfSumStats[0]
-##    report(modelledAverageMap, 'test1')
-    modelledNumber = listOfSumStats[1]
-    modelledPatchMap = listOfSumStats[2]
+   
+    
+    # Read observed sum stats from file
+    listDiff= []
+    j = 0
+    for aname in self.sumStats: 
+      observedMap = self.readDeterministic(os.path.join(base, aname + '-ave'))
+      diff = observedMap - listOfModelled[j]
+      report(diff, 'test')
+      if aname in ['nr', 'av', 'ps']:
+        points = covarMatrix.map2Array('test', \
+                            'input_data/sampPoint.col')
+      else:
+        points = covarMatrix.map2Array('test', \
+                            'input_data/sampPointNr.col')
+      listDiff.append(points)
+      j += 1
 
     # Be aware, without covar matrix has not been tested anymore since long!
+    # TO CHECK
     if parameters.getCovarOn() == 0:
-      # Read sum stats from file
-      observedAverageMap = self.readDeterministic(os.path.join(base, 'av-ave'))
-      observedNumberMap = self.readDeterministic(os.path.join(base, 'nr-ave'))
-      observedPatchMap = self.readDeterministic(os.path.join(base, 'ls-ave'))
-
-      # TO CHECK
       observedAveragePoints = ifthen(self.samplePoints, observedAverageMap)
 
       observedStdDevPoints1 = ifthenelse(observedAveragePoints > 0, \
@@ -702,39 +742,19 @@ class LandUseChangeModel(DynamicModel, MonteCarloModel, \
           'WEIGHT is', weightFloatingPoint
     
     else:
-      # Read sum stats from file
-      observedAverageMap = self.readDeterministic(os.path.join(base, 'av-ave'))
-      observedNumberMap = self.readDeterministic(os.path.join(base, 'nr-ave'))
-      observedPatchMap = self.readDeterministic(os.path.join(base, 'ls-ave'))      
-
       # Here selection
-      path = os.path.join(base, generateNameT('cov_nrz', self.currentTimeStep()))
+      path = os.path.join(base, generateNameT(parameters.getCovarName(), \
+                                              self.currentTimeStep()))
       covarObsErr = numpy.loadtxt(path)
-##      print covarObsErr * 100
 ##      print covarObsErr.shape[0]
 ##      print covarObsErr.shape[1]
       b = np.matrix(covarObsErr*1).I
       inverseCovar = np.array(b)
-      
-      # Difference observations and model output
-      obsMinusModel1 = observedAverageMap - modelledAverageMap
-      report(obsMinusModel1, 'test')
-      matrix1 = covarMatrix.map2Array('test', os.path.join('input_data', \
-                                                           'sampPoint.col'))
 
-      obsMinusModel2 = observedNumberMap - modelledNumber
-      report(obsMinusModel2, 'test')
-      matrix2 = covarMatrix.map2Array('test', os.path.join('input_data', \
-                                                           'sampPoint.col'))
-      
-      obsMinusModel3 = observedPatchMap - modelledPatchMap
-      report(obsMinusModel3, 'test')
-      matrix3 = covarMatrix.map2Array('test', os.path.join('input_data', \
-                                                           'sampPointNr.col'))
-
-      ##obsMinusModel = numpy.append(matrix1, matrix2)
-      ##obsMinusModel = numpy.append(obsMinusModel, matrix3)
-      obsMinusModel = matrix2
+      obsMinusModel = listDiff[0]
+      if len(listDiff) != 1:
+        for i in listDiff[1:]:
+          obsMinusModel = numpy.append(obsMinusModel, i) 
       
       print obsMinusModel
       firstTerm = numpy.dot(obsMinusModel.T, inverseCovar)

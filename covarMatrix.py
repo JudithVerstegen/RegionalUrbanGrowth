@@ -136,7 +136,8 @@ def calculateSumStats(systemState, listOfSumStats, zones, validation=False):
       patchSizes = areaarea(clumps)/parameters.getConversionUnit()
       oneCellPerPatch = pcreq(areamaximum(unique, clumps), unique)
       patchSizeOneCell = ifthen(oneCellPerPatch, patchSizes)
-      averagePatchSize = maptotal(patchSizeOneCell)/numberMap
+      ##averagePatchSize = maptotal(patchSizeOneCell)/numberMap
+      averagePatchSize = areaaverage(patchSizeOneCell, zones)
       listOfMaps.append(averagePatchSize)
     elif aStat == 'ls':
       scNegative = ifthenelse(boolean(systemState) == 1, boolean(0), boolean(1))
