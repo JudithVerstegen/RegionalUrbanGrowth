@@ -3,7 +3,7 @@ Judith Verstegen, 2017-10-16
 
 """
 import random
-random.seed(10)
+random.seed(12)
 import math
 from pcraster import *
 from pcraster.framework import *
@@ -679,6 +679,9 @@ class LandUseChangeModel(DynamicModel, MonteCarloModel, \
       
   def postmcloop(self):
     print '\nrunning postmcloop...'
+    print '...saving data to results folder...'
+    command = "python transform_save_data.py"
+    os.system(command)
     if int(self.nrSamples()) > 1:
       print '...calculating weights...'
       command = "python output_figs.py"
@@ -863,5 +866,5 @@ mcModel = MonteCarloFramework(dynamicModel, nrOfSamples)
 ##mcModel.run()
 pfModel = SequentialImportanceResamplingFramework(mcModel)
 ##pfModel = ResidualResamplingFramework(mcModel)
-pfModel.setFilterTimesteps([10,16]) # 10, 16, maybe 22 (=2000, 2006 & 2012)
+pfModel.setFilterTimesteps([10]) # 10, 16, maybe 22 (=2000, 2006 & 2012)
 pfModel.run()
