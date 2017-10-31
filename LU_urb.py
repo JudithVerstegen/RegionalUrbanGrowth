@@ -686,16 +686,16 @@ class LandUseChangeModel(DynamicModel, MonteCarloModel, \
       print '...calculating weights...'
       command = "python output_figs.py"
       os.system(command)
-##      print '...calculating fragstats...'			
-##      command = "python postloop_frst.py"
-##      os.system(command)
+      print '...calculating fragstats...'			
+      command = "python plotFragstats.py"
+      os.system(command)
 ##      command = "python postloop_frst_val.py"
 ##      os.system(command)
       # Stochastic variables for which mean, var and percentiles are needed
       print '...calculating statistics...'
       names = ['urb']
       sampleNumbers = self.sampleNumbers()
-      timeSteps = range(1, nrOfTimeSteps)
+      timeSteps = range(1, nrOfTimeSteps + 1)
       percentiles = [0.0, 0.05, 0.1, 0.3, 0.5, 0.7, 0.9, 0.95, 1.0]
       mcaveragevariance.mcaveragevariance(names, sampleNumbers, timeSteps)
 ##      names = ['ps']
