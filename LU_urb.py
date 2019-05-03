@@ -1,5 +1,5 @@
-"""Land use change model of Brazil
-Judith Verstegen, 2017-10-16
+"""Urban growth model
+Judith Verstegen, 2019-05-03
 
 """
 import random
@@ -11,7 +11,7 @@ setrandomseed(10)
 import parameters
 import uncertainty
 import pickle 
-import covarMatrix
+import metrics
 import numpy as np
 np.random.seed(10)
 import mcaveragevariance
@@ -201,10 +201,10 @@ class LandUseType:
         ## Dynamic factors are captured in the total suitability map
         pass
       else:
-        print 'ERROR: unknown suitability factor for landuse', self.typeNr
+        print('ERROR: unknown suitability factor for landuse', self.typeNr)
       i += 1
-    print 'weight of initial factors of', self.typeNr, \
-          'is', self.weightInitialSuitabilityMap
+    print('weight of initial factors of', self.typeNr, \
+          'is', self.weightInitialSuitabilityMap)
     self.initialSuitabilityMap += self.noise
 ##    report(self.initialSuitabilityMap, 'iniSuit' + str(self.typeNr))
 
@@ -240,7 +240,7 @@ class LandUseType:
         # Static factors already captured in the initial suitability map
         pass
       else:
-        print 'ERROR: unknown suitability factor for landuse', self.typeNr
+        print('ERROR: unknown suitability factor for landuse', self.typeNr)
       i += 1
     suitabilityMap += self.weightInitialSuitabilityMap * \
                       self.initialSuitabilityMap
@@ -273,17 +273,16 @@ class LandUseType:
     self.demand = float(mapmaximum(ownDemand))
     if self.demand < 0.0:
       self.demand = float(0.0)
-    print '\nland use type', self.typeNr
-    print 'demand is:', self.demand
-    print 'total yield is:', self.totalYield
+    print('demand is:', self.demand)
+    print('current total is:', self.totalYield)
     if self.totalYield > self.demand:
-      print 'remove'
+      print('remove')
       self.remove()
     elif self.totalYield < self.demand:
-      print 'add'
+      print('add')
       self.add(immutables)
     else:
-      print 'do nothing'
+      print('do nothing')
     newImmutables = ifthenelse(self.environment == self.typeNr, boolean(1),\
                                immutables)
     return self.environment, newImmutables
@@ -298,7 +297,7 @@ class LandUseType:
                                       self.totalSuitabilityMap)
     # Determine maximum suitability and allocate new cells there
     mapMax = mapmaximum(self.totalSuitabilityMap)
-    print 'start mapMax =', float(mapMax)
+    print('start mapMax =', float(mapMax))
     ordered = order(self.totalSuitabilityMap)
     maxIndex = int(mapmaximum(ordered))
     diff = float(self.demand - self.totalYield)
@@ -307,9 +306,9 @@ class LandUseType:
     i = 0
     tempEnv = self.environment
     while diff > 0 and xPrev > x:
-      print 'cells to add', int(maxIndex - x)
+      print('cells to add', int(maxIndex - x))
       if x < 0:
-        print 'No space left for land use', self.typeNr
+        print('No space left for land use', self.typeNr)
         break
       else:
         # The key: cells with maximum suitability are turned into THIS type
@@ -324,7 +323,7 @@ class LandUseType:
         diff = float(self.demand - self.totalYield)
         x -= int(diff / self.maxYield)
     self.setEnvironment(tempEnv)
-    print 'iterations', i, 'end yield is', self.totalYield
+    print('iterations', i, 'end yield is', self.totalYield)
 
   def remove(self):
     """Remove cells of this land use type until demand is fullfilled."""
@@ -333,14 +332,14 @@ class LandUseType:
                                       self.totalSuitabilityMap)
     ordered = order(self.totalSuitabilityMap)
     mapMin = mapminimum(self.totalSuitabilityMap)
-    print 'start mapMin =', float(mapMin)
+    print('start mapMin =', float(mapMin))
     diff = float(self.totalYield - self.demand)
     x = int(diff / (self.maxYield * 0.8))
     xPrev = 0
     i = 0
     tempEnv = self.environment
     while diff > 0 and xPrev < x and i < 100:
-      print 'cells to remove', x
+      print('cells to remove', x)
       # The key: cells with minimum suitability are turned into 'abandoned'
       tempEnvironment = ifthen(ordered < x, nominal(99))
       tempEnv = cover(tempEnvironment, self.environment)
@@ -351,14 +350,14 @@ class LandUseType:
       xPrev = x
       diff = float(self.totalYield - self.demand)
       if math.fmod(i, 40) == 0:
-        print 'NOT getting there...'
+        print('NOT getting there...')
         # Number of cells to be allocated
         x = 2 * (x + int(diff / self.maxYield))      
       else:
         # Number of cells to be allocated
         x += int(diff / self.maxYield)
     self.setEnvironment(tempEnv)
-    print 'iterations', i, 'end yield is', self.totalYield
+    print('iterations', i, 'end yield is', self.totalYield)
 ##    report(self.environment, 'newEnv' + str(self.typeNr))
 
 
@@ -369,7 +368,7 @@ class LandUse:
     """Construct a land use object with a nr of types and an environment."""
     self.types = types
     self.nrOfTypes = len(types)
-    print '\nnr of dynamic land use types is:', self.nrOfTypes
+    print('\nnr of dynamic land use types is:', self.nrOfTypes)
 ##    self.environment = environment
     # Map with 0 in study area and No Data outside, used for cover() functions
     self.nullMask = nullMask
@@ -566,16 +565,13 @@ class LandUseChangeModel(DynamicModel, MonteCarloModel, \
     # Draw random numbers between zero and one
     # To determine yield and demand
     self.demandStoch = round(float(mapuniform()),2)
-    print 'FRACTION DEMAND IS',self.demandStoch,'\n'
+    print('FRACTION DEMAND IS',self.demandStoch,'\n')
     self.maxYieldStoch = mapuniform()
     self.bioMaxYieldStoch = mapuniform()
 
   def dynamic(self):
     timeStep = self.currentTimeStep()
-    print '\ntime step', timeStep
-    
-    # NEW: report the state of the previous time step
-    sugarCane = pcreq(self.environment, 6)
+    print('\ntime step', timeStep)
     
     # Get max yield and demand per land use type
     # But for urban we don't use it now (perhaps later with pop), so 1
@@ -594,40 +590,12 @@ class LandUseChangeModel(DynamicModel, MonteCarloModel, \
     self.landUse.allocate(maxYield, demand)
     self.environment = self.landUse.getEnvironment()
 
-    # reporitings
-##    self.report(self.environment, 'landUse')
-##    os.system('legend --clone landuse.map -f \"legendLU.txt\" %s ' \
-##              %generateNameST('landUse', self.currentSampleNumber(),timeStep))
+    # reportings
     urban = pcreq(self.environment, 1)
     self.report(urban, 'urb')
-
-    # Objects with pickle or marshal
-    name1 = 'weights' + str(timeStep) + '.obj'
-    path1 = os.path.join(str(self.currentSampleNumber()), name1)
-    file_object1 = open(path1, 'w')
-    pickle.dump(self.weightDict, file_object1)
-    file_object1.close()
-
-    name2 = 'superDict' + str(timeStep) + '.obj'
-    path2 = os.path.join(str(self.currentSampleNumber()), name2)
-    file_object2 = open(path2, 'w')
-    pickle.dump(self.variableSuperDict, file_object2)
-    file_object2.close()
-
-    name3 = 'demandStoch' + str(timeStep) + '.obj'
-    path3 = os.path.join(str(self.currentSampleNumber()), name3)
-    file_object3 = open(path3, 'w')
-    pickle.dump(self.demandStoch, file_object3)
-    file_object3.close()
-
-    name4 = 'number' + str(timeStep) + '.obj'
-    path4 = os.path.join(str(self.currentSampleNumber()), name4)
-    file_object4 = open(path4, 'w')
-    pickle.dump(self.uniqueNumber, file_object4)
-    file_object4.close()
     
     # save the sum stats of the calibration blocks
-    listOfSumStats = covarMatrix.calculateSumStats(scalar(urban), \
+    listOfSumStats = metrics.calculateSumStats(scalar(urban), \
                                             self.sumStats, self.zones)
 
     j=0
@@ -638,10 +606,10 @@ class LandUseChangeModel(DynamicModel, MonteCarloModel, \
     for aStat in self.sumStats:
       path = generateNameST(aStat, self.currentSampleNumber(),timeStep)
       if aStat in ['nr', 'av', 'ps']:
-        modelledAverageArray = covarMatrix.map2Array(path, \
+        modelledAverageArray = metrics.map2Array(path, \
                               'input_data/sampPoint.col')
       else:
-        modelledAverageArray = covarMatrix.map2Array(path, \
+        modelledAverageArray = metrics.map2Array(path, \
                               'input_data/sampPointNr.col')
       name1 = aStat + str(timeStep) + '.obj'
       path1 = os.path.join(str(self.currentSampleNumber()), name1)
@@ -678,21 +646,21 @@ class LandUseChangeModel(DynamicModel, MonteCarloModel, \
 ##      os.remove(generateNameST(aStat,self.currentSampleNumber(), timeStep))
       
   def postmcloop(self):
-    print '\nrunning postmcloop...'
-    print '...saving data to results folder...'
+    print('\nrunning postmcloop...')
+    print('...saving data to results folder...')
     command = "python transform_save_data.py"
     os.system(command)
     if int(self.nrSamples()) > 1:
-      print '...calculating weights...'
+      print('...calculating weights...')
       command = "python output_figs.py"
       os.system(command)
-      print '...calculating fragstats...'			
+      print('...calculating fragstats...')		
       command = "python plotFragstats.py"
       os.system(command)
 ##      command = "python postloop_frst_val.py"
 ##      os.system(command)
       # Stochastic variables for which mean, var and percentiles are needed
-      print '...calculating statistics...'
+      print('...calculating statistics...')
       names = ['urb']
       sampleNumbers = self.sampleNumbers()
       timeSteps = range(1, nrOfTimeSteps + 1)
@@ -700,162 +668,8 @@ class LandUseChangeModel(DynamicModel, MonteCarloModel, \
       mcaveragevariance.mcaveragevariance(names, sampleNumbers, timeSteps)
 ##      names = ['ps']
 ##      mcpercentiles(names, percentiles, sampleNumbers, timeSteps)
-    print '\n...done'
-
-    
-  def updateWeight(self):
-    modelledData = self.readmap('urb')
-    base = os.path.join('observations', 'realizations')
-    listOfModelled = covarMatrix.calculateSumStats(modelledData, \
-                                                    self.sumStats, self.zones)
-   
-    
-    # Read observed sum stats from file
-    listDiff= []
-    j = 0
-    for aname in self.sumStats: 
-      observedMap = self.readDeterministic(os.path.join(base, aname + '-ave'))
-      diff = observedMap - listOfModelled[j]
-      report(diff, 'test')
-      if aname in ['nr', 'av', 'ps']:
-        points = covarMatrix.map2Array('test', \
-                            'input_data/sampPoint.col')
-      else:
-        points = covarMatrix.map2Array('test', \
-                            'input_data/sampPointNr.col')
-      listDiff.append(points)
-      j += 1
-
-    # Be aware, without covar matrix has not been tested anymore since long!
-    # TO CHECK
-    if parameters.getCovarOn() == 0:
-      observedAveragePoints = ifthen(self.samplePoints, observedAverageMap)
-
-      observedStdDevPoints1 = ifthenelse(observedAveragePoints > 0, \
-                                      observedAveragePoints * scalar(0.6), 0.1)
-#     self.report(observedStdDevPoints, 'sd')
-      total1 = maptotal(((observedAveragePoints - modelledAveragePoints)\
-                      ** 2) / (2.0 * (observedStdDevPoints1 ** 2)))
-        
-      # How to combine the two measures here?
-      # Can they cancel each other out now (should not)
-      weight = exp(0.0 - (total1))
-      weightFloatingPoint, valid = cellvalue(weight, 1, 1)
-      print 'TOTAL is', float(total1), float(total2), \
-          'WEIGHT is', weightFloatingPoint
-    
-    else:
-      # Here selection
-      path = os.path.join(base, generateNameT(parameters.getCovarName(), \
-                                              self.currentTimeStep()))
-      covarObsErr = numpy.loadtxt(path)
-##      print covarObsErr.shape[0]
-##      print covarObsErr.shape[1]
-      b = np.matrix(covarObsErr*1).I
-      inverseCovar = np.array(b)
-
-      obsMinusModel = listDiff[0]
-      if len(listDiff) != 1:
-        for i in listDiff[1:]:
-          obsMinusModel = numpy.append(obsMinusModel, i) 
-      
-      print obsMinusModel
-      firstTerm = numpy.dot(obsMinusModel.T, inverseCovar)
-      print firstTerm
-      total = 0.0 - (numpy.dot(firstTerm, obsMinusModel) / 2.0)
-
-      # HERE
-      total = total
-
-      weight = exp(total)
-      weightFloatingPoint, valid = cellvalue(weight, 1, 1)
-      if math.isinf(weightFloatingPoint):
-        print 'inf'
-        weightFloatingPoint = 0.0
-
-      print 'TOTAL is', float(total), \
-           'WEIGHT is', weightFloatingPoint
-      
-    
-    return weightFloatingPoint
-
-  def suspend(self):
-    print 'SUSPEND', str(self.currentSampleNumber()), '\n'
-    # Maps
-    self.reportState(self.environment, 'env')
-    
-    # Objects with pickle or marshal
-    path1 = os.path.join(str(self.currentSampleNumber()), 'stateVar', \
-                        'weights.obj')
-    file_object1 = open(path1, 'w')
-    pickle.dump(self.weightDict, file_object1)
-    file_object1.close()
-
-    path2 = os.path.join(str(self.currentSampleNumber()), 'stateVar', \
-                        'superDict.obj')
-    file_object2 = open(path2, 'w')
-    pickle.dump(self.variableSuperDict, file_object2)
-    file_object2.close()
-
-    path3 = os.path.join(str(self.currentSampleNumber()), 'stateVar', \
-                        'demandStoch.obj')
-    file_object3 = open(path3, 'w')
-    pickle.dump(self.demandStoch, file_object3)
-    file_object3.close()
-
-    path4 = os.path.join(str(self.currentSampleNumber()), 'stateVar', \
-                        'number.obj')
-    file_object4 = open(path4, 'w')
-    pickle.dump(self.uniqueNumber, file_object4)
-    file_object4.close()
-
-  def resume(self):
-    print 'RESUME', str(self.currentSampleNumber())
-    
-    # Maps
-    self.environment = self.readState('env')
-    
-    # Objects with pickle or marshal
-    path1 = os.path.join(str(self.currentSampleNumber()), 'stateVar', \
-                        'weights.obj')
-    filehandler1 = open(path1, 'r') 
-    self.weightDict = pickle.load(filehandler1) 
-    print self.weightDict
-    filehandler1.close()
-
-    path2 = os.path.join(str(self.currentSampleNumber()), 'stateVar', \
-                        'superDict.obj')
-##    path2 = str(self.currentSampleNumber()) + '\stateVar' + '\\superDict.obj'
-    filehandler2 = open(path2, 'r') 
-    self.variableSuperDict = pickle.load(filehandler2) 
-    print self.variableSuperDict
-    filehandler2.close()
-
-    path3 = os.path.join(str(self.currentSampleNumber()), 'stateVar', \
-                        'demandStoch.obj')
-    filehandler3 = open(path3, 'r') 
-    self.demandStoch = pickle.load(filehandler3) 
-    print 'stoch demand is', self.demandStoch
-    filehandler3.close()
-
-    path4 = os.path.join(str(self.currentSampleNumber()), 'stateVar', \
-                        'number.obj')
-    filehandler4 = open(path4, 'r') 
-    self.uniqueNumber = pickle.load(filehandler4) 
-    filehandler4.close()
-   
-    # Create an object for every landuse type in the list
-    # THINK ABOUT THE NOISE, NOT STATIC IS BETTER
-    self.landUse.createLandUseTypeObjects(self.relatedTypeDict, \
-                                          self.suitFactorDict, \
-                                          self.weightDict, \
-                                          self.variableSuperDict, \
-                                          self.noise)
-    self.landUse.setEnvironment(self.environment)
-    # Static suitability factors
-    self.landUse.determineNoGoAreas(self.noGoMap, self.noGoLanduseList)
-    self.landUse.loadDistanceMaps()
-    self.landUse.calculateStaticSuitabilityMaps(self.stochYieldMap)    
+    print('\n...done')
+ 
 
 nrOfTimeSteps = parameters.getNrTimesteps()
 nrOfSamples = parameters.getNrSamples()
@@ -863,8 +677,8 @@ myModel = LandUseChangeModel()
 dynamicModel = DynamicFramework(myModel, nrOfTimeSteps)
 mcModel = MonteCarloFramework(dynamicModel, nrOfSamples)
 #mcModel.setForkSamples(True,16)
-##mcModel.run()
-pfModel = SequentialImportanceResamplingFramework(mcModel)
+mcModel.run()
+##pfModel = SequentialImportanceResamplingFramework(mcModel)
 ##pfModel = ResidualResamplingFramework(mcModel)
 pfModel.setFilterTimesteps([10]) # 10, 16, maybe 22 (=2000, 2006 & 2012)
 pfModel.run()

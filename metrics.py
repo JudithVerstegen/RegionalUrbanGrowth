@@ -25,10 +25,11 @@ def map2Array(aMap, rowColFile):
   array = numpy.zeros(len(samplePoints)).astype(numpy.float32)
   j = 0
   for point in samplePoints:
-    attributes = string.split(point)
-##      print attributes
+    attributes = point.split()
+    print(attributes)
     row = int(round(float(attributes[1])))
     col = int(round(float(attributes[0])))
+    print(row, col)
 ##    array[[0],[j]], mask[[0],[j]] = readFieldCell(aMap, row, col)
     array[j], mask[j] = readFieldCell(aMap, row, col)
     j += 1
@@ -68,7 +69,7 @@ def mySelectSArray(name, sampleNumbers, rowColFile, base=None):
       j += 1
     i += 1
 #  array = numpy.compress(mask, array)
-  print 'array', array
+  print('array', array)
   return array
 
 def selectSArrayMultipleRasters(names,sampleNumbers,rowColFiles, base=None):
@@ -83,38 +84,6 @@ def selectSArrayMultipleRasters(names,sampleNumbers,rowColFiles, base=None):
     i += 1
   c = numpy.vstack(a)
   return c
-
-def covarMatrix(names,sampleNumbers,rowColFiles,covarMatrixName, \
-                corrMatrixName, base=None):
-  dataMatrix = selectSArrayMultipleRasters(names,sampleNumbers,rowColFiles,\
-                                           base)
-  numpy.savetxt('dataMatrix',dataMatrix)
-  covarMatrix = numpy.cov(dataMatrix)
-  print 'covarMatrix', covarMatrix.shape[0]
-  corrMatrix = numpy.corrcoef(dataMatrix)
-  if base is not None:
-    covarMatrixName = os.path.join(base, covarMatrixName)
-    corrMatrixName = os.path.join(base, corrMatrixName)
-  # This part was because Derek uses only 1 obs/timestep, which makes 1x1 matrix
-  if len(names) == 0:#1:
-    covarMatrixDifferentType=numpy.array([float(covarMatrix)])
-    corrMatrixDifferentType=numpy.array([float(corrMatrix)])
-    numpy.savetxt(covarMatrixName,covarMatrixDifferentType)
-    numpy.savetxt(corrMatrixName,corrMatrixDifferentType,fmt="%3.2f")
-  else:
-    numpy.savetxt(covarMatrixName,covarMatrix)
-    numpy.savetxt(corrMatrixName,corrMatrix,fmt="%3.2f")
-
-def mcCovarMatrix(names,sampleNumbers,timeSteps,rowColFile,\
-                  covarMatrixBaseName,corrMatrixBaseName, base=None):
-  for step in timeSteps:
-    namesForTimestep=[]
-    for name in names:
-      namesForTimestep.append(generateNameT(name,step)) 
-    covarMatrixName=generateNameT(covarMatrixBaseName,step)
-    corrMatrixName=generateNameT(corrMatrixBaseName,step)
-    covarMatrix(namesForTimestep, sampleNumbers, rowColFile, \
-                covarMatrixName,corrMatrixName, base)
 
 def calculateSumStats(systemState, listOfSumStats, zones, validation=False):
   """Return a list of sum stat maps for the sum stat"""
@@ -152,7 +121,7 @@ def calculateSumStats(systemState, listOfSumStats, zones, validation=False):
         lsi = totalPerimeter/smallestPerimeter
       listOfMaps.append(lsi)
     else:
-      print 'ERRRRRRRRRRRROR, unknown sum stat'
+      print('ERRRRRRRRRRRROR, unknown sum stat')
   return listOfMaps
 
 def makeCalibrationMask(rowColFile, zoneMap):
@@ -176,7 +145,7 @@ def makeCalibrationMask(rowColFile, zoneMap):
   listOfIndici = range(0, length)
   selection = random.sample(listOfIndici, length/2)
   selection.sort()
-  print selection
+  print(selection)
   # make a new row col file for the blocks
   newTextfile1 = open('input_data/sampPointAvSelection.col', 'w')
   newTextfile2 = open('input_data/sampPointNrSelection.col', 'w')
