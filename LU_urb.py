@@ -561,13 +561,6 @@ class LandUseChangeModel(DynamicModel, MonteCarloModel, \
     self.landUse.loadDistanceMaps()
     self.landUse.calculateStaticSuitabilityMaps(self.stochYieldMap)
 
-          
-    # Draw random numbers between zero and one
-    # To determine yield and demand
-    self.demandStoch = round(float(mapuniform()),2)
-    print('FRACTION DEMAND IS',self.demandStoch,'\n')
-    self.maxYieldStoch = mapuniform()
-    self.bioMaxYieldStoch = mapuniform()
 
   def dynamic(self):
     timeStep = self.currentTimeStep()
@@ -576,25 +569,21 @@ class LandUseChangeModel(DynamicModel, MonteCarloModel, \
     # Get max yield and demand per land use type
     # But for urban we don't use it now (perhaps later with pop), so 1
     maxYield = 1.0
-    
-##    demandUp = timeinputscalar('demandUp.tss', self.environment)
-##    demandLow = timeinputscalar('demandLow.tss', self.environment)
-    demandAv = timeinputscalar('input_data/demand_av.tss', self.environment)
-    demandSd = spatial(scalar(0))#timeinputscalar('demand_sd.tss', self.environment)
-    demand = demandAv + self.demandStoch * demandSd
+    demand = timeinputscalar('input_data/demand.tss', self.environment)
+
     
     # Suibility maps are calculated
     self.landUse.calculateSuitabilityMaps()
 
-    # Allocate new land use using demands of current time step
+    # Allocate urban land use using demands of current time step
     self.landUse.allocate(maxYield, demand)
     self.environment = self.landUse.getEnvironment()
 
-    # reportings
+    # save the map of urban / non-urban
     urban = pcreq(self.environment, 1)
     self.report(urban, 'urb')
     
-    # save the sum stats of the calibration blocks
+    # save the metrics
     listOfSumStats = metrics.calculateSumStats(scalar(urban), \
                                             self.sumStats, self.zones)
 
@@ -606,54 +595,28 @@ class LandUseChangeModel(DynamicModel, MonteCarloModel, \
     for aStat in self.sumStats:
       path = generateNameST(aStat, self.currentSampleNumber(),timeStep)
       if aStat in ['nr', 'av', 'ps']:
+        # these metrics result in one value per block (here 9 blocks)
         modelledAverageArray = metrics.map2Array(path, \
                               'input_data/sampPoint.col')
       else:
+        # other metrics result in one value for the whole study area
         modelledAverageArray = metrics.map2Array(path, \
                               'input_data/sampPointNr.col')
+      # metric is saved as a list
       name1 = aStat + str(timeStep) + '.obj'
       path1 = os.path.join(str(self.currentSampleNumber()), name1)
       file_object1 = open(path1, 'wb')
       pickle.dump(modelledAverageArray, file_object1)
       file_object1.close()
+      # the map with the metric is removed to save disk space
       os.remove(generateNameST(aStat,self.currentSampleNumber(), timeStep))
 
-##    # save the sumstats of the validation blocks
-##    listOfSumStats = covarMatrix.calculateSumStats(scalar(urban), \
-##                                          self.sumStats, self.zones, True)
-##    modelledAverageMap = listOfSumStats[0]
-##    modelledPatchNumber = listOfSumStats[1]
-##    modelledLS = listOfSumStats[2]
-##    #aguila(modelledAverageMap)
-##    self.report(modelledAverageMap, 'av')
-##    self.report(modelledPatchNumber, 'nr')
-##    #aguila(modelledLS)
-##    self.report(modelledLS, 'ls')
-##
-##    for aStat in self.sumStats:
-##      path = generateNameST(aStat, self.currentSampleNumber(),timeStep)
-##      if aStat == 'av':
-##        modelledAverageArray = covarMatrix.map2Array(path,
-##                              'input_data/sampPoint.col')
-##      else:
-##        modelledAverageArray = covarMatrix.map2Array(path,
-##                              'input_data/sampPointNr.col')
-##      name1 = aStat + '_val' + str(timeStep) + '.obj'
-##      path1 = os.path.join(str(self.currentSampleNumber()), name1)
-##      file_object1 = open(path1, 'w')
-##      pickle.dump(modelledAverageArray, file_object1)
-##      file_object1.close()
-##      os.remove(generateNameST(aStat,self.currentSampleNumber(), timeStep))
-      
   def postmcloop(self):
     print('\nrunning postmcloop...')
     print('...saving data to results folder...')
     command = "python transform_save_data.py"
     os.system(command)
     if int(self.nrSamples()) > 1:
-      print('...calculating weights...')
-      command = "python output_figs.py"
-      os.system(command)
       print('...calculating fragstats...')		
       command = "python plotFragstats.py"
       os.system(command)
