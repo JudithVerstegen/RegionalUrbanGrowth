@@ -141,9 +141,10 @@ def omiss_commiss_map(prev, bool_map, randmap, omiss, simple_lu):
 ############
 
 # 0. clean the two directories (input_data and observations)
+# Folders input_data and observations have to exist
 files = os.listdir(os.path.join(os.getcwd(), 'input_data'))
 for f in files:
-    if f not in ['make_demand_manual.xlsx', 'demand_av.tss']:
+    if f not in ['make_demand_manual.xlsx', 'demand.tss']:
         os.remove(os.path.join(os.getcwd(), 'input_data', f))
 files = os.listdir(os.path.join(os.getcwd(), 'observations'))
 for f in files:

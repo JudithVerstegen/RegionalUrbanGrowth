@@ -2,7 +2,7 @@
 import pickle
 #from collections import deque
 import os
-import covarMatrix
+import metrics
 import numpy as np
 import parameters
 from pcraster.framework import *
@@ -29,10 +29,10 @@ def openPickledSamplesAndTimestepsAsNumpyArray(basename,samples,timesteps, \
         name = generateNameT(basename, timestep)
         fileName = os.path.join('observations', 'realizations', \
                                 str(sample), name)
-        data = covarMatrix.map2Array(fileName, 'input_data/sampPoint.col')
+        data = metrics.map2Array(fileName, 'input_data/sampPoint.col')
       else:
         fileName = os.path.join(str(sample), basename + str(timestep) + '.obj')
-        filehandler = open(fileName, 'r') 
+        filehandler = open(fileName, 'rb') 
         data=pickle.load(filehandler)
         # if it is a dictionary, get the sugar cane parameters (lu type 6)
         if type(data) == dict:
@@ -62,9 +62,9 @@ def saveSamplesAndTimestepsAsNumpyArray(basename, samples, timesteps, \
 
 ##########
 
-# now save all outputs of the São Paulo model as one array per variable
+# now save all outputs of the model as one array per variable
 # so that we can delete all number folders
-variables = ['nr','demandStoch','number','superDict','weights']
+variables = ['nr']
 for aVariable in variables:
   saveSamplesAndTimestepsAsNumpyArray(aVariable, sampleNumbers, \
                                       timeSteps)
