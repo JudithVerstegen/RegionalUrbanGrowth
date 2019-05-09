@@ -1,13 +1,13 @@
 '''
-Judith Verstegen, October 2017
+Judith Verstegen, May 2019
 
 This script takes 1) Corine data ('90, '00, '06 and '12) and
 2) a map of roads to create all datasets necessary
-to run and calibrate PLUC as an urban growth model.
+to generate inputs and calibration data for an urban growth model.
 
 '''
 
-import gdal
+import gdal # version 2.3.3 for Python 3.6
 import numpy as np
 import os
 import osr
@@ -62,12 +62,12 @@ def clip(rast, coords):
     gt = rast.GetGeoTransform()
     ul_x, ul_y = world2pixel(gt, coords[0], coords[3])
     lr_x, lr_y = world2pixel(gt, coords[2], coords[1])
-    print 'column numbers are', ul_x, ul_y, lr_x, lr_y
+    print('column numbers are', ul_x, ul_y, lr_x, lr_y)
     # calculate how many rows and columns the ranges cover
     out_columns = lr_x - ul_x
     # y indices increase from top to bottom!!
     out_rows = lr_y - ul_y
-    print 'output raster extent:', out_columns, out_rows
+    print('output raster extent:', out_columns, out_rows)
     # Get data from the source raster and write to the new one
     in_band = rast.GetRasterBand(1)
     data = in_band.ReadAsArray(ul_x, ul_y, out_columns, out_rows)
@@ -80,10 +80,10 @@ def clip_and_convert(in_fn, coords, nodata):
     geotransform = rast_data_source.GetGeoTransform()
     width = geotransform[1]
     height = geotransform[5]
-    print 'Cell size:', width, height
+    print('Cell size:', width, height)
     origin_x = geotransform[0]
     origin_y = geotransform[3]
-    print 'x, y:', origin_x, origin_y
+    print('x, y:', origin_x, origin_y)
     data = clip(rast_data_source, coords)
     themap = numpy2pcr(Nominal, data, nodata)
     ##print data
@@ -163,14 +163,14 @@ for a_name in os.listdir(corine_dir):
                                  + '.tif')
         else:
             in_fn = os.path.join(corine_dir, a_name, a_name + '.tif')
-        print in_fn
+        print(in_fn)
         setclone('clone')
         lu = clip_and_convert(in_fn, coords, 48)
         report(lu, 'observations/' + a_name[5:10] + '.map')
 
         # 2. urban map
         urban = select_urban(lu)
-        print a_name[8:10], float(maptotal(scalar(urban)))
+        print(a_name[8:10], float(maptotal(scalar(urban))))
         report(urban, 'observations/urb' + a_name[8:10] + '.map')
         ##aguila(urban)
         
@@ -204,7 +204,7 @@ os.remove('resamp.map')
 os.remove('unique.map')
 
 # 6. blocks 
-import covarMatrix
+import metrics
 unique = uniqueid(one_mask)
 zones = readmap('input_data/zones.map')
 
@@ -230,7 +230,7 @@ avs = {}
 mins = {}
 maxs = {}
 for i in range(1, realizations + 1):
-    print i
+    print(i)
     # make directories for the realizations
     if not os.path.exists(os.path.join(os.getcwd(), 'observations', \
                                        'realizations', str(i))):
@@ -265,8 +265,8 @@ for i in range(1, realizations + 1):
         
         report(new_map, generateNameT('observations/realizations/' + \
                                          str(i) + '/urb', year[1]))
-        print year[0], float(maptotal(scalar(new_map)))
-        listOfSumStats = covarMatrix.calculateSumStats(new_map, \
+        print(year[0], float(maptotal(scalar(new_map))))
+        listOfSumStats = metrics.calculateSumStats(new_map, \
                                                         names,\
                                                         zones)
 
@@ -279,24 +279,8 @@ for i in range(1, realizations + 1):
             j+=1
         prev = amap
         
-        
-# 8. covar matrices
-samplelocs =  ['input_data/sampPoint.col', 'input_data/sampPointNr.col']
-sample_nrs =range(1, realizations+1, 1)
-time_st = [10, 16] # for calibration, so not 0 (init) and 22 (val)!
-textfile = open('input_data/sampPoint.col', 'r')
-aline = textfile.readline()
-newTextfile = open('input_data/sampPointNr.col', 'w')
-newTextfile.write(aline)
-textfile.close()
-newTextfile.close()
-covarMatrix.mcCovarMatrix(names,sample_nrs, time_st,\
-                          samplelocs, 'cov_' + cov_corr_name,
-                          'cor_' + cov_corr_name, base)
 
+print(mins)
+print(maxs)
+print(avs)
 
-print mins
-print maxs
-print avs
-# 9. postloop over realizations to calculate average fragstats
-##os.system('python observations/realizations/postl.py')
