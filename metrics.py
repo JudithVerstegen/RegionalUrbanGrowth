@@ -6,19 +6,19 @@ from pcraster import *
 from pcraster.framework import *
 import parameters
 
-def map2Array(aMap, rowColFile):
+def map2Array(filename, rowColFile):
   """Selects values at row, col from raster name in Monte Carlo samples.
 
-  name -- Name of raster.
-  sampleNumber -- Numbers of MC samples to use.
+  filename -- Name of raster.
   rowColFile -- File with row and col index of cell to read.
-  The returned array does not contain missing values so the size is maximimal
+  The returned array does not contain missing values so the size is minimal
   sampleNumbers but possibly smaller.
 
   Returned array has elements of type numpy.float32"""
   sampleFile = open(rowColFile, 'r')
   samplePoints = sampleFile.readlines()
   sampleFile.close()
+  amap = readmap(filename)
 ##  mask = numpy.zeros((1, len(samplePoints))).astype(numpy.bool_)
 ##  array = numpy.zeros((1, len(samplePoints))).astype(numpy.float32)
   mask = numpy.zeros(len(samplePoints)).astype(numpy.bool_)
@@ -26,15 +26,14 @@ def map2Array(aMap, rowColFile):
   j = 0
   for point in samplePoints:
     attributes = point.split()
-    print(attributes)
-    row = int(round(float(attributes[1])))
-    col = int(round(float(attributes[0])))
-    print(row, col)
-##    array[[0],[j]], mask[[0],[j]] = readFieldCell(aMap, row, col)
-    array[j], mask[j] = readFieldCell(aMap, row, col)
+##    print(attributes)
+    row = math.ceil(float(attributes[1]))
+    col = math.ceil(float(attributes[0]))
+##    print(row, col)
+    array[j], mask[j] = cellvalue(amap, row, col)
     j += 1
 #  array = numpy.compress(mask, array)
-#  print array
+  print(array)
   return array
 
 def mySelectSArray(name, sampleNumbers, rowColFile, base=None):
@@ -63,8 +62,8 @@ def mySelectSArray(name, sampleNumbers, rowColFile, base=None):
     j = 0
     for point in samplePoints:
       attributes = string.split(point)
-      col = int(round(float(attributes[1])))
-      row = int(round(float(attributes[0])))
+      row = math.ceil(float(attributes[1]))
+      col = math.ceil(float(attributes[0]))
       array[[j], [i]], mask[[j], [i]] = cellvalue(amap, row, col)
       j += 1
     i += 1

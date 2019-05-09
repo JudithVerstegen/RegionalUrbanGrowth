@@ -1,5 +1,5 @@
 """Urban growth model
-Judith Verstegen, 2019-05-03
+Judith Verstegen, 2019-05-09
 
 """
 import random
@@ -613,7 +613,7 @@ class LandUseChangeModel(DynamicModel, MonteCarloModel, \
                               'input_data/sampPointNr.col')
       name1 = aStat + str(timeStep) + '.obj'
       path1 = os.path.join(str(self.currentSampleNumber()), name1)
-      file_object1 = open(path1, 'w')
+      file_object1 = open(path1, 'wb')
       pickle.dump(modelledAverageArray, file_object1)
       file_object1.close()
       os.remove(generateNameST(aStat,self.currentSampleNumber(), timeStep))
@@ -678,7 +678,3 @@ dynamicModel = DynamicFramework(myModel, nrOfTimeSteps)
 mcModel = MonteCarloFramework(dynamicModel, nrOfSamples)
 #mcModel.setForkSamples(True,16)
 mcModel.run()
-##pfModel = SequentialImportanceResamplingFramework(mcModel)
-##pfModel = ResidualResamplingFramework(mcModel)
-pfModel.setFilterTimesteps([10]) # 10, 16, maybe 22 (=2000, 2006 & 2012)
-pfModel.run()
