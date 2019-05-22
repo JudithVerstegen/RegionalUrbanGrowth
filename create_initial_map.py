@@ -27,6 +27,7 @@ data_dir = os.path.join('C:\\', 'Users', 'verstege', \
 # in ERST 1989 (Corine projection) as [x0, y0, x1, y1]
 # current: Madrid
 coords = [3127009, 1979498, 3215656, 2064791]
+##coords = [4992510,3212710,5152510,3372710]
 # zone size as a factor of the cell size
 zone_size = 300 # 100 x 100 m = 10 000 m = 10x10 km
 # for creating observations
@@ -34,12 +35,48 @@ realizations = 20
 # window size as a factor of the cell size
 corr_window_size = 50
 omission = 10#52
-names = ['nr', 'ls']
-cov_corr_name = 'nrl'
+metric_names = ['nr', 'ls']
 
 #################
 ### functions ###
 #################
+
+def getRowsCols(rast, coords):
+    """Calculate nr of rows and colums of output file"""
+    # To translate coordinates to raster indices
+    gt = rast.GetGeoTransform()
+    ul_x, ul_y = world2pixel(gt, coords[0], coords[3])
+    lr_x, lr_y = world2pixel(gt, coords[2], coords[1])
+    print('column numbers are', ul_x, ul_y, lr_x, lr_y)
+    # calculate how many rows and columns the ranges cover
+    out_columns = lr_x - ul_x
+    # y indices increase from top to bottom!!
+    out_rows = lr_y - ul_y
+    return out_rows, out_columns, ul_x, ul_y
+
+def makeclone(in_fn, coords):
+    """Uses gdal and pcraster to automatically create a clone file."""
+    # remove existing clone if present
+    if os.path.exists('./clone.map'): os.remove('./clone.map')
+    # open the raster
+    rast = gdal.Open(in_fn)
+    out_rows, out_columns, ul_x, ul_y = getRowsCols(rast, coords)
+    # Make the clone with the following inputs
+    # -s for not invoking the menu
+    # -R nr of rows
+    # -C nr of columns
+    # -N data type Nominal
+    # -P y coordinates increase bottom to top
+    # -x x-coordinate of upper left corner
+    # -y y-coordinate of upper left corner
+    # -l cell length, set to 100 m (same as Corine)
+    strings = ['mapattr -s', ' -R ' + str(out_rows), \
+               ' -C ' + str(out_columns), ' -N ',  '-P yb2t', \
+               ' -x ' + str(coords[0]), ' -y ' + str(coords[3]), \
+               ' -l 100 clone.map']       
+    command = "".join(strings)
+    print(command)
+    os.system(command)
 
 def world2pixel(geoMatrix, x, y):
     """
@@ -58,15 +95,7 @@ def world2pixel(geoMatrix, x, y):
 
 def clip(rast, coords):
     '''Clip an opened file and return the clipped file.'''
-    # To translate coordinates to raster indices
-    gt = rast.GetGeoTransform()
-    ul_x, ul_y = world2pixel(gt, coords[0], coords[3])
-    lr_x, lr_y = world2pixel(gt, coords[2], coords[1])
-    print('column numbers are', ul_x, ul_y, lr_x, lr_y)
-    # calculate how many rows and columns the ranges cover
-    out_columns = lr_x - ul_x
-    # y indices increase from top to bottom!!
-    out_rows = lr_y - ul_y
+    out_rows, out_columns, ul_x, ul_y = getRowsCols(rast, coords)
     print('output raster extent:', out_columns, out_rows)
     # Get data from the source raster and write to the new one
     in_band = rast.GetRasterBand(1)
@@ -151,7 +180,17 @@ for f in files:
     if not os.path.isdir(os.path.join(os.getcwd(), 'observations', f)):
         os.remove(os.path.join(os.getcwd(), 'observations', f))
 
+# create the clone map
 corine_dir = os.path.join(data_dir, 'Corine')
+names = os.listdir(corine_dir)
+# hereto we need one Corine raster. It does not matter which one
+print(os.path.join(corine_dir, names[1]))
+if os.path.isdir(os.path.join(corine_dir, names[1])):
+    print('here')
+    in_fn = os.path.join(corine_dir, names[1], names[1] + '.tif')
+    makeclone(in_fn, coords)
+
+# Corine maps
 for a_name in os.listdir(corine_dir):
     # Corine maps are tiffs in folders with same name
     # Except when there is an 'a' behind the version
@@ -268,11 +307,11 @@ for i in range(1, realizations + 1):
                                          str(i) + '/urb', year[1]))
         print(year[0], float(maptotal(scalar(new_map))))
         listOfSumStats = metrics.calculateSumStats(new_map, \
-                                                        names,\
+                                                        metric_names,\
                                                         zones)
 
         j=0
-        for aname in names:
+        for aname in metric_names:
             observedmap = listOfSumStats[j]
             report(observedmap, \
                generateNameT(os.path.join(base, str(i), aname), \
