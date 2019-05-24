@@ -16,13 +16,17 @@ from pcraster.framework import *
 from matplotlib import pyplot as plt
 
 
+
 ##############
 ### inputs ###
 ##############
 
 # Directory of Corine land use maps
-data_dir = os.path.join('C:\\', 'Users', 'verstege', \
-'Documents', 'data')
+#data_dir = os.path.join('C:\\', 'Users', 'verstege', \
+#'Documents', 'data')
+data_dir = os.path.join('D:\\', 'Nauka', 'Geobazy', \
+'CORINE', 'Student_Assistant_Judith', 'from_Judith', 'RegionalUrbanGrowth-bruteforce', 'data')
+
 # Coordinates of case study region
 # in ERST 1989 (Corine projection) as [x0, y0, x1, y1]
 # current: Madrid
@@ -119,25 +123,22 @@ def clip_and_convert(in_fn, coords, nodata):
     return themap
 
 def select_urban(land_use):
-    '''Create a Boolean map of all urban land uses from Corine.'''
-    urban = pcrand(scalar(land_use) < 12, pcrnot(scalar(land_use) == 4))
-    return urban
+    '''Create a Boolean map of all urban land uses from Corine.Without 122 (roads) and 124 (airports)'''
+    urban = pcrand(scalar(land_use) < 200, pcrand(pcrnot(scalar(land_use) == 122), pcrnot(scalar(land_use) == 124)))
 
 def simplify_lu_map(amap):
     '''Change Corine map with many classes into simple land use map.'''
     # 1 = urban
     urban = select_urban(amap)
     landuse = nominal(urban)
-    # 2 = water, wetlands, AND ROADS
-    water = pcror(pcror(pcrand(scalar(amap) > 34, scalar(amap) < 48),\
-                  scalar(amap) == 50), scalar(amap) == 4)
+    # 2 = water AND ROADS
+    water = pcror(pcror(pcrand(scalar(amap) > 500, scalar(amap) < 900), scalar(amap) == 122), scalar(amap) == 124)
     landuse = ifthenelse(water, nominal(2), landuse)
     # 3 = nature
-    nature = pcror(pcrand(scalar(amap) > 22, scalar(amap) < 35),\
-                  scalar(amap) == 49)
+    nature = pcrand(scalar(amap) > 300, scalar(amap) < 500)
     landuse = ifthenelse(nature, nominal(3), landuse)
     # 4 = agriculture
-    ag = pcrand(scalar(amap) > 11, scalar(amap) < 23)
+    ag = pcrand(scalar(amap) > 200, scalar(amap) < 300)
     landuse = ifthenelse(ag, nominal(4), landuse)
     return landuse
 
@@ -164,6 +165,8 @@ def omiss_commiss_map(prev, bool_map, randmap, omiss, simple_lu):
 
     ##new_map = pcrand(pcrnot(to_remove), pcror(bool_map, to_add))
     return to_remove, to_add
+
+
 
 ############
 ### main ###
@@ -196,6 +199,7 @@ for a_name in os.listdir(corine_dir):
     # Except when there is an 'a' behind the version
     if os.path.isdir(os.path.join(corine_dir, a_name)):
         # functions to execute
+
         # 1. open, clip and convert
         # Path to the old and new raster file
         if a_name[-1] == 'a':
@@ -205,24 +209,23 @@ for a_name in os.listdir(corine_dir):
             in_fn = os.path.join(corine_dir, a_name, a_name + '.tif')
         print(in_fn)
         setclone('clone')
-        lu = clip_and_convert(in_fn, coords, 48)
-        report(lu, 'observations/' + a_name[5:10] + '.map')
+        lu = clip_and_convert(in_fn, coords, 999)
+        report(lu, 'observations/' + a_name[13:15] + '.map')
 
         # 2. urban map
         urban = select_urban(lu)
-        print(a_name[8:10], float(maptotal(scalar(urban))))
-        report(urban, 'observations/urb' + a_name[8:10] + '.map')
-        ##aguila(urban)
+        print a_name[13:15], float(maptotal(scalar(urban)))
+        report(urban, 'observations/urb' + a_name[13:15] + '.map')
         
         # 3. make simpler initial land use map only for 1990
-        if a_name[8:10] == '90':
+        if a_name[13:15] == '90':
             simple_lu = simplify_lu_map(lu)
             report(simple_lu, 'input_data/init_lu.map')
-            #aguila(simple_lu)
         
 # 4. road map outside loop
+# Reproject the input vector data using the raster as the reference layer
 road_dir = os.path.join(data_dir, 'roads')
-in_fn = os.path.join(road_dir, 'roads_spain.tif')
+in_fn = os.path.join(road_dir, 'roads_raster.tif')
 roads = clip_and_convert(in_fn, coords, 255)
 nullmask = spatial(nominal(0))
 report(cover(roads, nullmask), 'input_data/roads.map')
@@ -279,7 +282,7 @@ for i in range(1, realizations + 1):
     randmap = windowaverage(uniform(1), corr_window_size * celllength())
     base = os.path.join('observations', 'realizations')
     prev = None
-    for year in [('90', 0), ('00', 10), ('06', 16), ('12', 22)]:
+    for year in [('90', 0), ('00', 10), ('06', 16), ('12', 22), ('18', 28)]:
         amap = readmap('observations/urb' + year[0] + '.map')
         # change some of the NEW urban cells, not the existing ones
         if prev is not None:
@@ -319,8 +322,8 @@ for i in range(1, realizations + 1):
             j+=1
         prev = amap
         
-
 print(mins)
 print(maxs)
 print(avs)
+
 
