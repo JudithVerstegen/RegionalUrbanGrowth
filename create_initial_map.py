@@ -22,6 +22,8 @@ from matplotlib import pyplot as plt
 ##############
 
 # Directory of Corine land use maps
+#data_dir = os.path.join('C:\\', 'Users', 'verstege', \
+#'Documents', 'data')
 data_dir = os.path.join('D:\\', 'Nauka', 'Geobazy', \
 'CORINE', 'Student_Assistant_Judith', 'from_Judith', 'RegionalUrbanGrowth-bruteforce', 'data')
 
