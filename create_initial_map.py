@@ -25,7 +25,7 @@ from matplotlib import pyplot as plt
 #data_dir = os.path.join('C:\\', 'Users', 'verstege', \
 #'Documents', 'data')
 data_dir = os.path.join('D:\\', 'Nauka', 'Geobazy', \
-'CORINE', 'Student_Assistant_Judith', 'from_Judith', 'RegionalUrbanGrowth-bruteforce', 'data')
+'CORINE', 'Student_Assistant_Judith', 'from_Judith', 'RegionalUrbanGrowth','RegionalUrbanGrowth', 'data')
 
 # Coordinates of case study region
 # in ERST 1989 (Corine projection) as [x0, y0, x1, y1]
@@ -35,11 +35,11 @@ coords = [3127009, 1979498, 3215656, 2064791]
 # zone size as a factor of the cell size
 zone_size = 300 # 100 x 100 m = 10 000 m = 10x10 km
 # for creating observations
-realizations = 20
+realizations = 10 #20
 # window size as a factor of the cell size
 corr_window_size = 50
 omission = 10#52
-metric_names = ['nr', 'ls']
+metric_names = ['np'] # parameters.getSumStats()
 
 #################
 ### functions ###
@@ -125,7 +125,9 @@ def clip_and_convert(in_fn, coords, nodata):
 def select_urban(land_use):
     '''Create a Boolean map of all urban land uses from Corine.Without 122 (roads) and 124 (airports)'''
     urban = pcrand(scalar(land_use) < 200, pcrand(pcrnot(scalar(land_use) == 122), pcrnot(scalar(land_use) == 124)))
-
+    #aguila(urban)
+    return urban
+    
 def simplify_lu_map(amap):
     '''Change Corine map with many classes into simple land use map.'''
     # 1 = urban
@@ -214,7 +216,7 @@ for a_name in os.listdir(corine_dir):
 
         # 2. urban map
         urban = select_urban(lu)
-        print a_name[13:15], float(maptotal(scalar(urban)))
+        print(a_name[13:15], float(maptotal(scalar(urban))))
         report(urban, 'observations/urb' + a_name[13:15] + '.map')
         
         # 3. make simpler initial land use map only for 1990

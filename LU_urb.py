@@ -521,7 +521,7 @@ class LandUseChangeModel(DynamicModel, MonteCarloModel, \
     self.suitFactorDict = parameters.getSuitFactorDict()
 ##    self.weightDict = Parameters.getWeightDict()
 ##    self.variableSuperDict = parameters.getVariableSuperDict()
-    self.noGoLanduseList = parameters.getNoGoLanduseTypes()
+    self.noGoLanduseList = parameters.getNoGoLanduseTypes() ## Check wether is in the parameter list land use == 2
 
     # Uniform map of very small numbers, used to avoid equal suitabilities
     self.noise = uniform(1)/10000
@@ -594,7 +594,7 @@ class LandUseChangeModel(DynamicModel, MonteCarloModel, \
 
     for aStat in self.sumStats:
       path = generateNameST(aStat, self.currentSampleNumber(),timeStep)
-      if aStat in ['nr', 'av', 'ps']:
+      if aStat in ['np']:
         # these metrics result in one value per block (here 9 blocks)
         modelledAverageArray = metrics.map2Array(path, \
                               'input_data/sampPoint.col')
