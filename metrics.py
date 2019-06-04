@@ -179,3 +179,11 @@ def makeCalibrationMask(rowColFile, zoneMap):
   blocksTrue = lookupboolean('input_data/lookupTable_val.tbl', zoneMap)
   report(blocksTrue, 'input_data/zones_validation.map')
 
+# TEST
+systemState = readmap('input_data/init_lu.map') == 1 # select urban
+zones = readmap('input_data/zones.map')
+# put HERE the name(s) of the metric(s) you want to test 
+metrics = ['mp']
+listofmaps = calculateSumStats(systemState, metrics, zones)
+aguila(listofmaps[0])
+
