@@ -506,7 +506,7 @@ class LandUseChangeModel(DynamicModel, MonteCarloModel, \
     self.landuse = self.readmap('input_data/init_lu')
     self.initialUrb = self.landuse == 1
     self.roads = self.readmap('input_data/roads')
-    self.noGoMap = cover(self.landuse == 2, boolean(self.nullMask))
+    self.noGoMap = cover(self.landuse == 2, boolean(self.nullMask))  ## same as self.noGoLanduseList
     self.zones = readmap('input_data/zones')
     self.samplePoints = self.readmap('input_data/sampPoint')
     self.sumStats = parameters.getSumStats()
@@ -521,7 +521,7 @@ class LandUseChangeModel(DynamicModel, MonteCarloModel, \
     self.suitFactorDict = parameters.getSuitFactorDict()
 ##    self.weightDict = Parameters.getWeightDict()
 ##    self.variableSuperDict = parameters.getVariableSuperDict()
-    self.noGoLanduseList = parameters.getNoGoLanduseTypes() ## Check wether is in the parameter list land use == 2
+    self.noGoLanduseList = parameters.getNoGoLanduseTypes() 
 
     # Uniform map of very small numbers, used to avoid equal suitabilities
     self.noise = uniform(1)/10000
