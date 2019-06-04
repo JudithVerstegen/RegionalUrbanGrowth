@@ -94,31 +94,27 @@ def calculateSumStats(systemState, listOfSumStats, zones, validation=False):
   clumps = ifthen(boolean(systemState) == 1, clump(boolean(systemState)))
   numberMap = areadiversity(clumps, spatial(nominal(1)))
   for aStat in listOfSumStats:
-    if aStat == 'av':
-      averageMap = areaaverage(scalar(systemState), zones)
-      listOfMaps.append(averageMap)
-    elif aStat == 'nr':
-      average_nr = cover(areadiversity(clumps, zones), spatial(scalar(0)))
+    if aStat == 'np': # Number of patches 
+      average_nr = cover(areadiversity(clumps, zones), spatial(scalar(0)))  
       listOfMaps.append(average_nr)
-    elif aStat == 'ps':
-      patchSizes = areaarea(clumps)/parameters.getConversionUnit()
-      oneCellPerPatch = pcreq(areamaximum(unique, clumps), unique)
-      patchSizeOneCell = ifthen(oneCellPerPatch, patchSizes)
-      ##averagePatchSize = maptotal(patchSizeOneCell)/numberMap
-      averagePatchSize = areaaverage(patchSizeOneCell, zones)
-      listOfMaps.append(averagePatchSize)
-    elif aStat == 'ls':
+    elif aStat == 'pd': # Patch density
+      average_nr = cover(areadiversity(clumps, zones), spatial(scalar(0))) 
+      zone_area = areaarea(zones) 
+      patch_density = average_nr/zone_area
+      listOfMaps.append(patch_density)
+    elif aStat == 'mp': # Mean patch size 
+      patchSizes = areaarea(clumps)/parameters.getConversionUnit() 
+      oneCellPerPatch = pcreq(areamaximum(unique, clumps), unique) 
+      patchSizeOneCell = ifthen(oneCellPerPatch, patchSizes) 
+      averagePatchSize = areaaverage(patchSizeOneCell, zones) 
+      listOfMaps.append(averagePatchSize) 
+    elif aStat == 'fd': # Fractal dimension 
       scNegative = ifthenelse(boolean(systemState) == 1, boolean(0), boolean(1))
       borders = ifthen(boolean(systemState) == 1, \
-                       window4total(scalar(scNegative)))
-      totalPerimeter= maptotal(borders)
-      smallestPerimeter = sqrt(maptotal(scalar(systemState))) * 4
-      # non-zero number for division
-      if smallestPerimeter < 0.0001:
-        lsi = 0
-      else:
-        lsi = totalPerimeter/smallestPerimeter
-      listOfMaps.append(lsi)
+                       window4total(scalar(scNegative))) 
+      patchSizes = areaarea(clumps)/parameters.getConversionUnit()
+      fractal_dimension = 2*(ln(borders)/ln(patchSizes))
+      listOfMaps.append(fractal_dimension) 
     else:
       print('ERRRRRRRRRRRROR, unknown sum stat')
   return listOfMaps
@@ -183,20 +179,3 @@ def makeCalibrationMask(rowColFile, zoneMap):
   blocksTrue = lookupboolean('input_data/lookupTable_val.tbl', zoneMap)
   report(blocksTrue, 'input_data/zones_validation.map')
 
-### test
-###createTimeseries("jan", [1,2,3],[1,2], 1, 1,"test.pdf")
-###createTimeseriesConfInt("1/jan", "1/piet","2/jan", [1,2,3,4,5,6,7,8,9], 1, 1,"test.pdf")
-##
-  
-##setclone('input_data/nullmask.map')
-##sampleNumbers=range(3,51,1)
-##timeSteps=range(2,6,1)
-##mcCovarMatrix(['av'],sampleNumbers,timeSteps,\
-##                           'input_data/sampPoint.col',"input_data/covar",\
-##              "input_data/corr")
-##array = mySelectSArray('nr000000.002', range(1,51), \
-##                       'input_data/sampPoint.col')
-##print '\n'
-##matrix2 = map2Array('test', 'input_data/sampPoint.col')
-##zones = readmap('zones')
-##makeCalibrationMask('input_data/sampPointAv.col', zones)
