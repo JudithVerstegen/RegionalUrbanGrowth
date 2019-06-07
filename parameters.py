@@ -18,6 +18,13 @@ def getNrSamples():
   
   samples = 2
   return samples
+
+def getCountryName():
+  """ Returns the case study symbol """
+
+  name = 'PL'
+  return name
+  
   
 def getCovarOn():
   """Return 1 if filtering with covariance matrix is required."""  
