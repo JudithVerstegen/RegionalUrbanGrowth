@@ -8,7 +8,7 @@ def getNrTimesteps():
 
   e.g. 2005 to 2030 is 26 time steps."""
 
-  timesteps = 2
+  timesteps = 2 #22
   return timesteps
 
 def getNrSamples():
@@ -16,7 +16,7 @@ def getNrSamples():
 
   If Monte Carlo isn't required fill in 1; no statistics will be calculated."""
   
-  samples = 2
+  samples = 2 #100
   return samples
   
 def getCovarOn():
