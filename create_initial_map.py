@@ -12,6 +12,7 @@ import numpy as np
 import os
 import osr
 import ogr
+import parameters
 from pcraster import *
 from pcraster.framework import *
 from matplotlib import pyplot as plt
@@ -22,17 +23,14 @@ from matplotlib import pyplot as plt
 ### inputs ###
 ##############
 
-# Directory of Corine land use maps
-#data_dir = os.path.join('C:\\', 'Users', 'verstege', \
-#'Documents', 'data')
-data_dir = os.path.join(os.getcwd(), 'data')
-print('Data directory: ', data_dir)
+# Directory of Corine land use maps and other input
+data_dir = os.path.join(os.getcwd(), 'data') #os.path.join('D:\\', 'Nauka', 'Geobazy','CORINE', 'Student_Assistant_Judith', 'from_Judith', 'RegionalUrbanGrowth','RegionalUrbanGrowth', 'data')
 
 # Coordinates of case study region
 # in ERST 1989 (Corine projection) as [x0, y0, x1, y1]
-# current: Madrid
-coords = [3127009, 1979498, 3215656, 2064791]
-##coords = [4992510,3212710,5152510,3372710]
+# current: Warsaw
+coords = [4992510,3212710,5152510,3372710]
+
 # zone size as a factor of the cell size
 zone_size = 300 # 100 x 100 m = 10 000 m = 10x10 km
 # for creating observations
@@ -191,7 +189,7 @@ def reproject(in_fn, out_fn, in_rast):
     print('x, y:', originX, originY)
     
     rast_spatial_ref = rast_data_source.GetProjection()
-    print('raster spatial ref is', rast_spatial_ref)
+    #print('raster spatial ref is', rast_spatial_ref)
 
     # Get the correct driver
     driver = ogr.GetDriverByName('ESRI Shapefile')
@@ -207,7 +205,7 @@ def reproject(in_fn, out_fn, in_rast):
     layer = vect_data_source.GetLayer(0)
     # Get reference system info
     vect_spatial_ref = layer.GetSpatialRef()
-    print('vector spatial ref is', vect_spatial_ref)
+    #print('vector spatial ref is', vect_spatial_ref)
 
     # create osr object of raster spatial ref info
     sr = osr.SpatialReference(rast_spatial_ref)
@@ -223,7 +221,7 @@ def reproject(in_fn, out_fn, in_rast):
         print('Could not create %s' % (out_fn))
 
     # Create the shapefile layer WITH THE SR
-    out_lyr = out_ds.CreateLayer('roads', sr, 
+    out_lyr = out_ds.CreateLayer('reprojected', sr, 
                                  ogr.wkbLineString)
 
     out_lyr.CreateFields(layer.schema)
@@ -252,7 +250,6 @@ def rasterize(InputVector, OutputImage, RefImage):
     burnVal = 1 #value for the output image pixels
 
     # Get projection info from reference image
-    print('Get projection')
     Image = gdal.Open(RefImage, gdal.GA_ReadOnly)
 
     # Open Shapefile
@@ -285,6 +282,44 @@ def rasterize(InputVector, OutputImage, RefImage):
     subprocess.call("gdaladdo --config COMPRESS_OVERVIEW DEFLATE "+OutputImage+" 2 4 8 16 32 64", shell=True)
     print("Rasterized.")
 
+def create_filtered_shapefile(in_shapefile, country, out_dir, out_name):
+    ### Script for selecting train stations from OSM transport data.
+    ### Data was downlowaded for Ireland, Italy and Poland.
+    ### Data is in folders with names corresponding to the names of the countries
+    ### train station attributes: railway=halt and railway=station
+    
+    print('Filtering shapefile...')
+    # Get the correct driver
+    driver = ogr.GetDriverByName('ESRI Shapefile')
+    
+    # 0 means read-only. 1 means writeable.
+    data_source = driver.Open(in_shapefile,0)
+    
+    # Check to see if shapefile is found.
+    if data_source is None:
+        print('Could not open %s' % (in_path))
+    
+    # get the Layer class object
+    input_layer = data_source.GetLayer(0)
+
+    # Filter by our query
+    query_str = "fclass = 'railway_station' OR fclass = 'railway_halt'"
+    
+    # Apply a filter
+    input_layer.SetAttributeFilter(query_str)
+    
+    # Copy Filtered Layer and Output File
+    driver = ogr.GetDriverByName('ESRI Shapefile')
+    # Check if output data exists. If yes, delete.
+    if os.path.exists(os.path.join(out_dir, out_name)):
+        print('Shapefile exists, deleting')
+        os.remove(os.path.join(out_dir, out_name))
+    out_ds = driver.CreateDataSource(out_dir)
+    print('Filtered')
+    out_layer = out_ds.CopyLayer(input_layer, out_name)
+    
+    del input_layer, out_layer, out_ds
+
  
 ############
 ### main ###
@@ -292,14 +327,22 @@ def rasterize(InputVector, OutputImage, RefImage):
 
 # 0. clean the two directories (input_data and observations)
 # Folders input_data and observations have to exist
-files = os.listdir(os.path.join(os.getcwd(), 'input_data'))
+country = parameters.getCountryName()
+country_dir = os.path.join(os.getcwd(), 'input_data', str(country))
+if not os.path.isdir(country_dir):
+    os.mkdir(country_dir)
+if not os.path.isdir(os.path.join(os.getcwd(), 'observations', str(country))):
+    os.mkdir(os.path.join(os.getcwd(), 'observations', str(country)))
+
+files = os.listdir(country_dir)
 for f in files:
     if f not in ['make_demand_manual.xlsx', 'demand.tss']:
-        os.remove(os.path.join(os.getcwd(), 'input_data', f))
-files = os.listdir(os.path.join(os.getcwd(), 'observations'))
+        os.remove(os.path.join(country_dir, f))
+files = os.listdir(os.path.join(os.getcwd(), 'observations', str(country)))
 for f in files:
-    if not os.path.isdir(os.path.join(os.getcwd(), 'observations', f)):
-        os.remove(os.path.join(os.getcwd(), 'observations', f))
+    if not os.path.isdir(os.path.join(os.getcwd(), 'observations', \
+                                      str(country), f)):
+        os.remove(os.path.join(os.getcwd(), 'observations', str(country), f))
 
 # create the clone map
 corine_dir = os.path.join(data_dir, 'Corine')
@@ -312,6 +355,7 @@ if os.path.isdir(os.path.join(corine_dir, names[1])):
     makeclone(in_fn, coords)
 
 # Corine maps
+print('----------------------- Urban maps -----------------------')
 for a_name in os.listdir(corine_dir):
     # Corine maps are tiffs in folders with same name
     # Except when there is an 'a' behind the version
@@ -328,30 +372,32 @@ for a_name in os.listdir(corine_dir):
         print(in_fn)
         setclone('clone')
         lu = clip_and_convert(in_fn, coords, 999)
-        report(lu, 'observations/' + a_name[13:15] + '.map')
+        report(lu, os.path.join('observations', country, a_name[13:15] + '.map'))
 
         # 2. urban map
         urban = select_urban(lu)
         print(a_name[13:15], float(maptotal(scalar(urban))))
-        report(urban, 'observations/urb' + a_name[13:15] + '.map')
+        report(urban, os.path.join('observations', country, \
+                                   'urb' + a_name[13:15] + '.map'))
         
         # 3. make simpler initial land use map only for 1990
         if a_name[13:15] == '90':
             simple_lu = simplify_lu_map(lu)
-            report(simple_lu, 'input_data/init_lu.map')
+            report(simple_lu, os.path.join(country_dir, 'init_lu.map'))
         
 # 4. road map outside loop
+print('------------------------- Roads -------------------------')
 # Road dataset will be reprojected and rasterized and saved into 'raster' folder inside the road_dir.
 # 'raster' folder needs to exist.
-
 road_dir = os.path.join(data_dir, 'roads')
 raster_dir = os.path.join(road_dir, 'raster')
+temp_dir = os.path.join(data_dir, 'temporal_data')
 # Reproject the input vector data using the raster as the reference layer
 # Save the reprojected file in the input_data folder and remove later
 in_shp = os.path.join(road_dir, 'roads.shp')
 # Select the 1990 Corine raster as the reference raster
 raster_name = os.listdir(corine_dir)[0]
-print('Reference raster name '+raster_name)
+print('Reference raster name ' + raster_name)
 ref_raster = os.path.join(corine_dir, raster_name, raster_name + '.tif')
 out_fn = os.path.join(data_dir, 'temporal_data/roads_reprojected.shp')
 reproject(in_shp, out_fn, ref_raster)
@@ -360,30 +406,75 @@ out_raster = os.path.join(raster_dir,'roads_raster.tif')
 rasterize(out_fn, out_raster, ref_raster)
 roads = clip_and_convert(out_raster, coords, 255)
 nullmask = spatial(nominal(0))
-report(cover(roads, nullmask), 'input_data/roads.map')
+report(cover(roads, nullmask), os.path.join(country_dir, 'roads.map'))
 # Remove the working files
-os.remove(os.path.join(data_dir, 'temporal_data', 'roads_reprojected.shp'))
+road_files = os.listdir(temp_dir)
+for f in road_files:
+    os.remove(os.path.join(temp_dir, f))
 
-# 5. other input data sets
+# 5. train station map outside loop
+print('-------------------- Train stations --------------------')
+# Train station dataset will be reprojected and rasterized and saved into 'raster' folder inside the railways_dir.
+# 'raster' folder needs to exist.
+railway_dir = os.path.join(data_dir, 'railways')
+for f in os.listdir(railway_dir):
+    print('Creating train stations map in: ', f,'...')
+
+    # 1. Select the train stations
+    # Select the input and output shapefile dir and name
+    in_fn = os.path.join(railway_dir, f, 'gis_osm_transport_free_1.shp')
+    f_name = 'stations_' + f
+    out_dir = os.path.join(data_dir, 'temporal_data')
+    out_name = 'stations_' + f
+    create_filtered_shapefile(in_fn, f, out_dir, out_name)
+    print(f, ': Filtered shapefile created.')
+
+    # 2. Reproject the shapefiles
+    in_shp = os.path.join(data_dir, 'temporal_data', out_name + '.shp')
+    out_shp = os.path.join(data_dir, 'temporal_data', out_name + '_reprojected.shp')
+    reproject(in_shp, out_shp, ref_raster)
+
+    # 3. Rasterize the reprojected shapefile
+    f_dir = os.path.join(railway_dir, f)
+    raster_dir = os.path.join(f_dir, 'raster')
+    out_raster = os.path.join(raster_dir,'stations_' + f + '.tif')
+    rasterize(out_shp, out_raster, ref_raster)
+
+    # 4. Create the map files
+    stations = clip_and_convert(out_raster, coords, 255)
+    nullmask = spatial(nominal(0))
+    report(cover(stations, nullmask), os.path.join(country_dir, 'train_stations.map'))
+    
+# Remove the working files
+'''rail_files = os.listdir(temp_dir)
+for f in rail_files:
+    os.remove(os.path.join(temp_dir, f))'''
+print('Train stations created.')
+
+# 6. other input data sets
 # Masks with 0 and 1 for the study area and NoData elsewhere
 null_mask = spatial(scalar(0))
-report(null_mask, 'input_data/nullmask.map')
+report(null_mask, os.path.join(country_dir, 'nullmask.map'))
 one_mask = boolean(null_mask + 1)
-report(one_mask, 'input_data/onemask.map')
+report(one_mask, os.path.join(country_dir, 'onemask.map'))
 # Blocks (zones) for the calibration
-command = 'resample -r ' + str(zone_size) + ' input_data\onemask.map resamp.map'
+command = 'resample -r ' + str(zone_size) + ' ' + \
+          os.path.join(country_dir, 'onemask.map') + ' resamp.map'
 os.system(command)
 os.system('pcrcalc unique.map = uniqueid(resamp.map)')
-os.system('resample unique.map zones.map --clone input_data\onemask.map')
-os.system('pcrcalc input_data\zones.map = nominal(zones.map)')
+command = 'resample unique.map zones.map --clone ' + \
+          os.path.join(country_dir, 'onemask.map')
+os.system(command)
+os.system('pcrcalc ' + os.path.join(country_dir, 'zones.map') + \
+          ' = nominal(zones.map)')
 os.remove('zones.map')
 os.remove('resamp.map')
 os.remove('unique.map')
 
-# 6. blocks 
+# 7. blocks 
 import metrics
 unique = uniqueid(one_mask)
-zones = readmap('input_data/zones.map')
+zones = readmap(os.path.join(country_dir, 'zones.map'))
 
 ### remove zones with zero urban in 2000
 ##urb2000 = readmap('observations\urb00')
@@ -394,14 +485,16 @@ zones = readmap('input_data/zones.map')
 samplePoints = pcreq(areaminimum(unique, zones), unique)
 samplePoints = ifthen(samplePoints == 1, boolean(1))
 samplePoints = uniqueid(samplePoints)
-report(samplePoints, 'input_data/sampPoint.map')
-os.system('map2col --unitcell input_data/sampPoint.map input_data/sampPoint.col')
+report(samplePoints, os.path.join(country_dir, 'sampPoint.map'))
+command = 'map2col --unitcell ' + os.path.join(country_dir, 'sampPoint.map') + \
+          ' ' + os.path.join(country_dir, 'sampPoint.col')
+os.system(command)
 
-# 7. realizations and their summary statistics
+# 8. realizations and their summary statistics
 # list of pairs of actual year and time step
 if not os.path.exists(os.path.join(os.getcwd(), 'observations', \
-                                   'realizations')):
-    os.mkdir(os.path.join(os.getcwd(), 'observations', 'realizations'))
+                                   country, 'realizations')):
+    os.mkdir(os.path.join(os.getcwd(), 'observations', country, 'realizations'))
 
 avs = {}
 mins = {}
@@ -409,15 +502,17 @@ maxs = {}
 for i in range(1, realizations + 1):
     print(i)
     # make directories for the realizations
-    if not os.path.exists(os.path.join(os.getcwd(), 'observations', \
+    if not os.path.exists(os.path.join(os.getcwd(), 'observations', country, \
                                        'realizations', str(i))):
-        os.mkdir(os.path.join(os.getcwd(), 'observations', 'realizations', str(i)))
+        os.mkdir(os.path.join(os.getcwd(), 'observations', country, \
+                              'realizations', str(i)))
     # map with random numbers but with correlation by moving window
     randmap = windowaverage(uniform(1), corr_window_size * celllength())
-    base = os.path.join('observations', 'realizations')
+    base = os.path.join('observations', country, 'realizations')
     prev = None
     for year in [('90', 0), ('00', 10), ('06', 16), ('12', 22), ('18', 28)]:
-        amap = readmap('observations/urb' + year[0] + '.map')
+        amap = readmap(os.path.join(os.getcwd(), 'observations', \
+                                    country, 'urb' + year[0] + '.map'))
         # change some of the NEW urban cells, not the existing ones
         if prev is not None:
             diff = pcrand(amap, pcrnot(prev))
@@ -440,8 +535,8 @@ for i in range(1, realizations + 1):
             if cells > maxs[year[0]]: maxs[year[0]] = cells
                          
         
-        report(new_map, generateNameT('observations/realizations/' + \
-                                         str(i) + '/urb', year[1]))
+        report(new_map, generateNameT(os.path.join(base, str(i),\
+                                        'urb'), year[1]))
         print(year[0], float(maptotal(scalar(new_map))))
         listOfSumStats = metrics.calculateSumStats(new_map, \
                                                         metric_names,\
