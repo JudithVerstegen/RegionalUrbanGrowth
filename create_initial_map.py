@@ -11,6 +11,7 @@ import gdal # version 2.3.3 for Python 3.6
 import numpy as np
 import os
 import osr
+import ogr
 from pcraster import *
 from pcraster.framework import *
 from matplotlib import pyplot as plt
@@ -21,10 +22,8 @@ from matplotlib import pyplot as plt
 ### inputs ###
 ##############
 
-# Directory of Corine land use maps
-#data_dir = os.path.join('C:\\', 'Users', 'verstege', \
-#'Documents', 'data')
-data_dir = os.path.join(os.getcwd(), 'data')
+# Directory of Corine land use maps and other input
+data_dir = os.path.join(os.getcwd(), 'data') #os.path.join('D:\\', 'Nauka', 'Geobazy','CORINE', 'Student_Assistant_Judith', 'from_Judith', 'RegionalUrbanGrowth','RegionalUrbanGrowth', 'data')
 
 # Coordinates of case study region
 # in ERST 1989 (Corine projection) as [x0, y0, x1, y1]
@@ -34,7 +33,7 @@ coords = [3127009, 1979498, 3215656, 2064791]
 # zone size as a factor of the cell size
 zone_size = 300 # 100 x 100 m = 10 000 m = 10x10 km
 # for creating observations
-realizations = 10 #20
+realizations = 5 #20
 # window size as a factor of the cell size
 corr_window_size = 50
 omission = 10#52
@@ -167,8 +166,117 @@ def omiss_commiss_map(prev, bool_map, randmap, omiss, simple_lu):
     ##new_map = pcrand(pcrnot(to_remove), pcror(bool_map, to_add))
     return to_remove, to_add
 
+def reproject(in_fn, out_fn, in_rast):
+    print('Reprojecting shapefile...')
+    # Open the raster
+    rast_data_source = gdal.Open(in_rast)
 
+    # Get metadata (not required)
+    print('nr of bands:', rast_data_source.RasterCount)
+    cols = rast_data_source.RasterXSize
+    rows = rast_data_source.RasterYSize
+    print('extent:', cols, rows)
 
+    # Get georeference info (not required)
+    geotransform = rast_data_source.GetGeoTransform()
+    pixelWidth = geotransform[1]
+    pixelHeight = geotransform[5]
+    print('cell size:', pixelWidth, pixelHeight)
+    originX = geotransform[0]
+    originY = geotransform[3]
+    print('x, y:', originX, originY)
+    
+    rast_spatial_ref = rast_data_source.GetProjection()
+    print('raster spatial ref is', rast_spatial_ref)
+
+    # Get the correct driver
+    driver = ogr.GetDriverByName('ESRI Shapefile')
+
+    # 0 means read-only. 1 means writeable.
+    vect_data_source = driver.Open(in_fn, 0) 
+
+    # Check to see if shapefile is found.
+    if vect_data_source is None:
+        print('Could not open %s' % (in_fn))
+
+    # Get the Layer class object
+    layer = vect_data_source.GetLayer(0)
+    # Get reference system info
+    vect_spatial_ref = layer.GetSpatialRef()
+    print('vector spatial ref is', vect_spatial_ref)
+
+    # create osr object of raster spatial ref info
+    sr = osr.SpatialReference(rast_spatial_ref)
+    transform = osr.CoordinateTransformation(vect_spatial_ref, sr)
+
+    # Delete if output file already exists
+    # We can use the same driver
+    if os.path.exists(out_fn):
+        print('exists, deleting')
+        driver.DeleteDataSource(out_fn)
+    out_ds = driver.CreateDataSource(out_fn)
+    if out_ds is None:
+        print('Could not create %s' % (out_fn))
+
+    # Create the shapefile layer WITH THE SR
+    out_lyr = out_ds.CreateLayer('roads', sr, 
+                                 ogr.wkbLineString)
+
+    out_lyr.CreateFields(layer.schema)
+    out_defn = out_lyr.GetLayerDefn()
+    out_feat = ogr.Feature(out_defn)
+    # Loop over all features and change their spatial ref
+    for in_feat in layer:
+        geom = in_feat.geometry()
+        geom.Transform(transform)
+        out_feat.SetGeometry(geom)
+        # Make sure to also include the attributes in the new file
+        for i in range(in_feat.GetFieldCount()):
+            value = in_feat.GetField(i)
+            out_feat.SetField(i, value)
+        out_lyr.CreateFeature(out_feat)
+
+    del out_ds
+    print('Reprojected.')
+
+    return out_feat
+
+def rasterize(InputVector, OutputImage, RefImage):
+    print('Rasterizing shapefile...')
+    gdalformat = 'GTiff'
+    datatype = gdal.GDT_Byte
+    burnVal = 1 #value for the output image pixels
+
+    # Get projection info from reference image
+    Image = gdal.Open(RefImage, gdal.GA_ReadOnly)
+
+    # Open Shapefile
+    Shapefile = ogr.Open(InputVector)
+    Shapefile_layer = Shapefile.GetLayer()
+
+    # Rasterise
+    print("Rasterising shapefile...")
+    Output = gdal.GetDriverByName(gdalformat).Create(OutputImage, Image.RasterXSize, Image.RasterYSize, 1, datatype, options=['COMPRESS=DEFLATE'])
+    Output.SetProjection(Image.GetProjectionRef())
+    Output.SetGeoTransform(Image.GetGeoTransform()) 
+
+    # Write data to band 1
+    Band = Output.GetRasterBand(1)
+    Band.SetNoDataValue(255)
+    gdal.RasterizeLayer(Output, [1], Shapefile_layer, burn_values=[burnVal])
+
+    # Close datasets
+    Band = None
+    Output = None
+    Image = None
+    Shapefile = None
+
+    # Build image overviews
+    subprocess.call("gdaladdo --config COMPRESS_OVERVIEW DEFLATE "+OutputImage+" 2 4 8 16 32 64", shell=True)
+    print("Rasterized.")
+    return Output
+
+ 
 ############
 ### main ###
 ############
@@ -224,10 +332,19 @@ for a_name in os.listdir(corine_dir):
             report(simple_lu, 'input_data/init_lu.map')
         
 # 4. road map outside loop
-# Reproject the input vector data using the raster as the reference layer
 road_dir = os.path.join(data_dir, 'roads')
-in_fn = os.path.join(road_dir, 'roads_raster.tif')
-roads = clip_and_convert(in_fn, coords, 255)
+# Reproject the input vector data using the raster as the reference layer
+in_shp = os.path.join(road_dir, 'roads.shp')
+# Select the 1990 Corine ratser as the reference raster
+raster_name = os.listdir(corine_dir)[0]
+print('Reference raster name '+raster_name)
+ref_raster = os.path.join(corine_dir, raster_name, raster_name + '.tif')
+out_fn = os.path.join(road_dir,'roads_reprojected.shp')
+reprojected = reproject(in_shp, out_fn, ref_raster)
+# Rasterize the reprojected shapefile
+out_raster = os.path.join(road_dir,'roads_raster.tif')
+in_fn = rasterize(out_fn, out_raster, ref_raster) ## ADD DIFFERENT RASTER AS A REFERENCE
+roads = clip_and_convert(out_raster, coords, 255)
 nullmask = spatial(nominal(0))
 report(cover(roads, nullmask), 'input_data/roads.map')
 
