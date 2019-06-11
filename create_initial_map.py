@@ -328,12 +328,13 @@ for a_name in os.listdir(corine_dir):
         print(in_fn)
         setclone('clone')
         lu = clip_and_convert(in_fn, coords, 999)
-        report(lu, 'observations/' + a_name[13:15] + '.map')
+        report(lu, os.path.join('observations', country, a_name[13:15] + '.map'))
 
         # 2. urban map
         urban = select_urban(lu)
         print(a_name[13:15], float(maptotal(scalar(urban))))
-        report(urban, 'observations/urb' + a_name[13:15] + '.map')
+        report(urban, os.path.join('observations', country, \
+                                   'urb' + a_name[13:15] + '.map'))
         
         # 3. make simpler initial land use map only for 1990
         if a_name[13:15] == '90':
@@ -394,7 +395,7 @@ samplePoints = uniqueid(samplePoints)
 report(samplePoints, os.path.join(country_dir, 'sampPoint.map'))
 command = 'map2col --unitcell ' + os.path.join(country_dir, 'sampPoint.map') + \
           ' ' + os.path.join(country_dir, 'sampPoint.col')
-os.system()
+os.system(command)
 
 # 7. realizations and their summary statistics
 # list of pairs of actual year and time step
