@@ -24,8 +24,7 @@ from matplotlib import pyplot as plt
 # Directory of Corine land use maps
 #data_dir = os.path.join('C:\\', 'Users', 'verstege', \
 #'Documents', 'data')
-data_dir = os.path.join('D:\\', 'Nauka', 'Geobazy', \
-'CORINE', 'Student_Assistant_Judith', 'from_Judith', 'RegionalUrbanGrowth','RegionalUrbanGrowth', 'data')
+data_dir = os.path.join(os.getcwd(), 'data')
 
 # Coordinates of case study region
 # in ERST 1989 (Corine projection) as [x0, y0, x1, y1]

@@ -1,5 +1,5 @@
-"""Land use change model, designed for Brazil
-Judith Verstegen 2012-01-03
+"""Urban expansion model, parameters
+Judith Verstegen and Katarzyna Goch 2019-06-07
 
 """
 
