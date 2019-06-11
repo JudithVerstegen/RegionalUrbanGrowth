@@ -6,6 +6,8 @@ from pcraster import *
 from pcraster.framework import *
 import parameters
 
+inputfolder = os.path.join('input_data', parameters.getCountryName())
+
 def map2Array(filename, rowColFile):
   """Selects values at row, col from raster name in Monte Carlo samples.
 
@@ -87,8 +89,8 @@ def selectSArrayMultipleRasters(names,sampleNumbers,rowColFiles, base=None):
 def calculateSumStats(systemState, listOfSumStats, zones, validation=False):
   """Return a list of sum stat maps for the sum stat"""
   listOfMaps = []
-##  mask = readmap('input_data/zones_selection')
-##  if validation == True: mask = readmap('input_data/zones_validation')
+##  mask = readmap(inputfolder + '/zones_selection')
+##  if validation == True: mask = readmap(inputfolder + '/zones_validation')
 ##  systemState = ifthen(mask, systemState)
   unique = uniqueid(boolean(spatial(scalar(1))))
   clumps = ifthen(boolean(systemState) == 1, clump(boolean(systemState)))
@@ -142,12 +144,12 @@ def makeCalibrationMask(rowColFile, zoneMap):
   selection.sort()
   print(selection)
   # make a new row col file for the blocks
-  newTextfile1 = open('input_data/sampPointAvSelection.col', 'w')
-  newTextfile2 = open('input_data/sampPointNrSelection.col', 'w')
-  lookuptable1 = open('input_data/lookupTable_cal.tbl', 'w')
-  newTextfile3 = open('input_data/sampPointAvValidation.col', 'w')
-  newTextfile4 = open('input_data/sampPointNrValidation.col', 'w')
-  lookuptable2 = open('input_data/lookupTable_val.tbl', 'w')
+  newTextfile1 = open(inputfolder + '/sampPointAvSelection.col', 'w')
+  newTextfile2 = open(inputfolder + '/sampPointNrSelection.col', 'w')
+  lookuptable1 = open(inputfolder + '/lookupTable_cal.tbl', 'w')
+  newTextfile3 = open(inputfolder + '/sampPointAvValidation.col', 'w')
+  newTextfile4 = open(inputfolder + '/sampPointNrValidation.col', 'w')
+  lookuptable2 = open(inputfolder + '/lookupTable_val.tbl', 'w')
   i = 0
   j = 0
   for aNumber in listOfIndici:
@@ -174,14 +176,14 @@ def makeCalibrationMask(rowColFile, zoneMap):
   lookuptable2.close()
 
   # Make the mask, i.e. blocks that are SELECTED
-  blocksTrue = lookupboolean('input_data/lookupTable_cal.tbl', zoneMap)
-  report(blocksTrue, 'input_data/zones_selection.map')
-  blocksTrue = lookupboolean('input_data/lookupTable_val.tbl', zoneMap)
-  report(blocksTrue, 'input_data/zones_validation.map')
+  blocksTrue = lookupboolean(inputfolder + '/lookupTable_cal.tbl', zoneMap)
+  report(blocksTrue, inputfolder + '/zones_selection.map')
+  blocksTrue = lookupboolean(inputfolder + '/lookupTable_val.tbl', zoneMap)
+  report(blocksTrue, inputfolder + '/zones_validation.map')
 
 # TEST
-systemState = readmap('input_data/init_lu.map') == 1 # select urban
-zones = readmap('input_data/zones.map')
+systemState = readmap(inputfolder + '/init_lu.map') == 1 # select urban
+zones = readmap(inputfolder + '/zones.map')
 # put HERE the name(s) of the metric(s) you want to test 
 metrics = ['mp']
 listofmaps = calculateSumStats(systemState, metrics, zones)

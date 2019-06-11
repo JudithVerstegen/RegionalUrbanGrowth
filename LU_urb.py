@@ -488,27 +488,37 @@ class LandUse:
 	
 ########################################################
 
-class LandUseChangeModel(DynamicModel, MonteCarloModel, \
-                         ParticleFilterModel):
-  def __init__(self):
+class LandUseChangeModel(DynamicModel):
+  def __init__(self, nr, weights):
     DynamicModel.__init__(self)
-    MonteCarloModel.__init__(self)
-    ParticleFilterModel.__init__(self)
-    setclone('input_data/nullmask')
+    # number for reference
+    self.currentSampleNumber = nr
+    # parameters to calibrate
+    self.weightDict = {1: weights}
+    # input and output folders
+    country = parameters.getCountryName()
+    output_mainfolder = os.path.join(os.getcwd(), 'results', country)
+    if not os.path.isdir(output_mainfolder):
+      os.mkdir(output_mainfolder)
+    self.outputfolder = os.path.join(os.getcwd(), 'results', country, str(nr))
+    if not os.path.isdir(self.outputfolder):
+      os.mkdir(self.outputfolder)
+    self.inputfolder = os.path.join('input_data', country)
+    setclone(self.inputfolder + '/nullmask')
 ##    setglobaloption('nondiagonal')
 
-  def premcloop(self):
+  def initial(self):
     # create sample points
-    self.nullMask = self.readmap('input_data/nullmask')
-    self.oneMask = self.readmap('input_data/onemask')   
+    self.nullMask = self.readmap(self.inputfolder + '/nullmask')
+    self.oneMask = self.readmap(self.inputfolder + '/onemask')   
     # AT SOME POINT WITH STOCHASTIC INPUT
     # in that case land use should not include urban
-    self.landuse = self.readmap('input_data/init_lu')
+    self.landuse = self.readmap(self.inputfolder + '/init_lu')
     self.initialUrb = self.landuse == 1
-    self.roads = self.readmap('input_data/roads')
+    self.roads = self.readmap(self.inputfolder + '/roads')
     self.noGoMap = cover(self.landuse == 2, boolean(self.nullMask))  ## same as self.noGoLanduseList
-    self.zones = readmap('input_data/zones')
-    self.samplePoints = self.readmap('input_data/sampPoint')
+    self.zones = readmap(self.inputfolder + '/zones')
+    self.samplePoints = self.readmap(self.inputfolder + '/sampPoint')
     self.sumStats = parameters.getSumStats()
     self.yieldMap = scalar(self.oneMask)
 
@@ -517,25 +527,21 @@ class LandUseChangeModel(DynamicModel, MonteCarloModel, \
     self.relatedTypeDict = parameters.getRelatedTypeDict()
 
     # Input values from parameters file
-    # Comment out if obtained from uncertainty file
     self.suitFactorDict = parameters.getSuitFactorDict()
-##    self.weightDict = Parameters.getWeightDict()
-##    self.variableSuperDict = parameters.getVariableSuperDict()
+    self.variableSuperDict = parameters.getVariableSuperDict()
     self.noGoLanduseList = parameters.getNoGoLanduseTypes() 
 
     # Uniform map of very small numbers, used to avoid equal suitabilities
     self.noise = uniform(1)/10000
     
-    self.preMCLandUse = LandUse(self.landUseList, self.nullMask)
-    self.preMCLandUse.determineDistanceToRoads(self.roads)
-    self.preMCLandUse.determineSpeedRoads(self.roads)
 
-  def initial(self):
-    random.seed(self.currentSampleNumber())
-    np.random.seed(self.currentSampleNumber())
-    setrandomseed(self.currentSampleNumber())
+
+    # This part used to be the initial
+    # Set seeds to be able to reproduce results
+    random.seed(10)
+    np.random.seed(10)
+    setrandomseed(10)
     
-    self.uniqueNumber = self.currentSampleNumber()
     # Create the 'overall' landuse class
 ##    self.environment = uncertainty.getInitialLandUseMap(self.landuse)
     self.environment = self.landuse
@@ -543,11 +549,6 @@ class LandUseChangeModel(DynamicModel, MonteCarloModel, \
     self.landUse = LandUse(self.landUseList, self.nullMask)
     self.landUse.setInitialEnvironment(self.environment)
 
-    # Uncertainty that is static over time different per lu types
-    self.stochYieldMap = scalar(self.oneMask) #uncertainty.getYieldMap(self.yieldMap)
-    self.weightDict = uncertainty.getWeights2(self.suitFactorDict)
-    ##self.variableSuperDict = uncertainty.getSuitabilityParameters(self.suitFactorDict)
-    self.variableSuperDict = parameters.getVariableSuperDict()
 
     # Create an object for every landuse type in the list    
     self.landUse.createLandUseTypeObjects(self.relatedTypeDict, \
@@ -559,7 +560,7 @@ class LandUseChangeModel(DynamicModel, MonteCarloModel, \
     # Static suitability factors
     self.landUse.determineNoGoAreas(self.noGoMap, self.noGoLanduseList)
     self.landUse.loadDistanceMaps()
-    self.landUse.calculateStaticSuitabilityMaps(self.stochYieldMap)
+    self.landUse.calculateStaticSuitabilityMaps(self.yieldMap)
 
 
   def dynamic(self):
@@ -569,7 +570,7 @@ class LandUseChangeModel(DynamicModel, MonteCarloModel, \
     # Get max yield and demand per land use type
     # But for urban we don't use it now (perhaps later with pop), so 1
     maxYield = 1.0
-    demand = timeinputscalar('input_data/demand.tss', self.environment)
+    demand = timeinputscalar(self.inputfolder + '/demand.tss', self.environment)
 
     
     # Suibility maps are calculated
@@ -581,7 +582,7 @@ class LandUseChangeModel(DynamicModel, MonteCarloModel, \
 
     # save the map of urban / non-urban
     urban = pcreq(self.environment, 1)
-    self.report(urban, 'urb')
+    self.report(urban, os.path.join(self.outputfolder,'urb'))
     
     # save the metrics
     listOfSumStats = metrics.calculateSumStats(scalar(urban), \
@@ -590,54 +591,74 @@ class LandUseChangeModel(DynamicModel, MonteCarloModel, \
     j=0
     for aname in self.sumStats:
         modelledmap = listOfSumStats[j]
-        self.report(modelledmap, aname)
+        self.report(modelledmap, os.path.join(self.outputfolder, aname))
 
     for aStat in self.sumStats:
-      path = generateNameST(aStat, self.currentSampleNumber(),timeStep)
+      path = generateNameT(self.outputfolder + '/' + aStat, timeStep)
       if aStat in ['np']:
         # these metrics result in one value per block (here 9 blocks)
         modelledAverageArray = metrics.map2Array(path, \
-                              'input_data/sampPoint.col')
+                              self.inputfolder + '/sampPoint.col')
       else:
         # other metrics result in one value for the whole study area
         modelledAverageArray = metrics.map2Array(path, \
-                              'input_data/sampPointNr.col')
+                              self.inputfolder + '/sampPointNr.col')
       # metric is saved as a list
       name1 = aStat + str(timeStep) + '.obj'
-      path1 = os.path.join(str(self.currentSampleNumber()), name1)
+      path1 = os.path.join(self.outputfolder, name1)
       file_object1 = open(path1, 'wb')
       pickle.dump(modelledAverageArray, file_object1)
       file_object1.close()
       # the map with the metric is removed to save disk space
-      os.remove(generateNameST(aStat,self.currentSampleNumber(), timeStep))
+      ##os.remove(path)
 
-  def postmcloop(self):
-    print('\nrunning postmcloop...')
-    print('...saving data to results folder...')
-    command = "python transform_save_data.py"
-    os.system(command)
-    if int(self.nrSamples()) > 1:
-      print('...calculating fragstats...')		
-      command = "python plotFragstats.py"
-      os.system(command)
-##      command = "python postloop_frst_val.py"
-##      os.system(command)
-      # Stochastic variables for which mean, var and percentiles are needed
-      print('...calculating statistics...')
-      names = ['urb']
-      sampleNumbers = self.sampleNumbers()
-      timeSteps = range(1, nrOfTimeSteps + 1)
-      percentiles = [0.0, 0.05, 0.1, 0.3, 0.5, 0.7, 0.9, 0.95, 1.0]
-      mcaveragevariance.mcaveragevariance(names, sampleNumbers, timeSteps)
-##      names = ['ps']
-##      mcpercentiles(names, percentiles, sampleNumbers, timeSteps)
-    print('\n...done')
- 
+############
+### MAIN ###
+############
 
 nrOfTimeSteps = parameters.getNrTimesteps()
 nrOfSamples = parameters.getNrSamples()
-myModel = LandUseChangeModel()
+# Find the number of parameters to calibrate
+nrOfParameters = len(parameters.getSuitFactorDict()[1])
+
+# Before loop to save computation time
+inputfolder = os.path.join('input_data', parameters.getCountryName())
+nullMask = readmap(inputfolder + '/nullmask')
+roads = readmap(inputfolder + '/roads')
+landUseList = parameters.getLandUseList()
+preMCLandUse = LandUse(landUseList, nullMask)
+preMCLandUse.determineDistanceToRoads(roads)
+preMCLandUse.determineSpeedRoads(roads)
+
+# Set step size for calibration, put in parameters file?
+min_p = 0.0
+max_p = 1.0
+stepsize = 0.2
+param_steps = np.arange(min_p, max_p + 0.1, stepsize)
+print(param_steps)
+
+# Loop COMES HERE
+weights = [0.2,0.2,0.4,0.2]
+myModel = LandUseChangeModel(1, weights)
 dynamicModel = DynamicFramework(myModel, nrOfTimeSteps)
-mcModel = MonteCarloFramework(dynamicModel, nrOfSamples)
-#mcModel.setForkSamples(True,16)
-mcModel.run()
+dynamicModel.run()
+
+## USED TO BE THE POSTLOOP; SAVED FOR LATER USE
+##print('\nrunning postmcloop...')
+##print('...saving data to results folder...')
+##command = "python transform_save_data.py"
+##os.system(command)
+##if int(self.nrSamples()) > 1:
+##  print('...calculating fragstats...')		
+##  command = "python plotFragstats.py"
+##  os.system(command)
+##  # Stochastic variables for which mean, var and percentiles are needed
+##  print('...calculating statistics...')
+##  names = ['urb']
+##  sampleNumbers = self.sampleNumbers()
+##  timeSteps = range(1, nrOfTimeSteps + 1)
+##  percentiles = [0.0, 0.05, 0.1, 0.3, 0.5, 0.7, 0.9, 0.95, 1.0]
+##  mcaveragevariance.mcaveragevariance(names, sampleNumbers, timeSteps)
+##  names = ['ps']
+##  mcpercentiles(names, percentiles, sampleNumbers, timeSteps)
+##print('\n...done')

@@ -3,12 +3,14 @@ Judith Verstegen, 2011-10-12
 
 """
 import numpy as np
+import parameters
 from pcraster import *
 from pcraster.framework import *
 import math
 import os
 
-nullMask = readmap('input_data/nullmask')
+inputfolder = os.path.join('input_data', parameters.getCountryName())
+nullMask = readmap(inputfolder + '/nullmask')
 
 def getLogRealization(mu, sigma):
   realization = np.random.lognormal(mu, sigma)
