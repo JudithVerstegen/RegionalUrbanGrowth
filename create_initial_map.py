@@ -12,6 +12,7 @@ import numpy as np
 import os
 import osr
 import ogr
+import parameters
 from pcraster import *
 from pcraster.framework import *
 from matplotlib import pyplot as plt
@@ -283,14 +284,22 @@ def rasterize(InputVector, OutputImage, RefImage):
 
 # 0. clean the two directories (input_data and observations)
 # Folders input_data and observations have to exist
-files = os.listdir(os.path.join(os.getcwd(), 'input_data'))
+country = parameters.getCountryName()
+country_dir = os.path.join(os.getcwd(), 'input_data', str(country))
+if not os.path.isdir(country_dir):
+    os.mkdir(country_dir)
+if not os.path.isdir(os.path.join(os.getcwd(), 'observations', str(country))):
+    os.mkdir(os.path.join(os.getcwd(), 'observations', str(country)))
+
+files = os.listdir(country_dir)
 for f in files:
     if f not in ['make_demand_manual.xlsx', 'demand.tss']:
-        os.remove(os.path.join(os.getcwd(), 'input_data', f))
-files = os.listdir(os.path.join(os.getcwd(), 'observations'))
+        os.remove(os.path.join(country_dir, f))
+files = os.listdir(os.path.join(os.getcwd(), 'observations', str(country)))
 for f in files:
-    if not os.path.isdir(os.path.join(os.getcwd(), 'observations', f)):
-        os.remove(os.path.join(os.getcwd(), 'observations', f))
+    if not os.path.isdir(os.path.join(os.getcwd(), 'observations', \
+                                      str(country), f)):
+        os.remove(os.path.join(os.getcwd(), 'observations', str(country), f))
 
 # create the clone map
 corine_dir = os.path.join(data_dir, 'Corine')
@@ -329,7 +338,7 @@ for a_name in os.listdir(corine_dir):
         # 3. make simpler initial land use map only for 1990
         if a_name[13:15] == '90':
             simple_lu = simplify_lu_map(lu)
-            report(simple_lu, 'input_data/init_lu.map')
+            report(simple_lu, os.path.join(country_dir, 'init_lu.map'))
         
 # 4. road map outside loop
 road_dir = os.path.join(data_dir, 'roads')
@@ -337,7 +346,7 @@ road_dir = os.path.join(data_dir, 'roads')
 in_shp = os.path.join(road_dir, 'roads.shp')
 # Select the 1990 Corine ratser as the reference raster
 raster_name = os.listdir(corine_dir)[0]
-print('Reference raster name '+raster_name)
+print('Reference raster name ' + raster_name)
 ref_raster = os.path.join(corine_dir, raster_name, raster_name + '.tif')
 out_fn = os.path.join(road_dir,'roads_reprojected.shp')
 reprojected = reproject(in_shp, out_fn, ref_raster)
@@ -346,20 +355,24 @@ out_raster = os.path.join(road_dir,'roads_raster.tif')
 in_fn = rasterize(out_fn, out_raster, ref_raster) ## ADD DIFFERENT RASTER AS A REFERENCE
 roads = clip_and_convert(out_raster, coords, 255)
 nullmask = spatial(nominal(0))
-report(cover(roads, nullmask), 'input_data/roads.map')
+report(cover(roads, nullmask), os.path.join(country_dir, 'roads.map'))
 
 # 5. other input data sets
 # Masks with 0 and 1 for the study area and NoData elsewhere
 null_mask = spatial(scalar(0))
-report(null_mask, 'input_data/nullmask.map')
+report(null_mask, os.path.join(country_dir, 'nullmask.map'))
 one_mask = boolean(null_mask + 1)
-report(one_mask, 'input_data/onemask.map')
+report(one_mask, os.path.join(country_dir, 'onemask.map'))
 # Blocks (zones) for the calibration
-command = 'resample -r ' + str(zone_size) + ' input_data\onemask.map resamp.map'
+command = 'resample -r ' + str(zone_size) + ' ' + \
+          os.path.join(country_dir, 'onemask.map') + ' resamp.map'
 os.system(command)
 os.system('pcrcalc unique.map = uniqueid(resamp.map)')
-os.system('resample unique.map zones.map --clone input_data\onemask.map')
-os.system('pcrcalc input_data\zones.map = nominal(zones.map)')
+command = 'resample unique.map zones.map --clone ' + \
+          os.path.join(country_dir, 'onemask.map')
+os.system(command)
+os.system('pcrcalc ' + os.path.join(country_dir, 'zones.map') + \
+          ' = nominal(zones.map)')
 os.remove('zones.map')
 os.remove('resamp.map')
 os.remove('unique.map')
@@ -367,7 +380,7 @@ os.remove('unique.map')
 # 6. blocks 
 import metrics
 unique = uniqueid(one_mask)
-zones = readmap('input_data/zones.map')
+zones = readmap(os.path.join(country_dir, 'zones.map'))
 
 ### remove zones with zero urban in 2000
 ##urb2000 = readmap('observations\urb00')
@@ -378,14 +391,16 @@ zones = readmap('input_data/zones.map')
 samplePoints = pcreq(areaminimum(unique, zones), unique)
 samplePoints = ifthen(samplePoints == 1, boolean(1))
 samplePoints = uniqueid(samplePoints)
-report(samplePoints, 'input_data/sampPoint.map')
-os.system('map2col --unitcell input_data/sampPoint.map input_data/sampPoint.col')
+report(samplePoints, os.path.join(country_dir, 'sampPoint.map'))
+command = 'map2col --unitcell ' + os.path.join(country_dir, 'sampPoint.map') + \
+          ' ' + os.path.join(country_dir, 'sampPoint.col')
+os.system()
 
 # 7. realizations and their summary statistics
 # list of pairs of actual year and time step
 if not os.path.exists(os.path.join(os.getcwd(), 'observations', \
-                                   'realizations')):
-    os.mkdir(os.path.join(os.getcwd(), 'observations', 'realizations'))
+                                   country, 'realizations')):
+    os.mkdir(os.path.join(os.getcwd(), 'observations', country, 'realizations'))
 
 avs = {}
 mins = {}
@@ -393,15 +408,17 @@ maxs = {}
 for i in range(1, realizations + 1):
     print(i)
     # make directories for the realizations
-    if not os.path.exists(os.path.join(os.getcwd(), 'observations', \
+    if not os.path.exists(os.path.join(os.getcwd(), 'observations', country, \
                                        'realizations', str(i))):
-        os.mkdir(os.path.join(os.getcwd(), 'observations', 'realizations', str(i)))
+        os.mkdir(os.path.join(os.getcwd(), 'observations', country, \
+                              'realizations', str(i)))
     # map with random numbers but with correlation by moving window
     randmap = windowaverage(uniform(1), corr_window_size * celllength())
-    base = os.path.join('observations', 'realizations')
+    base = os.path.join('observations', country, 'realizations')
     prev = None
     for year in [('90', 0), ('00', 10), ('06', 16), ('12', 22), ('18', 28)]:
-        amap = readmap('observations/urb' + year[0] + '.map')
+        amap = readmap(os.path.join(os.getcwd(), 'observations', \
+                                    country, 'urb' + year[0] + '.map'))
         # change some of the NEW urban cells, not the existing ones
         if prev is not None:
             diff = pcrand(amap, pcrnot(prev))
@@ -424,8 +441,8 @@ for i in range(1, realizations + 1):
             if cells > maxs[year[0]]: maxs[year[0]] = cells
                          
         
-        report(new_map, generateNameT('observations/realizations/' + \
-                                         str(i) + '/urb', year[1]))
+        report(new_map, generateNameT(os.path.join(base, str(i),\
+                                        'urb'), year[1]))
         print(year[0], float(maptotal(scalar(new_map))))
         listOfSumStats = metrics.calculateSumStats(new_map, \
                                                         metric_names,\
