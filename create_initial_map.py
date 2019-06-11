@@ -25,7 +25,8 @@ from matplotlib import pyplot as plt
 # Directory of Corine land use maps
 #data_dir = os.path.join('C:\\', 'Users', 'verstege', \
 #'Documents', 'data')
-data_dir = os.path.join(os.getcwd(), 'data') #os.path.join('D:\\', 'Nauka', 'Geobazy','CORINE', 'Student_Assistant_Judith', 'from_Judith', 'RegionalUrbanGrowth','RegionalUrbanGrowth', 'data')
+data_dir = os.path.join(os.getcwd(), 'data')
+print('Data directory: ', data_dir)
 
 # Coordinates of case study region
 # in ERST 1989 (Corine projection) as [x0, y0, x1, y1]
@@ -120,6 +121,7 @@ def clip_and_convert(in_fn, coords, nodata):
     data = clip(rast_data_source, coords)
     themap = numpy2pcr(Nominal, data, nodata)
     ##print data
+    del rast_data_source
     return themap
 
 def select_urban(land_use):
@@ -250,15 +252,21 @@ def rasterize(InputVector, OutputImage, RefImage):
     burnVal = 1 #value for the output image pixels
 
     # Get projection info from reference image
+    print('Get projection')
     Image = gdal.Open(RefImage, gdal.GA_ReadOnly)
 
     # Open Shapefile
     Shapefile = ogr.Open(InputVector)
     Shapefile_layer = Shapefile.GetLayer()
 
+    # Chceck if raster exists. If yes, delete.
+    if os.path.exists(OutputImage):
+        print('Raster exists, deleting')
+        os.remove(OutputImage) 
+
     # Rasterise
-    print("Rasterising shapefile...")
     Output = gdal.GetDriverByName(gdalformat).Create(OutputImage, Image.RasterXSize, Image.RasterYSize, 1, datatype, options=['COMPRESS=DEFLATE'])
+    print('New raster created')
     Output.SetProjection(Image.GetProjectionRef())
     Output.SetGeoTransform(Image.GetGeoTransform()) 
 
@@ -276,7 +284,6 @@ def rasterize(InputVector, OutputImage, RefImage):
     # Build image overviews
     subprocess.call("gdaladdo --config COMPRESS_OVERVIEW DEFLATE "+OutputImage+" 2 4 8 16 32 64", shell=True)
     print("Rasterized.")
-    return Output
 
  
 ############
@@ -334,21 +341,28 @@ for a_name in os.listdir(corine_dir):
             report(simple_lu, 'input_data/init_lu.map')
         
 # 4. road map outside loop
+# Road dataset will be reprojected and rasterized and saved into 'raster' folder inside the road_dir.
+# 'raster' folder needs to exist.
+
 road_dir = os.path.join(data_dir, 'roads')
+raster_dir = os.path.join(road_dir, 'raster')
 # Reproject the input vector data using the raster as the reference layer
+# Save the reprojected file in the input_data folder and remove later
 in_shp = os.path.join(road_dir, 'roads.shp')
-# Select the 1990 Corine ratser as the reference raster
+# Select the 1990 Corine raster as the reference raster
 raster_name = os.listdir(corine_dir)[0]
 print('Reference raster name '+raster_name)
 ref_raster = os.path.join(corine_dir, raster_name, raster_name + '.tif')
-out_fn = os.path.join(road_dir,'roads_reprojected.shp')
-reprojected = reproject(in_shp, out_fn, ref_raster)
+out_fn = os.path.join(data_dir, 'temporal_data/roads_reprojected.shp')
+reproject(in_shp, out_fn, ref_raster)
 # Rasterize the reprojected shapefile
-out_raster = os.path.join(road_dir,'roads_raster.tif')
-in_fn = rasterize(out_fn, out_raster, ref_raster) ## ADD DIFFERENT RASTER AS A REFERENCE
+out_raster = os.path.join(raster_dir,'roads_raster.tif')
+rasterize(out_fn, out_raster, ref_raster)
 roads = clip_and_convert(out_raster, coords, 255)
 nullmask = spatial(nominal(0))
 report(cover(roads, nullmask), 'input_data/roads.map')
+# Remove the working files
+os.remove(os.path.join(data_dir, 'temporal_data', 'roads_reprojected.shp'))
 
 # 5. other input data sets
 # Masks with 0 and 1 for the study area and NoData elsewhere
