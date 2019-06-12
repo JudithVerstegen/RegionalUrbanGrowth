@@ -515,10 +515,10 @@ class LandUseChangeModel(DynamicModel):
     # in that case land use should not include urban
     self.landuse = self.readmap(self.inputfolder + '/init_lu')
     self.initialUrb = self.landuse == 1
-    self.roads = self.readmap(self.inputfolder + '/roads')
-    self.noGoMap = cover(self.landuse == 2, boolean(self.nullMask))  ## same as self.noGoLanduseList
-    self.zones = readmap(self.inputfolder + '/zones')
-    self.samplePoints = self.readmap(self.inputfolder + '/sampPoint')
+    self.roads = self.readmap('input_data/roads')
+    self.noGoMap = cover(self.landuse == 2, boolean(self.nullMask))  ## same as self.noGoLanduseList <- ADD nogo map, created by the create_initial_map.py
+    self.zones = readmap('input_data/zones')
+    self.samplePoints = self.readmap('input_data/sampPoint')
     self.sumStats = parameters.getSumStats()
     self.yieldMap = scalar(self.oneMask)
 

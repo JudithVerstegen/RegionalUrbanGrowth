@@ -24,7 +24,7 @@ from matplotlib import pyplot as plt
 ##############
 
 # Directory of Corine land use maps and other input
-data_dir = os.path.join(os.getcwd(), 'data') #os.path.join('D:\\', 'Nauka', 'Geobazy','CORINE', 'Student_Assistant_Judith', 'from_Judith', 'RegionalUrbanGrowth','RegionalUrbanGrowth', 'data')
+data_dir = os.path.join(os.getcwd(), 'data')
 
 # Coordinates of case study region
 # in ERST 1989 (Corine projection) as [x0, y0, x1, y1]
@@ -168,7 +168,9 @@ def omiss_commiss_map(prev, bool_map, randmap, omiss, simple_lu):
     ##new_map = pcrand(pcrnot(to_remove), pcror(bool_map, to_add))
     return to_remove, to_add
 
-def reproject(in_fn, out_fn, in_rast):
+def reproject(in_fn, out_fn, in_rast, data_type):
+    # data_type: ['point','polyline','polygon']
+    
     print('Reprojecting shapefile...')
     # Open the raster
     rast_data_source = gdal.Open(in_rast)
@@ -189,8 +191,7 @@ def reproject(in_fn, out_fn, in_rast):
     print('x, y:', originX, originY)
     
     rast_spatial_ref = rast_data_source.GetProjection()
-    #print('raster spatial ref is', rast_spatial_ref)
-
+    
     # Get the correct driver
     driver = ogr.GetDriverByName('ESRI Shapefile')
 
@@ -221,8 +222,15 @@ def reproject(in_fn, out_fn, in_rast):
         print('Could not create %s' % (out_fn))
 
     # Create the shapefile layer WITH THE SR
+    if data_type == 'point':
+        data_arg = ogr.wkbPoint
+    elif data_type == 'polyline':
+        data_arg = ogr.wkbLineString
+    elif data_type == 'polygon':
+        data_arg = ogr.wkbLinearRing
+        
     out_lyr = out_ds.CreateLayer('reprojected', sr, 
-                                 ogr.wkbLineString)
+                                 data_arg)
 
     out_lyr.CreateFields(layer.schema)
     out_defn = out_lyr.GetLayerDefn()
@@ -282,7 +290,7 @@ def rasterize(InputVector, OutputImage, RefImage):
     subprocess.call("gdaladdo --config COMPRESS_OVERVIEW DEFLATE "+OutputImage+" 2 4 8 16 32 64", shell=True)
     print("Rasterized.")
 
-def create_filtered_shapefile(in_shapefile, country, out_dir, out_name):
+def create_filtered_shapefile(in_shapefile, country, out_dir, out_name, filter_query):
     ### Script for selecting train stations from OSM transport data.
     ### Data was downlowaded for Ireland, Italy and Poland.
     ### Data is in folders with names corresponding to the names of the countries
@@ -301,12 +309,9 @@ def create_filtered_shapefile(in_shapefile, country, out_dir, out_name):
     
     # get the Layer class object
     input_layer = data_source.GetLayer(0)
-
-    # Filter by our query
-    query_str = "fclass = 'railway_station' OR fclass = 'railway_halt'"
     
     # Apply a filter
-    input_layer.SetAttributeFilter(query_str)
+    input_layer.SetAttributeFilter(filter_query)
     
     # Copy Filtered Layer and Output File
     driver = ogr.GetDriverByName('ESRI Shapefile')
@@ -319,6 +324,15 @@ def create_filtered_shapefile(in_shapefile, country, out_dir, out_name):
     out_layer = out_ds.CopyLayer(input_layer, out_name)
     
     del input_layer, out_layer, out_ds
+
+def reproject_tif(in_raster, out_raster, ref_raster):
+    print('Reprojecting tif...')
+    Image = gdal.Open(ref_raster, gdal.GA_ReadOnly) 
+    proj = osr.SpatialReference(wkt=Image.GetProjection())
+    arg = 'EPSG:' + str(proj.GetAttrValue('AUTHORITY',1)).strip()
+    gdal.Warp(out_raster,in_raster,dstSRS=arg)
+    print('Tif reprojected')
+    del Image
 
  
 ############
@@ -384,6 +398,13 @@ for a_name in os.listdir(corine_dir):
         if a_name[13:15] == '90':
             simple_lu = simplify_lu_map(lu)
             report(simple_lu, os.path.join(country_dir, 'init_lu.map'))
+
+# Select the 1990 Corine raster as the reference raster for further actions
+raster_name = os.listdir(corine_dir)[0]
+print('Reference raster name ' + raster_name)
+ref_raster = os.path.join(corine_dir, raster_name, raster_name + '.tif')
+# Select the dir for the temporal working files
+temp_dir = os.path.join(data_dir, 'temporal_data')
         
 # 4. road map outside loop
 print('------------------------- Roads -------------------------')
@@ -391,16 +412,12 @@ print('------------------------- Roads -------------------------')
 # 'raster' folder needs to exist.
 road_dir = os.path.join(data_dir, 'roads')
 raster_dir = os.path.join(road_dir, 'raster')
-temp_dir = os.path.join(data_dir, 'temporal_data')
+
 # Reproject the input vector data using the raster as the reference layer
 # Save the reprojected file in the input_data folder and remove later
 in_shp = os.path.join(road_dir, 'roads.shp')
-# Select the 1990 Corine raster as the reference raster
-raster_name = os.listdir(corine_dir)[0]
-print('Reference raster name ' + raster_name)
-ref_raster = os.path.join(corine_dir, raster_name, raster_name + '.tif')
 out_fn = os.path.join(data_dir, 'temporal_data/roads_reprojected.shp')
-reproject(in_shp, out_fn, ref_raster)
+reproject(in_shp, out_fn, ref_raster, 'polyline')
 # Rasterize the reprojected shapefile
 out_raster = os.path.join(raster_dir,'roads_raster.tif')
 rasterize(out_fn, out_raster, ref_raster)
@@ -411,47 +428,83 @@ report(cover(roads, nullmask), os.path.join(country_dir, 'roads.map'))
 road_files = os.listdir(temp_dir)
 for f in road_files:
     os.remove(os.path.join(temp_dir, f))
+print('Roads created.')
 
 # 5. train station map outside loop
 print('-------------------- Train stations --------------------')
 # Train station dataset will be reprojected and rasterized and saved into 'raster' folder inside the railways_dir.
 # 'raster' folder needs to exist.
 railway_dir = os.path.join(data_dir, 'railways')
-for f in os.listdir(railway_dir):
-    print('Creating train stations map in: ', f,'...')
 
-    # 1. Select the train stations
-    # Select the input and output shapefile dir and name
-    in_fn = os.path.join(railway_dir, f, 'gis_osm_transport_free_1.shp')
-    f_name = 'stations_' + f
-    out_dir = os.path.join(data_dir, 'temporal_data')
-    out_name = 'stations_' + f
-    create_filtered_shapefile(in_fn, f, out_dir, out_name)
-    print(f, ': Filtered shapefile created.')
+print('Creating train stations map in: ', country,'...')
 
-    # 2. Reproject the shapefiles
-    in_shp = os.path.join(data_dir, 'temporal_data', out_name + '.shp')
-    out_shp = os.path.join(data_dir, 'temporal_data', out_name + '_reprojected.shp')
-    reproject(in_shp, out_shp, ref_raster)
+### 1. Select the train stations
+# Select the input and output shapefile dir and name
+in_fn = os.path.join(railway_dir, country, 'gis_osm_transport_free_1.shp')
+f_name = 'stations_' + country
+out_dir = os.path.join(data_dir, 'temporal_data')
+out_name = 'stations_' + country
+# Filter by our query
+query_str = "fclass = 'railway_station' OR fclass = 'railway_halt'"
+create_filtered_shapefile(in_fn, country, out_dir, out_name, query_str)
+print(country, ': Filtered shapefile created.')
 
-    # 3. Rasterize the reprojected shapefile
-    f_dir = os.path.join(railway_dir, f)
-    raster_dir = os.path.join(f_dir, 'raster')
-    out_raster = os.path.join(raster_dir,'stations_' + f + '.tif')
-    rasterize(out_shp, out_raster, ref_raster)
+### 2. Reproject the shapefiles
+in_shp = os.path.join(data_dir, 'temporal_data', out_name + '.shp')
+out_shp = os.path.join(data_dir, 'temporal_data', out_name + '_reprojected.shp')
+reproject(in_shp, out_shp, ref_raster, 'point')
 
-    # 4. Create the map files
-    stations = clip_and_convert(out_raster, coords, 255)
-    nullmask = spatial(nominal(0))
-    report(cover(stations, nullmask), os.path.join(country_dir, 'train_stations.map'))
+### 3. Rasterize the reprojected shapefile
+f_dir = os.path.join(railway_dir, country)
+raster_dir = os.path.join(f_dir, 'raster')
+out_raster = os.path.join(raster_dir,'stations_' + country + '.tif')
+rasterize(out_shp, out_raster, ref_raster)
+
+### 4. Create the map files
+stations = clip_and_convert(out_raster, coords, 255)
+nullmask = spatial(nominal(0))
+report(cover(stations, nullmask), os.path.join(country_dir, 'train_stations.map'))
     
-# Remove the working files
-'''rail_files = os.listdir(temp_dir)
+### 5. Remove the working files
+rail_files = os.listdir(temp_dir)
 for f in rail_files:
-    os.remove(os.path.join(temp_dir, f))'''
+    os.remove(os.path.join(temp_dir, f))
 print('Train stations created.')
 
-# 6. other input data sets
+# 6. no-go areas map outside loop  <- to be merged into one no-go map
+# Protected areas from NATURA2000 database and areas with the slope > 30 degrees are excluded
+print('---------------------- No-go map ----------------------')
+
+print('---------- 1. Protected areas ----------')
+# Excluded areas will be rasterized and saved into 'raster' folder inside the protected_dir.
+# 'raster' folder needs to exist.
+protected_dir = os.path.join(data_dir, 'NATURA2000')
+
+### 1. Rasterize the projected area shapefile
+# Select the input and output dir and name
+in_fn = os.path.join(protected_dir, 'Natura2000_end2018_epsg3035.shp')
+raster_dir = os.path.join(protected_dir, 'raster')
+out_raster = os.path.join(raster_dir,'protected.tif')
+rasterize(in_fn, out_raster, ref_raster)
+
+print('----------- 2. Steep areas -----------')
+### 1. Calculate slope from the DEM
+# Opend the DEM
+dem_names = {
+    'IT': 'eu_dem_v11_E40N20',
+    'IR': 'eu_dem_v11_E30N30',
+    'PL': 'eu_dem_v11_E50N30'
+    }
+dem_dir = os.path.join(data_dir, 'DEM', country, dem_names[country] + '.TIF')
+dem_repr = os.path.join(temp_dir,'reprojected_dem_' + country + '.tif')
+# Reproject
+reproject_tif(dem_dir, dem_repr, ref_raster)
+# Clip and convert
+slope = clip_and_convert(dem_repr, coords, 255)
+nullmask = spatial(nominal(0))
+report(cover(slope, nullmask), os.path.join(country_dir, 'dem.map'))
+
+# 7. other input data sets
 # Masks with 0 and 1 for the study area and NoData elsewhere
 null_mask = spatial(scalar(0))
 report(null_mask, os.path.join(country_dir, 'nullmask.map'))
@@ -471,7 +524,7 @@ os.remove('zones.map')
 os.remove('resamp.map')
 os.remove('unique.map')
 
-# 7. blocks 
+# 8. blocks 
 import metrics
 unique = uniqueid(one_mask)
 zones = readmap(os.path.join(country_dir, 'zones.map'))
@@ -490,7 +543,7 @@ command = 'map2col --unitcell ' + os.path.join(country_dir, 'sampPoint.map') + \
           ' ' + os.path.join(country_dir, 'sampPoint.col')
 os.system(command)
 
-# 8. realizations and their summary statistics
+# 9. realizations and their summary statistics
 # list of pairs of actual year and time step
 if not os.path.exists(os.path.join(os.getcwd(), 'observations', \
                                    country, 'realizations')):
@@ -554,5 +607,4 @@ for i in range(1, realizations + 1):
 print(mins)
 print(maxs)
 print(avs)
-
 
