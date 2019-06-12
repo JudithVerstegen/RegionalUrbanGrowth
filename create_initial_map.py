@@ -24,7 +24,7 @@ from matplotlib import pyplot as plt
 ##############
 
 # Directory of Corine land use maps and other input
-data_dir = os.path.join(os.getcwd(), 'data') #os.path.join('D:\\', 'Nauka', 'Geobazy','CORINE', 'Student_Assistant_Judith', 'from_Judith', 'RegionalUrbanGrowth','RegionalUrbanGrowth', 'data')
+data_dir = os.path.join(os.getcwd(), 'data')
 
 # Coordinates of case study region
 # in ERST 1989 (Corine projection) as [x0, y0, x1, y1]
@@ -414,8 +414,8 @@ nullmask = spatial(nominal(0))
 report(cover(roads, nullmask), os.path.join(country_dir, 'roads.map'))
 # Remove the working files
 road_files = os.listdir(temp_dir)
-'''for f in road_files:
-    os.remove(os.path.join(temp_dir, f))'''
+for f in road_files:
+    os.remove(os.path.join(temp_dir, f))
 print('Roads created.')
 
 # 5. train station map outside loop
@@ -423,40 +423,40 @@ print('-------------------- Train stations --------------------')
 # Train station dataset will be reprojected and rasterized and saved into 'raster' folder inside the railways_dir.
 # 'raster' folder needs to exist.
 railway_dir = os.path.join(data_dir, 'railways')
-for f in os.listdir(railway_dir):
-    print('Creating train stations map in: ', f,'...')
 
-    # 1. Select the train stations
-    # Select the input and output shapefile dir and name
-    in_fn = os.path.join(railway_dir, f, 'gis_osm_transport_free_1.shp')
-    f_name = 'stations_' + f
-    out_dir = os.path.join(data_dir, 'temporal_data')
-    out_name = 'stations_' + f
-    # Filter by our query
-    query_str = "fclass = 'railway_station' OR fclass = 'railway_halt'"
-    create_filtered_shapefile(in_fn, f, out_dir, out_name, query_str)
-    print(f, ': Filtered shapefile created.')
+print('Creating train stations map in: ', country,'...')
 
-    # 2. Reproject the shapefiles
-    in_shp = os.path.join(data_dir, 'temporal_data', out_name + '.shp')
-    out_shp = os.path.join(data_dir, 'temporal_data', out_name + '_reprojected.shp')
-    reproject(in_shp, out_shp, ref_raster, 'point')
+# 1. Select the train stations
+# Select the input and output shapefile dir and name
+in_fn = os.path.join(railway_dir, country, 'gis_osm_transport_free_1.shp')
+f_name = 'stations_' + country
+out_dir = os.path.join(data_dir, 'temporal_data')
+out_name = 'stations_' + country
+# Filter by our query
+query_str = "fclass = 'railway_station' OR fclass = 'railway_halt'"
+create_filtered_shapefile(in_fn, country, out_dir, out_name, query_str)
+print(country, ': Filtered shapefile created.')
 
-    # 3. Rasterize the reprojected shapefile
-    f_dir = os.path.join(railway_dir, f)
-    raster_dir = os.path.join(f_dir, 'raster')
-    out_raster = os.path.join(raster_dir,'stations_' + f + '.tif')
-    rasterize(out_shp, out_raster, ref_raster)
+# 2. Reproject the shapefiles
+in_shp = os.path.join(data_dir, 'temporal_data', out_name + '.shp')
+out_shp = os.path.join(data_dir, 'temporal_data', out_name + '_reprojected.shp')
+reproject(in_shp, out_shp, ref_raster, 'point')
 
-    # 4. Create the map files
-    stations = clip_and_convert(out_raster, coords, 255)
-    nullmask = spatial(nominal(0))
-    report(cover(stations, nullmask), os.path.join(country_dir, 'train_stations.map'))
+# 3. Rasterize the reprojected shapefile
+f_dir = os.path.join(railway_dir, country)
+raster_dir = os.path.join(f_dir, 'raster')
+out_raster = os.path.join(raster_dir,'stations_' + country + '.tif')
+rasterize(out_shp, out_raster, ref_raster)
+
+# 4. Create the map files
+stations = clip_and_convert(out_raster, coords, 255)
+nullmask = spatial(nominal(0))
+report(cover(stations, nullmask), os.path.join(country_dir, 'train_stations.map'))
     
 # Remove the working files
-'''rail_files = os.listdir(temp_dir)
+rail_files = os.listdir(temp_dir)
 for f in rail_files:
-    os.remove(os.path.join(temp_dir, f))'''
+    os.remove(os.path.join(temp_dir, f))
 print('Train stations created.')
 
 # 6. other input data sets

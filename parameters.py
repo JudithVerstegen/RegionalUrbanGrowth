@@ -21,6 +21,7 @@ def getNrSamples():
 
 def getCountryName():
   """ Returns the case study symbol """
+  # case studies: 'IT', 'IR', 'PL'
 
   name = 'PL'
   return name
