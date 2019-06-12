@@ -506,7 +506,7 @@ class LandUseChangeModel(DynamicModel, MonteCarloModel, \
     self.landuse = self.readmap('input_data/init_lu')
     self.initialUrb = self.landuse == 1
     self.roads = self.readmap('input_data/roads')
-    self.noGoMap = cover(self.landuse == 2, boolean(self.nullMask))  ## same as self.noGoLanduseList
+    self.noGoMap = cover(self.landuse == 2, boolean(self.nullMask))  ## same as self.noGoLanduseList <- ADD nogo map, created by the create_initial_map.py
     self.zones = readmap('input_data/zones')
     self.samplePoints = self.readmap('input_data/sampPoint')
     self.sumStats = parameters.getSumStats()
