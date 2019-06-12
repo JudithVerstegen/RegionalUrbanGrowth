@@ -168,7 +168,9 @@ def omiss_commiss_map(prev, bool_map, randmap, omiss, simple_lu):
     ##new_map = pcrand(pcrnot(to_remove), pcror(bool_map, to_add))
     return to_remove, to_add
 
-def reproject(in_fn, out_fn, in_rast):
+def reproject(in_fn, out_fn, in_rast, data_type):
+    # data_type: ['point','polyline','polygon']
+    
     print('Reprojecting shapefile...')
     # Open the raster
     rast_data_source = gdal.Open(in_rast)
@@ -189,8 +191,7 @@ def reproject(in_fn, out_fn, in_rast):
     print('x, y:', originX, originY)
     
     rast_spatial_ref = rast_data_source.GetProjection()
-    #print('raster spatial ref is', rast_spatial_ref)
-
+    
     # Get the correct driver
     driver = ogr.GetDriverByName('ESRI Shapefile')
 
@@ -221,8 +222,15 @@ def reproject(in_fn, out_fn, in_rast):
         print('Could not create %s' % (out_fn))
 
     # Create the shapefile layer WITH THE SR
+    if data_type == 'point':
+        data_arg = ogr.wkbPoint
+    elif data_type == 'polyline':
+        data_arg = ogr.wkbLineString
+    elif data_type == 'polygon':
+        data_arg = ogr.wkbLinearRing
+        
     out_lyr = out_ds.CreateLayer('reprojected', sr, 
-                                 ogr.wkbLineString)
+                                 data_arg)
 
     out_lyr.CreateFields(layer.schema)
     out_defn = out_lyr.GetLayerDefn()
@@ -282,7 +290,7 @@ def rasterize(InputVector, OutputImage, RefImage):
     subprocess.call("gdaladdo --config COMPRESS_OVERVIEW DEFLATE "+OutputImage+" 2 4 8 16 32 64", shell=True)
     print("Rasterized.")
 
-def create_filtered_shapefile(in_shapefile, country, out_dir, out_name):
+def create_filtered_shapefile(in_shapefile, country, out_dir, out_name, filter_query):
     ### Script for selecting train stations from OSM transport data.
     ### Data was downlowaded for Ireland, Italy and Poland.
     ### Data is in folders with names corresponding to the names of the countries
@@ -301,12 +309,9 @@ def create_filtered_shapefile(in_shapefile, country, out_dir, out_name):
     
     # get the Layer class object
     input_layer = data_source.GetLayer(0)
-
-    # Filter by our query
-    query_str = "fclass = 'railway_station' OR fclass = 'railway_halt'"
     
     # Apply a filter
-    input_layer.SetAttributeFilter(query_str)
+    input_layer.SetAttributeFilter(filter_query)
     
     # Copy Filtered Layer and Output File
     driver = ogr.GetDriverByName('ESRI Shapefile')
@@ -400,7 +405,7 @@ raster_name = os.listdir(corine_dir)[0]
 print('Reference raster name ' + raster_name)
 ref_raster = os.path.join(corine_dir, raster_name, raster_name + '.tif')
 out_fn = os.path.join(data_dir, 'temporal_data/roads_reprojected.shp')
-reproject(in_shp, out_fn, ref_raster)
+reproject(in_shp, out_fn, ref_raster, 'polyline')
 # Rasterize the reprojected shapefile
 out_raster = os.path.join(raster_dir,'roads_raster.tif')
 rasterize(out_fn, out_raster, ref_raster)
@@ -409,8 +414,9 @@ nullmask = spatial(nominal(0))
 report(cover(roads, nullmask), os.path.join(country_dir, 'roads.map'))
 # Remove the working files
 road_files = os.listdir(temp_dir)
-for f in road_files:
-    os.remove(os.path.join(temp_dir, f))
+'''for f in road_files:
+    os.remove(os.path.join(temp_dir, f))'''
+print('Roads created.')
 
 # 5. train station map outside loop
 print('-------------------- Train stations --------------------')
@@ -426,13 +432,15 @@ for f in os.listdir(railway_dir):
     f_name = 'stations_' + f
     out_dir = os.path.join(data_dir, 'temporal_data')
     out_name = 'stations_' + f
-    create_filtered_shapefile(in_fn, f, out_dir, out_name)
+    # Filter by our query
+    query_str = "fclass = 'railway_station' OR fclass = 'railway_halt'"
+    create_filtered_shapefile(in_fn, f, out_dir, out_name, query_str)
     print(f, ': Filtered shapefile created.')
 
     # 2. Reproject the shapefiles
     in_shp = os.path.join(data_dir, 'temporal_data', out_name + '.shp')
     out_shp = os.path.join(data_dir, 'temporal_data', out_name + '_reprojected.shp')
-    reproject(in_shp, out_shp, ref_raster)
+    reproject(in_shp, out_shp, ref_raster, 'point')
 
     # 3. Rasterize the reprojected shapefile
     f_dir = os.path.join(railway_dir, f)
