@@ -29,7 +29,7 @@ data_dir = os.path.join(os.getcwd(), 'data')
 # Coordinates of case study region
 # in ERST 1989 (Corine projection) as [x0, y0, x1, y1]
 # current: Warsaw
-coords = [4992510,3212710,5152510,3372710]
+coords = [5002510,3212710,5162510,3372710] 
 
 # zone size as a factor of the cell size
 zone_size = 300 # 100 x 100 m = 10 000 m = 10x10 km
@@ -105,8 +105,9 @@ def clip(rast, coords):
     data = in_band.ReadAsArray(ul_x, ul_y, out_columns, out_rows)
     return data
 
-def clip_and_convert(in_fn, coords, nodata):        
+def clip_and_convert(in_fn, coords, nodata, datatype):        
     '''Open, clip and convert dataset to PCRaster map.'''
+    '''datatype: Boolean, Nominal, Ordinal, Scalar, Directional or Ldd'''
     rast_data_source = gdal.Open(in_fn)
     # Get georeference info
     geotransform = rast_data_source.GetGeoTransform()
@@ -117,7 +118,7 @@ def clip_and_convert(in_fn, coords, nodata):
     origin_y = geotransform[3]
     print('x, y:', origin_x, origin_y)
     data = clip(rast_data_source, coords)
-    themap = numpy2pcr(Nominal, data, nodata)
+    themap = numpy2pcr(datatype, data, nodata)
     ##print data
     del rast_data_source
     return themap
@@ -325,14 +326,36 @@ def create_filtered_shapefile(in_shapefile, country, out_dir, out_name, filter_q
     
     del input_layer, out_layer, out_ds
 
-def reproject_tif(in_raster, out_raster, ref_raster):
-    print('Reprojecting tif...')
-    Image = gdal.Open(ref_raster, gdal.GA_ReadOnly) 
-    proj = osr.SpatialReference(wkt=Image.GetProjection())
-    arg = 'EPSG:' + str(proj.GetAttrValue('AUTHORITY',1)).strip()
-    gdal.Warp(out_raster,in_raster,dstSRS=arg)
-    print('Tif reprojected')
-    del Image
+def reproject_resample_tif(in_raster, out_raster, ref_raster):
+    ''' Reprojects the inout raster to match the CRS and cell size of the reference raster.'''
+    ''' Resampling method: Nearest Neighbour.'''
+    print('Reprojecting and resampling tif...')
+
+    theinput = gdal.Open(in_raster, gdal.GA_ReadOnly)
+    inputProj = theinput.GetProjection()
+    inputTrans = theinput.GetGeoTransform()
+
+    reference = gdal.Open(ref_raster, gdal.GA_ReadOnly)
+    referenceProj = reference.GetProjection()
+    referenceTrans = reference.GetGeoTransform()
+    bandreference = reference.GetRasterBand(1)    
+    x = reference.RasterXSize 
+    y = reference.RasterYSize
+    
+    # Chceck if raster exists. If yes, delete.
+    if os.path.exists(out_raster):
+        print('Raster exists, deleting')
+        os.remove(out_raster)
+        
+    driver= gdal.GetDriverByName('GTiff')
+    output = driver.Create(out_raster,x,y,1,bandreference.DataType)
+    output.SetGeoTransform(referenceTrans)
+    output.SetProjection(referenceProj)
+
+    gdal.ReprojectImage(theinput,output,inputProj,referenceProj,gdal.GRA_NearestNeighbour)
+    print('Tif reprojected and resampled')
+
+    del theinput, output, reference
 
  
 ############
@@ -385,7 +408,7 @@ for a_name in os.listdir(corine_dir):
             in_fn = os.path.join(corine_dir, a_name, a_name + '.tif')
         print(in_fn)
         setclone('clone')
-        lu = clip_and_convert(in_fn, coords, 999)
+        lu = clip_and_convert(in_fn, coords, 999, Nominal)
         report(lu, os.path.join('observations', country, a_name[13:15] + '.map'))
 
         # 2. urban map
@@ -399,13 +422,15 @@ for a_name in os.listdir(corine_dir):
             simple_lu = simplify_lu_map(lu)
             report(simple_lu, os.path.join(country_dir, 'init_lu.map'))
 
+# Select the dir for the temporal working files
+temp_dir = os.path.join(data_dir, 'temporal_data')
+
+print('-------------------- Reference raster --------------------')
 # Select the 1990 Corine raster as the reference raster for further actions
 raster_name = os.listdir(corine_dir)[0]
 print('Reference raster name ' + raster_name)
 ref_raster = os.path.join(corine_dir, raster_name, raster_name + '.tif')
-# Select the dir for the temporal working files
-temp_dir = os.path.join(data_dir, 'temporal_data')
-        
+    
 # 4. road map outside loop
 print('------------------------- Roads -------------------------')
 # Road dataset will be reprojected and rasterized and saved into 'raster' folder inside the road_dir.
@@ -485,24 +510,45 @@ protected_dir = os.path.join(data_dir, 'NATURA2000')
 in_fn = os.path.join(protected_dir, 'Natura2000_end2018_epsg3035.shp')
 raster_dir = os.path.join(protected_dir, 'raster')
 out_raster = os.path.join(raster_dir,'protected.tif')
-rasterize(in_fn, out_raster, ref_raster)
+'''rasterize(in_fn, out_raster, ref_raster)'''
+
+### 2. Create the map file
+protected = clip_and_convert(out_raster, coords, 255, Nominal)
+report(cover(protected, nullmask), os.path.join(country_dir, 'NATURA2000.map'))
+print('Protected areas created.')
 
 print('----------- 2. Steep areas -----------')
-### 1. Calculate slope from the DEM
 # Opend the DEM
 dem_names = {
     'IT': 'eu_dem_v11_E40N20',
     'IR': 'eu_dem_v11_E30N30',
-    'PL': 'eu_dem_v11_E50N30'
+    'PL': 'eu_dem_v11_E50N30' 
     }
 dem_dir = os.path.join(data_dir, 'DEM', country, dem_names[country] + '.TIF')
-dem_repr = os.path.join(temp_dir,'reprojected_dem_' + country + '.tif')
-# Reproject
-reproject_tif(dem_dir, dem_repr, ref_raster)
+dem_repr = os.path.join(temp_dir, 'reprojected_dem_' + country + '.tif')
+# Reproject and resample DEM tif to match the CLC dataset
+reproject_resample_tif(dem_dir, dem_repr, ref_raster)
 # Clip and convert
-slope = clip_and_convert(dem_repr, coords, 255)
-nullmask = spatial(nominal(0))
-report(cover(slope, nullmask), os.path.join(country_dir, 'dem.map'))
+dem = clip_and_convert(dem_repr, coords, 255, Scalar)
+nullmask = spatial(scalar(0))
+report(cover(dem, nullmask), os.path.join(country_dir, 'dem.map'))
+print('DEM map created.')
+# Calculate the slope
+slope = slope(dem)
+report(cover(slope, nullmask), os.path.join(country_dir, 'slope.map'))
+print('Slope map created.')
+# Remove the working files
+dem_files = os.listdir(temp_dir)
+for f in dem_files:
+    os.remove(os.path.join(temp_dir, f))
+
+
+print('------------ 3. No-go map ------------')
+# Combine the maps into the no-go map
+# NATURA2000 and slope >30 degrees (around 58%) are excluded
+nogo = pcror(boolean(protected),slope>=0.58)
+report(nogo, os.path.join(country_dir, 'nogo.map')) # SHOULD I USE COVER() FUNCTION?
+print('nogo map created.')
 
 # 7. other input data sets
 # Masks with 0 and 1 for the study area and NoData elsewhere
