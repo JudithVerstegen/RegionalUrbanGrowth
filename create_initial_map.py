@@ -357,7 +357,6 @@ def reproject_resample_tif(in_raster, out_raster, ref_raster):
 
     del theinput, output, reference
 
- 
 ############
 ### main ###
 ############
