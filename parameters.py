@@ -21,9 +21,9 @@ def getNrSamples():
 
 def getCountryName():
   """ Returns the case study symbol """
-  # case studies: 'IT', 'IR', 'PL'
+  # case studies: 'IT', 'IE', 'PL'
 
-  name = 'PL'
+  name = 'IE'
   return name
   
   
@@ -41,7 +41,7 @@ def getSumStats():
   # 'awmpfd': Area weighted mean patch fractal dimension <- not implemented
   # 'fd': Fractal dimension
   
-  sumStats = ['np', 'fd', 'mp', 'np', 'pd']
+  sumStats = ['np']
   return sumStats
 
 def getCovarName():
