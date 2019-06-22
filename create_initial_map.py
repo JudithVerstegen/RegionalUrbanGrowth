@@ -28,17 +28,28 @@ data_dir = os.path.join(os.getcwd(), 'data')
 
 # Coordinates of case study region
 # in ERST 1989 (Corine projection) as [x0, y0, x1, y1]
-# current: Warsaw
-coords = [5002510,3212710,5162510,3372710] 
+country = parameters.getCountryName()
+coords_dict = {
+    'IE':[3167978,3406127,3327978,3566127],
+    'IT':[4172280,2403670,4332280,2563670],
+    'PL':[5002510,3212710,5162510,3372710]
+}
+
+# Dublin, IE [3167978,3406127,3327978,3566127]
+# Milan, IT [4172280,2403670,4332280,2563670]
+# Warsaw, PL [5002510,3212710,5162510,3372710]
+
+# current: Dublin
+coords = coords_dict[country] 
 
 # zone size as a factor of the cell size
 zone_size = 300 # 100 x 100 m = 10 000 m = 10x10 km
 # for creating observations
-realizations = 5 #20
+realizations = 20
 # window size as a factor of the cell size
 corr_window_size = 50
 omission = 10#52
-metric_names = ['np'] # parameters.getSumStats()
+metric_names = parameters.getSumStats()
 
 #################
 ### functions ###
@@ -125,7 +136,7 @@ def clip_and_convert(in_fn, coords, nodata, datatype):
 
 def select_urban(land_use):
     '''Create a Boolean map of all urban land uses from Corine.Without 122 (roads) and 124 (airports)'''
-    urban = pcrand(scalar(land_use) < 200, pcrand(pcrnot(scalar(land_use) == 122), pcrnot(scalar(land_use) == 124)))
+    urban = pcrand(scalar(land_use) < 200, pcrand(scalar(land_use) > 0,pcrand(pcrnot(scalar(land_use) == 122), pcrnot(scalar(land_use) == 124))))
     #aguila(urban)
     return urban
     
@@ -134,7 +145,7 @@ def simplify_lu_map(amap):
     # 1 = urban
     urban = select_urban(amap)
     landuse = nominal(urban)
-    # 2 = water AND ROADS
+    # 2 = water AND ROADS and NoData (added later)
     water = pcror(pcror(pcrand(scalar(amap) > 500, scalar(amap) < 900), scalar(amap) == 122), scalar(amap) == 124)
     landuse = ifthenelse(water, nominal(2), landuse)
     # 3 = nature
@@ -143,6 +154,9 @@ def simplify_lu_map(amap):
     # 4 = agriculture
     ag = pcrand(scalar(amap) > 200, scalar(amap) < 300)
     landuse = ifthenelse(ag, nominal(4), landuse)
+    # NODATA = 2
+    nodata = (landuse==0)
+    landuse = ifthenelse(nodata, nominal(2), landuse)
     return landuse
 
 def omiss_commiss_map(prev, bool_map, randmap, omiss, simple_lu):
@@ -363,7 +377,6 @@ def reproject_resample_tif(in_raster, out_raster, ref_raster):
 
 # 0. clean the two directories (input_data and observations)
 # Folders input_data and observations have to exist
-country = parameters.getCountryName()
 country_dir = os.path.join(os.getcwd(), 'input_data', str(country))
 if not os.path.isdir(country_dir):
     os.mkdir(country_dir)
@@ -445,7 +458,7 @@ reproject(in_shp, out_fn, ref_raster, 'polyline')
 # Rasterize the reprojected shapefile
 out_raster = os.path.join(raster_dir,'roads_raster.tif')
 rasterize(out_fn, out_raster, ref_raster)
-roads = clip_and_convert(out_raster, coords, 255)
+roads = clip_and_convert(out_raster, coords, 255, Nominal)
 nullmask = spatial(nominal(0))
 report(cover(roads, nullmask), os.path.join(country_dir, 'roads.map'))
 # Remove the working files
@@ -485,7 +498,7 @@ out_raster = os.path.join(raster_dir,'stations_' + country + '.tif')
 rasterize(out_shp, out_raster, ref_raster)
 
 ### 4. Create the map files
-stations = clip_and_convert(out_raster, coords, 255)
+stations = clip_and_convert(out_raster, coords, 255, Nominal)
 nullmask = spatial(nominal(0))
 report(cover(stations, nullmask), os.path.join(country_dir, 'train_stations.map'))
     
@@ -520,7 +533,7 @@ print('----------- 2. Steep areas -----------')
 # Opend the DEM
 dem_names = {
     'IT': 'eu_dem_v11_E40N20',
-    'IR': 'eu_dem_v11_E30N30',
+    'IE': 'eu_dem_v11_E30N30',
     'PL': 'eu_dem_v11_E50N30' 
     }
 dem_dir = os.path.join(data_dir, 'DEM', country, dem_names[country] + '.TIF')
@@ -588,7 +601,22 @@ command = 'map2col --unitcell ' + os.path.join(country_dir, 'sampPoint.map') + \
           ' ' + os.path.join(country_dir, 'sampPoint.col')
 os.system(command)
 
-# 9. realizations and their summary statistics
+# 9. summary statistics with no stochasticity
+print('---------------------- Statistics ----------------------')
+print('------------ CLC area ------------')
+area = {}
+
+for year in ['90','00','06','12','18']:
+    amap = readmap(os.path.join(os.getcwd(), 'observations', \
+                                country, 'urb' + year + '.map'))
+    # collect total area data for demand
+    area[year] = float(maptotal(scalar(amap)))
+print('Area from CLC:')
+print(area)
+print('')
+
+# 10. realizations and their summary statistics
+print('------------ Realizations ------------')
 # list of pairs of actual year and time step
 if not os.path.exists(os.path.join(os.getcwd(), 'observations', \
                                    country, 'realizations')):
@@ -648,7 +676,7 @@ for i in range(1, realizations + 1):
                             year[1]))
             j+=1
         prev = amap
-        
+print('Stochastic area:')        
 print(mins)
 print(maxs)
 print(avs)
