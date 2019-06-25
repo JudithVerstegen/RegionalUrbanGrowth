@@ -320,7 +320,7 @@ def create_filtered_shapefile(in_shapefile, country, out_dir, out_name, filter_q
     
     # Check to see if shapefile is found.
     if data_source is None:
-        print('Could not open %s' % (in_path))
+        print('Could not open %s' % (in_shapefile))
     
     # get the Layer class object
     input_layer = data_source.GetLayer(0)
@@ -448,15 +448,14 @@ print('------------------------- Roads -------------------------')
 # Road dataset will be reprojected and rasterized and saved into 'raster' folder inside the road_dir.
 # 'raster' folder needs to exist.
 road_dir = os.path.join(data_dir, 'roads')
-raster_dir = os.path.join(road_dir, 'raster')
 
 # Reproject the input vector data using the raster as the reference layer
 # Save the reprojected file in the input_data folder and remove later
 in_shp = os.path.join(road_dir, 'roads.shp')
-out_fn = os.path.join(data_dir, 'temporal_data/roads_reprojected.shp')
+out_fn = os.path.join(data_dir, 'temporal_data', 'roads_reprojected.shp')
 reproject(in_shp, out_fn, ref_raster, 'polyline')
 # Rasterize the reprojected shapefile
-out_raster = os.path.join(raster_dir,'roads_raster.tif')
+out_raster = os.path.join(data_dir, 'temporal_data', 'roads_raster.tif')
 rasterize(out_fn, out_raster, ref_raster)
 roads = clip_and_convert(out_raster, coords, 255, Nominal)
 nullmask = spatial(nominal(0))
@@ -493,8 +492,8 @@ reproject(in_shp, out_shp, ref_raster, 'point')
 
 ### 3. Rasterize the reprojected shapefile
 f_dir = os.path.join(railway_dir, country)
-raster_dir = os.path.join(f_dir, 'raster')
-out_raster = os.path.join(raster_dir,'stations_' + country + '.tif')
+##raster_dir = os.path.join(f_dir, 'raster')
+out_raster = os.path.join(data_dir, 'temporal_data', 'stations_' + country + '.tif')
 rasterize(out_shp, out_raster, ref_raster)
 
 ### 4. Create the map files
@@ -520,9 +519,9 @@ protected_dir = os.path.join(data_dir, 'NATURA2000')
 ### 1. Rasterize the projected area shapefile
 # Select the input and output dir and name
 in_fn = os.path.join(protected_dir, 'Natura2000_end2018_epsg3035.shp')
-raster_dir = os.path.join(protected_dir, 'raster')
-out_raster = os.path.join(raster_dir,'protected.tif')
-'''rasterize(in_fn, out_raster, ref_raster)'''
+##raster_dir = os.path.join(protected_dir, 'raster')
+out_raster = os.path.join(data_dir, 'temporal_data','protected.tif')
+rasterize(in_fn, out_raster, ref_raster)
 
 ### 2. Create the map file
 protected = clip_and_convert(out_raster, coords, 255, Nominal)

@@ -108,16 +108,21 @@ class LandUseType:
     return roadSuitability
 
   ## 3
-  def getYieldSuitability(self, yieldMap):
-    """Return suitability map based on yield for crops or cattle."""
-    #LOADED HERE BECAUSE OF ONEMAP
+  def getTravelTimeCityBorder(self):
+    """Return suitability map based on distance to large cities."""
+    booleanSelf = pcreq(self.environment, self.typeNr)
+    clumps = clump(ifthen(booleanSelf == 1, boolean(1)))
+    sizes = areaarea(clumps)
+    city = cover(sizes == mapmaximum(sizes), boolean(0))
+
+    dist = spread(city, 0, self.friction)
+    # The usual way
     variableList = self.variableDict.get(3)
     a = variableList[0]
-    yieldSuitability = yieldMap ** a
-##    yieldRelation = yexp(yieldFrac)
-##    yieldSuitability = self.normalizeMap(yieldRelation)
-##    report(yieldSuitability, 'yieldSuit')
-    return yieldSuitability
+    normalized = self.normalizeMap(dist)
+    travelSuitability = 1 - (normalized ** a)  
+    report(travelSuitability, 'travelSuit' + str(self.typeNr))
+    return travelSuitability
 
   ## 4
   def getCurrentLandUseSuitability(self):
@@ -132,41 +137,15 @@ class LandUseType:
 ##    report(currentLandUseSuitbaility, 'autoSuit')
     return currentLandUseSuitbaility
 
-  ## 5
-  def getRandomSuitability(self):
-    """Return suitability that is completely random."""
-    randmap = windowaverage(uniform(boolean(self.yieldFrac)), \
-                            10 * celllength())
-    randomSuitability = self.normalizeMap(randmap)
-    return randomSuitability
-
-  ## 6
-  def getTravelTimeMadrid(self):
-    """Return suitability map based on distance to large cities."""
-    booleanSelf = pcreq(self.environment, self.typeNr)
-    clumps = clump(ifthen(booleanSelf == 1, boolean(1)))
-    sizes = areaarea(clumps)
-    madrid = cover(sizes == mapmaximum(sizes), boolean(0))
-
-    dist = spread(madrid, 0, self.friction)
-    # The usual way
-    variableList = self.variableDict.get(6)
-    a = variableList[0]
-    normalized = self.normalizeMap(dist)
-    travelSuitability = 1 - (normalized ** a)  
-    report(travelSuitability, 'travelSuit' + str(self.typeNr))
-    return travelSuitability
  
-  def createInitialSuitabilityMap(self, distRoads, yieldFrac, friction):
+  def createInitialSuitabilityMap(self, distmap, yieldFrac, friction):
     """Return the initial suitability map, i.e. for static factors.
 
     Given the maps:
-    distRoads -- distances to roads
-    distWater -- distances to open water
-    distCities -- distances to cities
+    distmap -- distances to something 
     yieldFrac -- fraction of maximum yield that can be reached in a cell
-    slope -- slope (fraction, i.e. 0.12 = 12%)
-    distMills -- distances to sugar cane mills
+                (is kept for potential later use of population density)
+    friction -- friction computed from road map (for distance urban border)
     
     Uses a lists and two dictionaries created at construction of the object:
     factors -- the names (nrs) of the suitability factors (methods) needed
@@ -188,16 +167,13 @@ class LandUseType:
     for aFactor in self.suitFactorList:
       if aFactor == 2:
         self.initialSuitabilityMap += self.weightList[i] * \
-                                 self.getDistanceSuitability(distRoads)
+                                 self.getDistanceSuitability(distmap)
         self.weightInitialSuitabilityMap += self.weightList[i]      
-      elif aFactor == 3:
+      elif aFactor == 4:
         self.initialSuitabilityMap += self.weightList[i] * \
-                                      self.getYieldSuitability(yieldFrac)
+                          self.getCurrentLandUseSuitability()
         self.weightInitialSuitabilityMap += self.weightList[i]
-##      elif  aFactor == 6:
-##        self.initialSuitabilityMap += self.weightList[i] * \
-##                                      self.getTravelTimeMadrid()
-      elif aFactor in (1, 4, 5, 6):
+      elif aFactor in (1, 3):
         ## Dynamic factors are captured in the total suitability map
         pass
       else:
@@ -228,15 +204,10 @@ class LandUseType:
     for aFactor in self.suitFactorList:
       if aFactor == 1:
         suitabilityMap += self.weightList[i] * self.getNeighborSuitability()
-      elif aFactor == 4:
+      elif aFactor == 3:
         suitabilityMap += self.weightList[i] * \
-                          self.getCurrentLandUseSuitability()
-      elif aFactor == 5:
-        suitabilityMap += self.weightList[i] * \
-                          self.getRandomSuitability()
-      elif  aFactor == 6:
-        suitabilityMap += self.weightList[i] * self.getTravelTimeMadrid()
-      elif aFactor in (2, 3):#, 6):
+                                      self.getTravelTimeCityBorder()
+      elif aFactor in (2, 4):
         # Static factors already captured in the initial suitability map
         pass
       else:
@@ -431,17 +402,17 @@ class LandUse:
       self.landUseTypes[i].createInitialMask(self.excluded)
       i += 1
 
-  def determineDistanceToRoads(self, mapRoads):
+  def determineDistanceToStations(self, mapStations):
     """Create map with distance to roads, given a boolean map with roads."""
-    # roads now as boolean
-    roads = pcrne(mapRoads, 0)
-    self.distRoads = spread(roads, 0, 1)
-    report(self.distRoads, 'distRoads.map')
+    # stations now as boolean
+    stations = pcrne(mapStations, 0)
+    self.distStations = spread(stations, 0, 1)
+    report(self.distStations, 'distStations.map')
     
   def loadDistanceMaps(self):
     """load the distance maps, when they cannot be kept in memory (fork)"""
 ##    print os.getcwd()
-    self.distRoads = readmap('distRoads')
+    self.distStations = readmap('distStations')
     self.relativeFriction = readmap('relativeFriction')
 
   def determineSpeedRoads(self, nominalMapRoads):
@@ -458,7 +429,7 @@ class LandUse:
     for aType in self.landUseTypes:
       # Check whether the type has static suitability factors
       # Those have to be calculated only once (in initial)
-      aType.createInitialSuitabilityMap(self.distRoads, stochYieldMap,\
+      aType.createInitialSuitabilityMap(self.distStations, stochYieldMap,\
                                         self.relativeFriction)
 
   def calculateSuitabilityMaps(self):      
@@ -515,10 +486,10 @@ class LandUseChangeModel(DynamicModel):
     # in that case land use should not include urban
     self.landuse = self.readmap(self.inputfolder + '/init_lu')
     self.initialUrb = self.landuse == 1
-    self.roads = self.readmap('input_data/roads')
-    self.noGoMap = cover(self.landuse == 2, boolean(self.nullMask))  ## same as self.noGoLanduseList <- ADD nogo map, created by the create_initial_map.py
-    self.zones = readmap('input_data/zones')
-    self.samplePoints = self.readmap('input_data/sampPoint')
+    self.roads = self.readmap(self.inputfolder + '/roads')
+    self.noGoMap = self.readmap(self.inputfolder + '/nogo')
+    self.zones = readmap(self.inputfolder + '/zones')
+    self.samplePoints = self.readmap(self.inputfolder + '/sampPoint')
     self.sumStats = parameters.getSumStats()
     self.yieldMap = scalar(self.oneMask)
 
@@ -534,8 +505,6 @@ class LandUseChangeModel(DynamicModel):
     # Uniform map of very small numbers, used to avoid equal suitabilities
     self.noise = uniform(1)/10000
     
-
-
     # This part used to be the initial
     # Set seeds to be able to reproduce results
     random.seed(10)
@@ -624,10 +593,12 @@ nrOfParameters = len(parameters.getSuitFactorDict()[1])
 # Before loop to save computation time
 inputfolder = os.path.join('input_data', parameters.getCountryName())
 nullMask = readmap(inputfolder + '/nullmask')
-roads = readmap(inputfolder + '/roads')
+
 landUseList = parameters.getLandUseList()
 preMCLandUse = LandUse(landUseList, nullMask)
-preMCLandUse.determineDistanceToRoads(roads)
+stations = readmap(inputfolder + '/train_stations')
+preMCLandUse.determineDistanceToStations(stations)
+roads = readmap(inputfolder + '/roads')
 preMCLandUse.determineSpeedRoads(roads)
 
 # Set step size for calibration, put in parameters file?

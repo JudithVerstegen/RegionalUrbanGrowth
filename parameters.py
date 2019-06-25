@@ -23,7 +23,7 @@ def getCountryName():
   """ Returns the case study symbol """
   # case studies: 'IT', 'IE', 'PL'
 
-  name = 'IE'
+  name = 'PL'
   return name
   
   
@@ -80,7 +80,7 @@ def getSuitFactorDict():
   land use type 1 uses suitability factors 1, 2, 4, 5, 6 and 9."""
   
   suitFactorDict = {}
-  suitFactorDict[1] = [1, 6, 4, 5]
+  suitFactorDict[1] = [1, 2, 3, 4]
   return suitFactorDict
 
 def getWeightDict():
@@ -122,8 +122,8 @@ def getVariableSuperDict():
   variableDict1 = {}
   variableDict1[1] = [500, 0.7]
   variableDict1[2] = [0.3]
-  variableDict1[4] = {4:1, 99:0.5}
-  variableDict1[6] = [1]
+  variableDict1[3] = [1]
+  variableDict1[4] = {1:0, 2:0, 3:0.5, 4:1}
   variableSuperDict[1] = variableDict1
   return variableSuperDict
 
