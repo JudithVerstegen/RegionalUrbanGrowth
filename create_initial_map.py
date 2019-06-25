@@ -35,10 +35,6 @@ coords_dict = {
     'PL':[5002510,3212710,5162510,3372710]
 }
 
-# Dublin, IE [3167978,3406127,3327978,3566127]
-# Milan, IT [4172280,2403670,4332280,2563670]
-# Warsaw, PL [5002510,3212710,5162510,3372710]
-
 # current: Dublin
 coords = coords_dict[country] 
 
@@ -145,7 +141,7 @@ def simplify_lu_map(amap):
     # 1 = urban
     urban = select_urban(amap)
     landuse = nominal(urban)
-    # 2 = water AND ROADS and NoData (added later)
+    # 2 = water AND ROADS
     water = pcror(pcror(pcrand(scalar(amap) > 500, scalar(amap) < 900), scalar(amap) == 122), scalar(amap) == 124)
     landuse = ifthenelse(water, nominal(2), landuse)
     # 3 = nature
@@ -154,9 +150,11 @@ def simplify_lu_map(amap):
     # 4 = agriculture
     ag = pcrand(scalar(amap) > 200, scalar(amap) < 300)
     landuse = ifthenelse(ag, nominal(4), landuse)
-    # NODATA = 2
+    # 5 = NODATA # find nodata in pcraster
     nodata = (landuse==0)
-    landuse = ifthenelse(nodata, nominal(2), landuse)
+    landuse = ifthenelse(nodata, nominal(5), landuse)
+
+    landuse = ifthen(scalar(landuse)<5, landuse)
     return landuse
 
 def omiss_commiss_map(prev, bool_map, randmap, omiss, simple_lu):
