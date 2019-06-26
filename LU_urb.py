@@ -90,7 +90,7 @@ class LandUseType:
     neighborSuitability = -1*(nrNeighborsSameLU**2) + f * 2 * maxNr *\
                                nrNeighborsSameLU
     neighborSuitability = self.normalizeMap(neighborSuitability)
-##    report(neighborSuitability, 'neighborSuitability_new')
+    report(neighborSuitability, 'suit_neigh' + str(self.typeNr))
 ##    maxNr = ((windowLength / celllength())**2) - 1
 ##    report(maxNr, 'test_old')
 ##    neighborSuitability = nrNeighborsSameLU / maxNr
@@ -104,7 +104,7 @@ class LandUseType:
     a = variableList[0]
     normalized = self.normalizeMap(spreadMap)
     roadSuitability = 1 - (normalized ** a)  
-    ##report(roadSuitability, 'roadSuit' + str(self.typeNr))
+    report(roadSuitability, 'suit_station' + str(self.typeNr))
     return roadSuitability
 
   ## 3
@@ -116,12 +116,11 @@ class LandUseType:
     city = cover(sizes == mapmaximum(sizes), boolean(0))
 
     dist = spread(city, 0, self.friction)
-    # The usual way
     variableList = self.variableDict.get(3)
     a = variableList[0]
     normalized = self.normalizeMap(dist)
     travelSuitability = 1 - (normalized ** a)  
-    report(travelSuitability, 'travelSuit' + str(self.typeNr))
+    report(travelSuitability, 'suit_travel' + str(self.typeNr))
     return travelSuitability
 
   ## 4
@@ -132,9 +131,8 @@ class LandUseType:
     for aKey in variableDict.keys():
       current = ifthenelse(pcreq(self.environment, aKey), \
                            variableDict.get(aKey), current)
-##      print 'HERE', aKey, variableDict.get(aKey)
     currentLandUseSuitbaility = self.normalizeMap(current)
-##    report(currentLandUseSuitbaility, 'autoSuit')
+    report(currentLandUseSuitbaility, 'suit_curLu' + str(self.typeNr))
     return currentLandUseSuitbaility
 
  
@@ -216,6 +214,7 @@ class LandUseType:
     suitabilityMap += self.weightInitialSuitabilityMap * \
                       self.initialSuitabilityMap
     self.totalSuitabilityMap = self.normalizeMap(suitabilityMap)
+    report(self.totalSuitabilityMap, 'suit_tot' + str(self.typeNr))
     return self.totalSuitabilityMap
 
   def setMaxYield(self, maxYield):
@@ -487,7 +486,8 @@ class LandUseChangeModel(DynamicModel):
     self.landuse = self.readmap(self.inputfolder + '/init_lu')
     self.initialUrb = self.landuse == 1
     self.roads = self.readmap(self.inputfolder + '/roads')
-    self.noGoMap = self.readmap(self.inputfolder + '/nogo')
+    self.noGoMap = cover(self.readmap(self.inputfolder + '/nogo'), \
+                         boolean(self.nullMask))
     self.zones = readmap(self.inputfolder + '/zones')
     self.samplePoints = self.readmap(self.inputfolder + '/sampPoint')
     self.sumStats = parameters.getSumStats()
