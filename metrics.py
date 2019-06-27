@@ -6,7 +6,7 @@ from pcraster import *
 from pcraster.framework import *
 import parameters
 
-inputfolder = os.path.join('input_data', parameters.getCountryName())
+inputfolder = os.path.join(os.getcwd(), 'input_data', parameters.getCountryName())
 
 def map2Array(filename, rowColFile):
   """Selects values at row, col from raster name in Monte Carlo samples.
@@ -94,29 +94,35 @@ def calculateSumStats(systemState, listOfSumStats, zones, validation=False):
 ##  systemState = ifthen(mask, systemState)
   unique = uniqueid(boolean(spatial(scalar(1))))
   clumps = ifthen(boolean(systemState) == 1, clump(boolean(systemState)))
-  numberMap = areadiversity(clumps, spatial(nominal(1)))
+  numberMap = areadiversity(clumps, spatial(nominal(1))) # doesnt work for test map
+  #aguila(numberMap)
   for aStat in listOfSumStats:
     if aStat == 'np': # Number of patches 
       average_nr = cover(areadiversity(clumps, zones), spatial(scalar(0)))  
       listOfMaps.append(average_nr)
     elif aStat == 'pd': # Patch density
-      average_nr = cover(areadiversity(clumps, zones), spatial(scalar(0))) 
-      zone_area = areaarea(zones) 
+      average_nr = cover(areadiversity(clumps, zones), spatial(scalar(0)))
+      #aguila(average_nr)
+      zone_area = areaarea(zones) # unit? zones are defined as 300, here they are calculated as 30 000
+      #aguila(zone_area)
       patch_density = average_nr/zone_area
       listOfMaps.append(patch_density)
-    elif aStat == 'mp': # Mean patch size 
-      patchSizes = areaarea(clumps)/parameters.getConversionUnit() 
-      oneCellPerPatch = pcreq(areamaximum(unique, clumps), unique) 
-      patchSizeOneCell = ifthen(oneCellPerPatch, patchSizes) 
-      averagePatchSize = areaaverage(patchSizeOneCell, zones) 
-      listOfMaps.append(averagePatchSize) 
-    elif aStat == 'fd': # Fractal dimension 
-      scNegative = ifthenelse(boolean(systemState) == 1, boolean(0), boolean(1))
-      borders = ifthen(boolean(systemState) == 1, \
-                       window4total(scalar(scNegative))) 
+    elif aStat == 'mp': # Mean patch size. If patch is in more than one zone it is assigned to one zone only...
+      # the same trik as with the sea
       patchSizes = areaarea(clumps)/parameters.getConversionUnit()
-      fractal_dimension = 2*(ln(borders)/ln(patchSizes))
-      listOfMaps.append(fractal_dimension) 
+      oneCellPerPatch = pcreq(areamaximum(unique, clumps), unique)
+      patchSizeOneCell = ifthen(oneCellPerPatch, patchSizes)
+      averagePatchSize = areaaverage(patchSizeOneCell, zones)
+      averagePatchSizeScalar = cover(averagePatchSize, spatial(scalar(0)))
+      listOfMaps.append(averagePatchSizeScalar) 
+    elif aStat == 'fd': # Fractal dimension. ### Value of the metric is dependend on the unit used ###
+      scNegative = ifthenelse(boolean(systemState) == 1, boolean(0), boolean(1))
+      borders = ifthen(boolean(systemState) == 1, window4total(scalar(scNegative)))
+      perimeter = areatotal(borders, nominal(clumps)) 
+      patchSizes = areaarea(clumps)/parameters.getConversionUnit()
+      fractalDimension = 2*ln(perimeter)/ln(patchSizes)
+      fractalDimensionScalar = cover(fractalDimension, spatial(scalar(0)))
+      listOfMaps.append(fractalDimensionScalar) 
     else:
       print('ERRRRRRRRRRRROR, unknown sum stat')
   return listOfMaps
@@ -183,10 +189,14 @@ def makeCalibrationMask(rowColFile, zoneMap):
 
 # TEST
 """ Testing on the map with one zone: size 30 km x 30 km, with one patch: area 30 km2, perimeter 80 km"""
-systemState = readmap(inputfolder + '/init_lu.map') == 1 # select urban
-zones = readmap(inputfolder + '/zones.map')
-# put HERE the name(s) of the metric(s) you want to test 
-metrics = ['fd']
+test_map = os.path.join(os.getcwd(), 'data', 'test_data', 'metric_test_3patches_IE.map')
+aguila(test_map)
+systemState = readmap(test_map) == 1 # select urban or predefined pattern
+zones_map = os.path.join(inputfolder, 'zones.map')
+zones = readmap(zones_map)
+# put HERE the name(s) of the metric(s) you want to test
+# ['np', 'pd', 'mp', 'fd']
+metrics = ['mp']
 listofmaps = calculateSumStats(systemState, metrics, zones)
 aguila(listofmaps[0])
 
