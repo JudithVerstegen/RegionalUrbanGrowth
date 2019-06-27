@@ -182,10 +182,11 @@ def makeCalibrationMask(rowColFile, zoneMap):
   report(blocksTrue, inputfolder + '/zones_validation.map')
 
 # TEST
+""" Testing on the map with one zone: size 30 km x 30 km, with one patch: area 30 km2, perimeter 80 km"""
 systemState = readmap(inputfolder + '/init_lu.map') == 1 # select urban
 zones = readmap(inputfolder + '/zones.map')
 # put HERE the name(s) of the metric(s) you want to test 
-metrics = ['mp']
+metrics = ['fd']
 listofmaps = calculateSumStats(systemState, metrics, zones)
 aguila(listofmaps[0])
 
