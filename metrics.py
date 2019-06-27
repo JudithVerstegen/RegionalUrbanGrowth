@@ -174,8 +174,17 @@ def makeCalibrationMask(rowColFile, zoneMap):
   lookuptable2.close()
 
   # Make the mask, i.e. blocks that are SELECTED
-  blocksTrue = lookupboolean('input_data/lookupTable_cal.tbl', zoneMap)
-  report(blocksTrue, 'input_data/zones_selection.map')
-  blocksTrue = lookupboolean('input_data/lookupTable_val.tbl', zoneMap)
-  report(blocksTrue, 'input_data/zones_validation.map')
+  blocksTrue = lookupboolean(inputfolder + '/lookupTable_cal.tbl', zoneMap)
+  report(blocksTrue, inputfolder + '/zones_selection.map')
+  blocksTrue = lookupboolean(inputfolder + '/lookupTable_val.tbl', zoneMap)
+  report(blocksTrue, inputfolder + '/zones_validation.map')
+
+# TEST
+""" Testing on the map with one zone: size 30 km x 30 km, with one patch: area 30 km2, perimeter 80 km"""
+systemState = readmap(inputfolder + '/init_lu.map') == 1 # select urban
+zones = readmap(inputfolder + '/zones.map')
+# put HERE the name(s) of the metric(s) you want to test 
+metrics = ['fd']
+listofmaps = calculateSumStats(systemState, metrics, zones)
+aguila(listofmaps[0])
 

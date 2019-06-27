@@ -157,6 +157,12 @@ def simplify_lu_map(amap):
     landuse = ifthen(scalar(landuse)<5, landuse)
     return landuse
 
+def metric_test_map(amap):
+    test_map = boolean(scalar(amap))
+    #test_map = nominal(amap)
+    aguila(test_map)
+    return
+
 def omiss_commiss_map(prev, bool_map, randmap, omiss, simple_lu):
     # commission error
     arr = pcr2numpy(randmap, np.nan)
@@ -435,6 +441,14 @@ for a_name in os.listdir(corine_dir):
 # Select the dir for the temporal working files
 temp_dir = os.path.join(data_dir, 'temporal_data')
 
+print('-------------------- Create test map --------------------')
+test_patch = os.path.join(data_dir,'test_data\IE_test_patch_recl.tif')
+test_map = clip_and_convert(test_patch, coords, 0, Nominal)
+t_map = metric_test_map(test_map)
+nullmask = spatial(nominal(0))
+t_map=cover(t_map, nullmask)
+report(t_map, os.path.join(country_dir, 'metric_test.map'))
+
 print('-------------------- Reference raster --------------------')
 # Select the 1990 Corine raster as the reference raster for further actions
 raster_name = os.listdir(corine_dir)[0]
@@ -457,7 +471,7 @@ reproject(in_shp, out_fn, ref_raster, 'polyline')
 out_raster = os.path.join(raster_dir,'roads_raster.tif')
 rasterize(out_fn, out_raster, ref_raster)
 roads = clip_and_convert(out_raster, coords, 255, Nominal)
-nullmask = spatial(nominal(0))
+
 report(cover(roads, nullmask), os.path.join(country_dir, 'roads.map'))
 # Remove the working files
 road_files = os.listdir(temp_dir)
