@@ -115,11 +115,11 @@ def calculateSumStats(systemState, listOfSumStats, zones, validation=False):
       averagePatchSize = areaaverage(patchSizeOneCell, zones)
       averagePatchSizeScalar = cover(averagePatchSize, spatial(scalar(0)))
       listOfMaps.append(averagePatchSizeScalar) 
-    elif aStat == 'fd': # Fractal dimension. ### Value of the metric is dependend on the unit used ###
+    elif aStat == 'fd': # Fractal dimension. ### Value of the metric is dependend on the unit used ### Value needs to be higher than e = ~2.71
       scNegative = ifthenelse(boolean(systemState) == 1, boolean(0), boolean(1))
       borders = ifthen(boolean(systemState) == 1, window4total(scalar(scNegative)))
-      perimeter = areatotal(borders, nominal(clumps)) 
-      patchSizes = areaarea(clumps)/parameters.getConversionUnit()
+      perimeter = areatotal(borders, nominal(clumps))*100 # Times the size of the cell
+      patchSizes = areaarea(clumps)#/parameters.getConversionUnit()
       fractalDimension = 2*ln(perimeter)/ln(patchSizes)
       fractalDimensionScalar = cover(fractalDimension, spatial(scalar(0)))
       listOfMaps.append(fractalDimensionScalar) 
@@ -196,7 +196,7 @@ zones_map = os.path.join(inputfolder, 'zones.map')
 zones = readmap(zones_map)
 # put HERE the name(s) of the metric(s) you want to test
 # ['np', 'pd', 'mp', 'fd']
-metrics = ['mp']
+metrics = ['fd']
 listofmaps = calculateSumStats(systemState, metrics, zones)
 aguila(listofmaps[0])
 
