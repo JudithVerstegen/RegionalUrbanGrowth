@@ -587,14 +587,15 @@ class LandUseChangeModel(DynamicModel, MonteCarloModel, \
     listOfSumStats = metrics.calculateSumStats(scalar(urban), \
                                             self.sumStats, self.zones)
 
-    j=0
+    j=0 # What is the aim of the j?
     for aname in self.sumStats:
         modelledmap = listOfSumStats[j]
-        self.report(modelledmap, aname)
+        self.report(modelledmap, os.path.join(self.outputfolder, aname))
+        j = j + 1
 
-    for aStat in self.sumStats:
-      path = generateNameST(aStat, self.currentSampleNumber(),timeStep)
-      if aStat in ['np']:
+    for aStat in self.sumStats: # All maps should be calculated for zones
+      path = generateNameT(self.outputfolder + '/' + aStat, timeStep)
+      if aStat in ['np', 'pd', 'mp']:
         # these metrics result in one value per block (here 9 blocks)
         modelledAverageArray = metrics.map2Array(path, \
                               'input_data/sampPoint.col')
@@ -636,13 +637,11 @@ class LandUseChangeModel(DynamicModel, MonteCarloModel, \
 
 nrOfTimeSteps = parameters.getNrTimesteps()
 nrOfSamples = parameters.getNrSamples()
-<<<<<<< Updated upstream
 myModel = LandUseChangeModel()
 dynamicModel = DynamicFramework(myModel, nrOfTimeSteps)
 mcModel = MonteCarloFramework(dynamicModel, nrOfSamples)
 #mcModel.setForkSamples(True,16)
 mcModel.run()
-=======
 # Find the number of parameters to calibrate
 nrOfParameters = len(parameters.getSuitFactorDict()[1])
 
@@ -703,4 +702,3 @@ for p1 in param_steps:
 ##  names = ['ps']
 ##  mcpercentiles(names, percentiles, sampleNumbers, timeSteps)
 ##print('\n...done')
->>>>>>> Stashed changes
