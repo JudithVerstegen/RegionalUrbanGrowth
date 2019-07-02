@@ -557,14 +557,15 @@ class LandUseChangeModel(DynamicModel):
     listOfSumStats = metrics.calculateSumStats(scalar(urban), \
                                             self.sumStats, self.zones)
 
-    j=0
+    j=0 # What is the aim of the j?
     for aname in self.sumStats:
         modelledmap = listOfSumStats[j]
         self.report(modelledmap, os.path.join(self.outputfolder, aname))
+        j = j + 1
 
-    for aStat in self.sumStats:
+    for aStat in self.sumStats: # All maps should be calculated for zones
       path = generateNameT(self.outputfolder + '/' + aStat, timeStep)
-      if aStat in ['np']:
+      if aStat in ['np', 'pd', 'mp']:
         # these metrics result in one value per block (here 9 blocks)
         modelledAverageArray = metrics.map2Array(path, \
                               self.inputfolder + '/sampPoint.col')
@@ -612,7 +613,49 @@ print(param_steps)
 weights = [0.2,0.2,0.4,0.2]
 myModel = LandUseChangeModel(1, weights)
 dynamicModel = DynamicFramework(myModel, nrOfTimeSteps)
-dynamicModel.run()
+mcModel = MonteCarloFramework(dynamicModel, nrOfSamples)
+#mcModel.setForkSamples(True,16)
+mcModel.run()
+# Find the number of parameters to calibrate
+nrOfParameters = len(parameters.getSuitFactorDict()[1])
+
+# Before loop to save computation time
+inputfolder = os.path.join('input_data', parameters.getCountryName())
+nullMask = readmap(inputfolder + '/nullmask')
+
+landUseList = parameters.getLandUseList()
+preMCLandUse = LandUse(landUseList, nullMask)
+stations = readmap(inputfolder + '/train_stations')
+preMCLandUse.determineDistanceToStations(stations)
+roads = readmap(inputfolder + '/roads')
+preMCLandUse.determineSpeedRoads(roads)
+
+# Set step size for calibration, put in parameters file?
+min_p = 0.0
+max_p = 1.0
+stepsize = 0.5
+param_steps = np.arange(min_p, max_p + 0.1, stepsize)
+for step in range(0,len(param_steps)):
+    param_steps[step] = round(param_steps[step],1)
+
+print(param_steps)
+
+# Loop COMES HERE
+sumOfParameters = 0
+loopCount = 0
+
+for p1 in param_steps:
+    for p2 in param_steps:
+        for p3 in param_steps:
+            for p4 in param_steps:
+                sumOfParameters = p1+p2+p3+p4
+                if (sumOfParameters == 1):
+                    loopCount = loopCount + 1
+                    print('Model Run: ',loopCount,'Parameters used: ',p1,p2,p3,p4,)
+                    weights = [p1,p2,p3,p4]
+                    myModel = LandUseChangeModel(1, weights)
+                    dynamicModel = DynamicFramework(myModel, nrOfTimeSteps)
+                    dynamicModel.run()
 
 ## USED TO BE THE POSTLOOP; SAVED FOR LATER USE
 ##print('\nrunning postmcloop...')

@@ -36,12 +36,12 @@ def getSumStats():
   # 'np': Number of patches
   # 'mp': Mean patch size
   # 'pd': Patch density
-  # 'shdi': Shannon's diveristy index <- not implemented
-  # 'cilp': Compactness index of the largest patch <- not implemented
-  # 'awmpfd': Area weighted mean patch fractal dimension <- not implemented
+  ### 'shdi': Shannon's diveristy index <- not implemented
+  ### 'cilp': Compactness index of the largest patch <- not implemented
+  ### 'awmpfd': Area weighted mean patch fractal dimension <- not implemented
   # 'fd': Fractal dimension
   
-  sumStats = ['np']
+  sumStats = ['np', 'mp', 'pd', 'fd']
   return sumStats
 
 def getCovarName():
