@@ -636,8 +636,71 @@ class LandUseChangeModel(DynamicModel, MonteCarloModel, \
 
 nrOfTimeSteps = parameters.getNrTimesteps()
 nrOfSamples = parameters.getNrSamples()
+<<<<<<< Updated upstream
 myModel = LandUseChangeModel()
 dynamicModel = DynamicFramework(myModel, nrOfTimeSteps)
 mcModel = MonteCarloFramework(dynamicModel, nrOfSamples)
 #mcModel.setForkSamples(True,16)
 mcModel.run()
+=======
+# Find the number of parameters to calibrate
+nrOfParameters = len(parameters.getSuitFactorDict()[1])
+
+# Before loop to save computation time
+inputfolder = os.path.join('input_data', parameters.getCountryName())
+nullMask = readmap(inputfolder + '/nullmask')
+
+landUseList = parameters.getLandUseList()
+preMCLandUse = LandUse(landUseList, nullMask)
+stations = readmap(inputfolder + '/train_stations')
+preMCLandUse.determineDistanceToStations(stations)
+roads = readmap(inputfolder + '/roads')
+preMCLandUse.determineSpeedRoads(roads)
+
+# Set step size for calibration, put in parameters file?
+min_p = 0.0
+max_p = 1.0
+stepsize = 0.5
+param_steps = np.arange(min_p, max_p + 0.1, stepsize)
+for step in range(0,len(param_steps)):
+    param_steps[step] = round(param_steps[step],1)
+
+print(param_steps)
+
+# Loop COMES HERE
+sumOfParameters = 0
+loopCount = 0
+
+for p1 in param_steps:
+    for p2 in param_steps:
+        for p3 in param_steps:
+            for p4 in param_steps:
+                sumOfParameters = p1+p2+p3+p4
+                if (sumOfParameters == 1):
+                    loopCount = loopCount + 1
+                    print('Model Run: ',loopCount,'Parameters used: ',p1,p2,p3,p4,)
+                    weights = [p1,p2,p3,p4]
+                    myModel = LandUseChangeModel(1, weights)
+                    dynamicModel = DynamicFramework(myModel, nrOfTimeSteps)
+                    dynamicModel.run()
+
+## USED TO BE THE POSTLOOP; SAVED FOR LATER USE
+##print('\nrunning postmcloop...')
+##print('...saving data to results folder...')
+##command = "python transform_save_data.py"
+##os.system(command)
+##if int(self.nrSamples()) > 1:
+##  print('...calculating fragstats...')		
+##  command = "python plotFragstats.py"
+##  os.system(command)
+##  # Stochastic variables for which mean, var and percentiles are needed
+##  print('...calculating statistics...')
+##  names = ['urb']
+##  sampleNumbers = self.sampleNumbers()
+##  timeSteps = range(1, nrOfTimeSteps + 1)
+##  percentiles = [0.0, 0.05, 0.1, 0.3, 0.5, 0.7, 0.9, 0.95, 1.0]
+##  mcaveragevariance.mcaveragevariance(names, sampleNumbers, timeSteps)
+##  names = ['ps']
+##  mcpercentiles(names, percentiles, sampleNumbers, timeSteps)
+##print('\n...done')
+>>>>>>> Stashed changes
