@@ -95,33 +95,30 @@ def calculateSumStats(systemState, listOfSumStats, zones, validation=False):
   unique = uniqueid(boolean(spatial(scalar(1))))
   clumps = ifthen(boolean(systemState) == 1, clump(boolean(systemState)))
   numberMap = areadiversity(clumps, spatial(nominal(1))) # doesnt work for test map
-  #aguila(numberMap)
   for aStat in listOfSumStats:
     if aStat == 'np': # Number of patches 
       average_nr = cover(areadiversity(clumps, zones), spatial(scalar(0)))  
       listOfMaps.append(average_nr)
     elif aStat == 'pd': # Patch density
       average_nr = cover(areadiversity(clumps, zones), spatial(scalar(0)))
-      #aguila(average_nr)
       zone_area = areaarea(zones) # unit? zones are defined as 300, here they are calculated as 30 000
-      #aguila(zone_area)
       patch_density = average_nr/zone_area
       listOfMaps.append(patch_density)
     elif aStat == 'mp': # Mean patch size. If patch is in more than one zone it is assigned to one zone only...
-      # the same trik as with the sea
-      patchSizes = areaarea(clumps)/parameters.getConversionUnit()
-      oneCellPerPatch = pcreq(areamaximum(unique, clumps), unique)
+      patchSizes = areaarea(clumps)/parameters.getConversionUnit() # each patch has a size assigned
+      oneCellPerPatch = pcreq((areamaximum(unique, clumps)), unique) # gets the cell in the right bottom corner of a patch
       patchSizeOneCell = ifthen(oneCellPerPatch, patchSizes)
       averagePatchSize = areaaverage(patchSizeOneCell, zones)
-      averagePatchSizeScalar = cover(averagePatchSize, spatial(scalar(0)))
-      listOfMaps.append(averagePatchSizeScalar) 
+      aguila(averagePatchSize)
+      listOfMaps.append(averagePatchSize) 
     elif aStat == 'fd': # Fractal dimension. ### Value of the metric is dependend on the unit used ### Value needs to be higher than e = ~2.71
       scNegative = ifthenelse(boolean(systemState) == 1, boolean(0), boolean(1))
       borders = ifthen(boolean(systemState) == 1, window4total(scalar(scNegative)))
-      perimeter = areatotal(borders, nominal(clumps))*100 # Times the size of the cell
-      patchSizes = areaarea(clumps)#/parameters.getConversionUnit()
+      perimeter = areatotal(borders, nominal(clumps))*sqrt(cellarea())
+      patchSizes = areaarea(clumps) # no conversion to km, as we are using meters
       fractalDimension = 2*ln(perimeter)/ln(patchSizes)
       fractalDimensionScalar = cover(fractalDimension, spatial(scalar(0)))
+      aguila(fractalDimensionScalar)
       listOfMaps.append(fractalDimensionScalar) 
     else:
       print('ERRRRRRRRRRRROR, unknown sum stat')
@@ -186,17 +183,19 @@ def makeCalibrationMask(rowColFile, zoneMap):
   report(blocksTrue, inputfolder + '/zones_selection.map')
   blocksTrue = lookupboolean(inputfolder + '/lookupTable_val.tbl', zoneMap)
   report(blocksTrue, inputfolder + '/zones_validation.map')
-
+'''
 # TEST
 """ Testing on the map with one zone: size 30 km x 30 km, with one patch: area 30 km2, perimeter 80 km"""
 test_map = os.path.join(os.getcwd(), 'data', 'test_data', 'metric_test_3patches_IE.map')
-aguila(test_map)
+#aguila(test_map)
 systemState = readmap(test_map) == 1 # select urban or predefined pattern
 zones_map = os.path.join(inputfolder, 'zones.map')
 zones = readmap(zones_map)
 # put HERE the name(s) of the metric(s) you want to test
 # ['np', 'pd', 'mp', 'fd']
-metrics = ['fd']
+metrics = ['np', 'pd', 'mp', 'fd']
 listofmaps = calculateSumStats(systemState, metrics, zones)
-aguila(listofmaps[0])
+#for m in listofmaps:
+  #aguila(m)
+'''
 
