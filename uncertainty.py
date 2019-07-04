@@ -7,8 +7,10 @@ from pcraster import *
 from pcraster.framework import *
 import math
 import os
+import parameters
 
-nullMask = readmap('input_data/nullmask')
+inputfolder = os.path.join('input_data', parameters.getCountryName())
+nullMask = readmap(inputfolder + '/nullmask')
 
 def getLogRealization(mu, sigma):
   realization = np.random.lognormal(mu, sigma)
