@@ -8,6 +8,7 @@ from pcraster import *
 from pcraster.framework import *
 import math
 import os
+import parameters
 
 inputfolder = os.path.join('input_data', parameters.getCountryName())
 nullMask = readmap(inputfolder + '/nullmask')
