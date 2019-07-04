@@ -198,4 +198,5 @@ zones = readmap(zones_map)
 metrics = ['np', 'pd', 'mp', 'fd']
 listofmaps = calculateSumStats(systemState, metrics, zones)
 #aguila(listofmaps[0])
+'''
 
