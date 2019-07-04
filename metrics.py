@@ -94,35 +94,36 @@ def calculateSumStats(systemState, listOfSumStats, zones, validation=False):
 ##  systemState = ifthen(mask, systemState)
   unique = uniqueid(boolean(spatial(scalar(1))))
   clumps = ifthen(boolean(systemState) == 1, clump(boolean(systemState)))
-  numberMap = areadiversity(clumps, spatial(nominal(1))) # doesnt work for test map
+  #numberMap = areadiversity(clumps, spatial(nominal(1))) # doesnt work for test map
+  oneCellPerPatch = pcreq(areamaximum(unique, clumps), unique)
   #aguila(numberMap)
   for aStat in listOfSumStats:
-    if aStat == 'np': # Number of patches 
+    if aStat == 'np': # Number of patches in one zone
       average_nr = cover(areadiversity(clumps, zones), spatial(scalar(0)))  
       listOfMaps.append(average_nr)
-    elif aStat == 'pd': # Patch density
+    elif aStat == 'pd': # Patch density in a zone
       average_nr = cover(areadiversity(clumps, zones), spatial(scalar(0)))
-      #aguila(average_nr)
       zone_area = areaarea(zones) # unit? zones are defined as 300, here they are calculated as 30 000
-      #aguila(zone_area)
       patch_density = average_nr/zone_area
       listOfMaps.append(patch_density)
     elif aStat == 'mp': # Mean patch size. If patch is in more than one zone it is assigned to one zone only...
       # the same trik as with the sea
       patchSizes = areaarea(clumps)/parameters.getConversionUnit()
-      oneCellPerPatch = pcreq(areamaximum(unique, clumps), unique)
       patchSizeOneCell = ifthen(oneCellPerPatch, patchSizes)
       averagePatchSize = areaaverage(patchSizeOneCell, zones)
       averagePatchSizeScalar = cover(averagePatchSize, spatial(scalar(0)))
       listOfMaps.append(averagePatchSizeScalar) 
-    elif aStat == 'fd': # Fractal dimension. ### Value of the metric is dependend on the unit used ### Value needs to be higher than e = ~2.71
+    elif aStat == 'fd': # Average fractal dimension of patches in one zone.
+      ### Value of the metric is dependend on the unit used
+      ### 'perimeter' and 'patchSizes' need to be higher than e = ~2.71
       scNegative = ifthenelse(boolean(systemState) == 1, boolean(0), boolean(1))
       borders = ifthen(boolean(systemState) == 1, window4total(scalar(scNegative)))
       perimeter = areatotal(borders, nominal(clumps))*100 # Times the size of the cell
       patchSizes = areaarea(clumps)#/parameters.getConversionUnit()
       fractalDimension = 2*ln(perimeter)/ln(patchSizes)
-      fractalDimensionScalar = cover(fractalDimension, spatial(scalar(0)))
-      listOfMaps.append(fractalDimensionScalar) 
+      patchFractalDimensionOneCell = ifthen(oneCellPerPatch, fractalDimension)
+      averageFractalDimension = areaaverage(patchFractalDimensionOneCell, zones)
+      listOfMaps.append(averageFractalDimension) 
     else:
       print('ERRRRRRRRRRRROR, unknown sum stat')
   return listOfMaps
@@ -198,5 +199,5 @@ zones = readmap(zones_map)
 # ['np', 'pd', 'mp', 'fd']
 metrics = ['fd']
 listofmaps = calculateSumStats(systemState, metrics, zones)
-aguila(listofmaps[0])
+#aguila(listofmaps[0])
 
