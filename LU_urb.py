@@ -565,7 +565,7 @@ class LandUseChangeModel(DynamicModel):
 
     for aStat in self.sumStats: # All maps should be calculated for zones
       path = generateNameT(self.outputfolder + '/' + aStat, timeStep)
-      if aStat in ['np', 'pd', 'mp']:
+      if aStat in ['np', 'pd', 'mp', 'fd']:
         # these metrics result in one value per block (here 9 blocks)
         modelledAverageArray = metrics.map2Array(path, \
                               self.inputfolder + '/sampPoint.col')
@@ -602,20 +602,6 @@ preMCLandUse.determineDistanceToStations(stations)
 roads = readmap(inputfolder + '/roads')
 preMCLandUse.determineSpeedRoads(roads)
 
-# Set step size for calibration, put in parameters file?
-min_p = 0.0
-max_p = 1.0
-stepsize = 0.2
-param_steps = np.arange(min_p, max_p + 0.1, stepsize)
-print(param_steps)
-
-# Loop COMES HERE
-weights = [0.2,0.2,0.4,0.2]
-myModel = LandUseChangeModel(1, weights)
-dynamicModel = DynamicFramework(myModel, nrOfTimeSteps)
-mcModel = MonteCarloFramework(dynamicModel, nrOfSamples)
-#mcModel.setForkSamples(True,16)
-mcModel.run()
 # Find the number of parameters to calibrate
 nrOfParameters = len(parameters.getSuitFactorDict()[1])
 
@@ -638,8 +624,6 @@ param_steps = np.arange(min_p, max_p + 0.1, stepsize)
 for step in range(0,len(param_steps)):
     param_steps[step] = round(param_steps[step],1)
 
-print(param_steps)
-
 # Loop COMES HERE
 sumOfParameters = 0
 loopCount = 0
@@ -653,7 +637,7 @@ for p1 in param_steps:
                     loopCount = loopCount + 1
                     print('Model Run: ',loopCount,'Parameters used: ',p1,p2,p3,p4,)
                     weights = [p1,p2,p3,p4]
-                    myModel = LandUseChangeModel(1, weights)
+                    myModel = LandUseChangeModel(loopCount, weights)
                     dynamicModel = DynamicFramework(myModel, nrOfTimeSteps)
                     dynamicModel.run()
 
