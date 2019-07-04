@@ -494,21 +494,21 @@ class LandUseChangeModel(DynamicModel, MonteCarloModel, \
     DynamicModel.__init__(self)
     MonteCarloModel.__init__(self)
     ParticleFilterModel.__init__(self)
-    setclone(os.path.join('input_data', parameters.getCountryName()), 'nullmask')
+    setclone(os.path.join('input_data', parameters.getCountryName(), 'nullmask')
 ##    setglobaloption('nondiagonal')
 
   def premcloop(self):
     # create sample points
-    self.nullMask = self.readmap('input_data/nullmask')
-    self.oneMask = self.readmap('input_data/onemask')   
+    self.nullMask = self.readmap('input_data', parameters.getCountryName(), 'nullmask')
+    self.oneMask = self.readmap('input_data', parameters.getCountryName(), 'onemask')   
     # AT SOME POINT WITH STOCHASTIC INPUT
     # in that case land use should not include urban
-    self.landuse = self.readmap('input_data/init_lu')
+    self.landuse = self.readmap('input_data', parameters.getCountryName(), 'init_lu')
     self.initialUrb = self.landuse == 1
-    self.roads = self.readmap('input_data/roads')
+    self.roads = self.readmap('input_data', parameters.getCountryName(), 'roads')
     self.noGoMap = cover(self.landuse == 2, boolean(self.nullMask))  ## same as self.noGoLanduseList <- ADD nogo map, created by the create_initial_map.py
-    self.zones = readmap('input_data/zones')
-    self.samplePoints = self.readmap('input_data/sampPoint')
+    self.zones = readmap('input_data', parameters.getCountryName(), 'zones')
+    self.samplePoints = self.readmap('input_data', parameters.getCountryName(), 'sampPoint')
     self.sumStats = parameters.getSumStats()
     self.yieldMap = scalar(self.oneMask)
 
