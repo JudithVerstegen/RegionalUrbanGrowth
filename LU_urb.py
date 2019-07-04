@@ -494,7 +494,7 @@ class LandUseChangeModel(DynamicModel, MonteCarloModel, \
     DynamicModel.__init__(self)
     MonteCarloModel.__init__(self)
     ParticleFilterModel.__init__(self)
-    setclone('input_data/nullmask')
+    setclone(os.path.join('input_data', parameters.getCountryName()), 'nullmask')
 ##    setglobaloption('nondiagonal')
 
   def premcloop(self):
