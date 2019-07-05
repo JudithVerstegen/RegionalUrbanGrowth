@@ -477,6 +477,13 @@ class LandUseChangeModel(DynamicModel):
     setclone(self.inputfolder + '/nullmask')
 ##    setglobaloption('nondiagonal')
 
+    # Save the parameters as a list to the folder with the calculated metrics
+    pName = 'parameters_' + str(nr) + '.obj'
+    pPath = os.path.join(self.outputfolder, pName)
+    parametersFile = open(pPath, 'wb')
+    pickle.dump(weights, parametersFile)
+    parametersFile.close()
+
   def initial(self):
     # create sample points
     self.nullMask = self.readmap(self.inputfolder + '/nullmask')
@@ -531,7 +538,6 @@ class LandUseChangeModel(DynamicModel):
     self.landUse.loadDistanceMaps()
     self.landUse.calculateStaticSuitabilityMaps(self.yieldMap)
 
-
   def dynamic(self):
     timeStep = self.currentTimeStep()
     print('\ntime step', timeStep)
@@ -581,6 +587,9 @@ class LandUseChangeModel(DynamicModel):
       file_object1.close()
       # the map with the metric is removed to save disk space
       os.remove(path)
+
+    
+    
 
 ############
 ### MAIN ###
