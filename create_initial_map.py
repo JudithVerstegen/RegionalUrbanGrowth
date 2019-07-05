@@ -39,7 +39,7 @@ coords_dict = {
 coords = coords_dict[country] 
 
 # zone size as a factor of the cell size
-zone_size = 200 # 100 x 100 m = 10 000 m = 10x10 km
+zone_size = 300 # x 100 m = 30 000 m = 30 km 
 # for creating observations
 realizations = 20
 # window size as a factor of the cell size
