@@ -31,7 +31,7 @@ resultFolder = os.path.join(os.getcwd(),'results',country)
 ### FUNCTIONS ###
 #################
 
-def openPickledSamplesAndTimestepsAsNumpyArray(basename,samples,timesteps, \
+def openPickledSamplesAndTimestepsAsNumpyArray(basename,iterations,timesteps, \
                                                obs=False):
   output=[]
   
@@ -45,7 +45,7 @@ def openPickledSamplesAndTimestepsAsNumpyArray(basename,samples,timesteps, \
       filehandler = open(pFileName, 'rb') 
       pData = pickle.load(filehandler)
       pArray = np.array(pData, ndmin=1)
-    
+          
       # If we are working with the observed data (CLC data):
       if obs:
         name = generateNameT(basename, timestep)
@@ -73,7 +73,6 @@ def openPickledSamplesAndTimestepsAsNumpyArray(basename,samples,timesteps, \
       array = array.reshape(len(array),1)
       allSamples.append([pArray,array]) # test if this would work??????????????
     output.append(allSamples)
-
   outputAsArray=np.array(output)
   return outputAsArray
 
@@ -97,16 +96,15 @@ def saveSamplesAndTimestepsAsNumpyArray(basename, iterations, timesteps, \
 variables = parameters.getSumStats()
 print("Save modelled and observed metrics: ", variables)
 
-# For the modelled metrics:
+# Save for the modelled and observed metrics:
 for aVariable in variables:
   saveSamplesAndTimestepsAsNumpyArray(aVariable, iterations, \
                                       timeSteps)
+  saveSamplesAndTimestepsAsNumpyArray(aVariable, obsSampleNumbers,obsTimeSteps, True)  
 
-# For the observed values:
-for aVariable in variables:
-  saveSamplesAndTimestepsAsNumpyArray(aVariable, obsSampleNumbers,obsTimeSteps, True)
-
-np.load(os.path.join("results", country, 'fd.npy'))
+test = np.load(os.path.join("results", country, 'fd.npy'))
+print('Set of parameters for metric np: ',test[0][0][0])
+print('np values for each zone: ', test[0][0][1])
 '''
 # TEST
 
