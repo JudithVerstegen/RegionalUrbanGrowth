@@ -580,7 +580,7 @@ class LandUseChangeModel(DynamicModel):
       pickle.dump(modelledAverageArray, file_object1)
       file_object1.close()
       # the map with the metric is removed to save disk space
-      ##os.remove(path)
+      os.remove(path)
 
 ############
 ### MAIN ###
