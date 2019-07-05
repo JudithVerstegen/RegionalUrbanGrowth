@@ -90,6 +90,21 @@ def getSuitFactorDict():
   suitFactorDict[1] = [1, 2, 3, 4]
   return suitFactorDict
 
+def getNumberofIterations(getSuitFactorDict, getParametersforCalibration):
+  """ Returns number of iterations depnded on the number, min, max and step of the parameters"""
+  from math import factorial
+
+  nrParamteres = len(getSuitFactorDict[1])
+  pmin = getParametersforCalibration[0]
+  pmax = getParametersforCalibration[1]
+  pstep = getParametersforCalibration[2]
+  n = int(1/pstep + nrParamteres - 1)
+  k = nrParamteres - 1
+  
+  return factorial(n) // (factorial(k) * factorial(n - k))
+
+#print(getNumberofIterations(getSuitFactorDict(), getParametersforCalibration()))
+
 def getWeightDict():
   """Return dictionary how a type (key) weights (items) its suit factors.
 
