@@ -11,10 +11,12 @@ from pcraster.framework import *
 #### Metrics are transformed into an array
 
 # Get the number of samples and number of time step defined in the parameter.py script
-nrOfSamples=parameters.getNrSamples()
+#nrOfSamples=parameters.getNrSamples()
 nrOfTimesteps=parameters.getNrTimesteps()
+numberOfIterations = parameters.getNumberofIterations(parameters.getSuitFactorDict(), parameters.getParametersforCalibration())
 
-sampleNumbers=range(1,nrOfSamples+1,1)
+#sampleNumbers=range(1,nrOfSamples+1,1)
+iterations = range(1, numberOfIterations+1, 1)
 timeSteps=range(1,nrOfTimesteps+1,1)
 
 # Get the observed time steps. Time steps relate to the year of the CLC data, where 1990 was time step 0.
@@ -36,10 +38,10 @@ def openPickledSamplesAndTimestepsAsNumpyArray(basename,samples,timesteps, \
   for timestep in timesteps:
     allSamples=[]
     
-    for sample in samples:
+    for i in iterations:
       # Read in the parameters
-      pName = 'parameters_' + str(sample) + '.obj'
-      pFileName = os.path.join(resultFolder, str(sample), pName)
+      pName = 'parameters_' + str(i) + '.obj'
+      pFileName = os.path.join(resultFolder, str(i), pName)
       filehandler = open(pFileName, 'rb') 
       pData = pickle.load(filehandler)
       pArray = np.array(pData, ndmin=1)
@@ -48,13 +50,13 @@ def openPickledSamplesAndTimestepsAsNumpyArray(basename,samples,timesteps, \
       if obs:
         name = generateNameT(basename, timestep)
         fileName = os.path.join('observations', country, 'realizations', \
-                                str(sample), name)
+                                str(i), name)
         data = metrics.map2Array(fileName, os.path.join('input_data', country, 'sampPoint.col'))
 
       # If we are working with the observed values:  
       else:
         theName = basename + str(timestep) + '.obj'
-        fileName = os.path.join(resultFolder, str(sample), theName)
+        fileName = os.path.join(resultFolder, str(i), theName)
         filehandler = open(fileName, 'rb') 
         data = pickle.load(filehandler)
         '''# Keep these lines for the later use:
@@ -75,9 +77,9 @@ def openPickledSamplesAndTimestepsAsNumpyArray(basename,samples,timesteps, \
   outputAsArray=np.array(output)
   return outputAsArray
 
-def saveSamplesAndTimestepsAsNumpyArray(basename, samples, timesteps, \
+def saveSamplesAndTimestepsAsNumpyArray(basename, iterations, timesteps, \
                                         obs=False):
-  output = openPickledSamplesAndTimestepsAsNumpyArray(basename, samples,\
+  output = openPickledSamplesAndTimestepsAsNumpyArray(basename, iterations,\
                                                       timesteps, obs)
   if obs:
     fileName = os.path.join("results", country, basename + '_obs')
@@ -97,7 +99,7 @@ print("Save modelled and observed metrics: ", variables)
 
 # For the modelled metrics:
 for aVariable in variables:
-  saveSamplesAndTimestepsAsNumpyArray(aVariable, sampleNumbers, \
+  saveSamplesAndTimestepsAsNumpyArray(aVariable, iterations, \
                                       timeSteps)
 
 # For the observed values:
