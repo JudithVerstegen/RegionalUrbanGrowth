@@ -588,8 +588,25 @@ class LandUseChangeModel(DynamicModel):
       # the map with the metric is removed to save disk space
       os.remove(path)
 
+  '''def NrOfIterations(min_p, max_p, stepsize):
+  """
+  A fast way to calculate binomial coefficients by Andrew Dalke.
+  See http://stackoverflow.com/questions/3025162/statistics-combinations-in-python
+  """
+    numberOfParameters = 4
+    n = 1/(stepsize)+ numberOfParameters - 1
+    k = numberOfParameters - 1
     
-    
+    if 0 <= k <= n:
+      ntok = 1
+      ktok = 1
+      for t in xrange(1, min(k, n - k) + 1):
+            ntok *= n
+            ktok *= t
+            n -= 1
+        return ntok // ktok
+    else:
+        return 0'''
 
 ############
 ### MAIN ###
@@ -640,6 +657,8 @@ for step in range(0,len(param_steps)):
 # Loop COMES HERE
 sumOfParameters = 0
 loopCount = 0
+
+'''print('Number of iterations: ', LandUseChangeModel.NrOfIterations(min_p, max_p, stepsize))'''
 
 for p1 in param_steps:
     for p2 in param_steps:
