@@ -572,6 +572,7 @@ class LandUseChangeModel(DynamicModel):
     for aStat in self.sumStats: # All maps should be calculated for zones
       path = generateNameT(self.outputfolder + '/' + aStat, timeStep)
       if aStat in ['np', 'pd', 'mp', 'fd']:
+        print(aStat, ':')
         # these metrics result in one value per block (here 9 blocks)
         modelledAverageArray = metrics.map2Array(path, \
                               self.inputfolder + '/sampPoint.col')
@@ -588,34 +589,15 @@ class LandUseChangeModel(DynamicModel):
       # the map with the metric is removed to save disk space
       os.remove(path)
 
-  '''def NrOfIterations(min_p, max_p, stepsize):
-  """
-  A fast way to calculate binomial coefficients by Andrew Dalke.
-  See http://stackoverflow.com/questions/3025162/statistics-combinations-in-python
-  """
-    numberOfParameters = 4
-    n = 1/(stepsize)+ numberOfParameters - 1
-    k = numberOfParameters - 1
-    
-    if 0 <= k <= n:
-      ntok = 1
-      ktok = 1
-      for t in xrange(1, min(k, n - k) + 1):
-            ntok *= n
-            ktok *= t
-            n -= 1
-        return ntok // ktok
-    else:
-        return 0'''
-
 ############
 ### MAIN ###
 ############
 
 nrOfTimeSteps = parameters.getNrTimesteps()
-nrOfSamples = parameters.getNrSamples()
+#nrOfSamples = parameters.getNrSamples() # This variable is not being used as MC was eliminated from the model
 # Find the number of parameters to calibrate
 nrOfParameters = len(parameters.getSuitFactorDict()[1])
+nrOfIterations = parameters.getNumberofIterations(parameters.getSuitFactorDict(), parameters.getParametersforCalibration())
 
 # Before loop to save computation time
 inputfolder = os.path.join('input_data', parameters.getCountryName())
@@ -644,6 +626,13 @@ preMCLandUse.determineDistanceToStations(stations)
 roads = readmap(inputfolder + '/roads')
 preMCLandUse.determineSpeedRoads(roads)
 
+#######################
+### Loop COMES HERE ###
+#######################
+
+sumOfParameters = 0
+loopCount = 0
+
 # Set step size for calibration, put in parameters file?
 min_p = parameters.getParametersforCalibration()[0]
 max_p = parameters.getParametersforCalibration()[1]
@@ -654,11 +643,7 @@ param_steps = np.arange(min_p, max_p + 0.1, stepsize)
 for step in range(0,len(param_steps)):
     param_steps[step] = round(param_steps[step],1)
 
-# Loop COMES HERE
-sumOfParameters = 0
-loopCount = 0
-
-'''print('Number of iterations: ', LandUseChangeModel.NrOfIterations(min_p, max_p, stepsize))'''
+print('Number of iterations: ', nrOfIterations)
 
 for p1 in param_steps:
     for p2 in param_steps:
@@ -667,7 +652,7 @@ for p1 in param_steps:
                 sumOfParameters = p1+p2+p3+p4
                 if (sumOfParameters == 1):
                     loopCount = loopCount + 1
-                    print('Model Run: ',loopCount,'Parameters used: ',p1,p2,p3,p4,)
+                    print('Model Run: ',loopCount,'. Parameters used: ',p1,p2,p3,p4,)
                     weights = [p1,p2,p3,p4]
                     myModel = LandUseChangeModel(loopCount, weights)
                     dynamicModel = DynamicFramework(myModel, nrOfTimeSteps)
