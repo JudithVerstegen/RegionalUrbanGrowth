@@ -23,10 +23,9 @@ def getParametersforCalibration():
   """Return min, max and step of the parameter to be used in the calibration
      minParameter needs to be >= 0
      maxParameter needs to be <= 1
-     [minParameter, maxParameter, stepSize] """
+    [minParameter, maxParameter, stepSize] """
   
-  
-  return [0.0, 1.0, 0.5]
+    return [0.0, 1.0, 0.5]
 
 def getCountryName():
   """ Returns the case study symbol """
