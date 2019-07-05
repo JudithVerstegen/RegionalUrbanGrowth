@@ -7,14 +7,19 @@ import numpy as np
 import parameters
 from pcraster.framework import *
 
+#### Script to read in the metrics saved as the result of the LU_urb.py script.
+#### Metrics are transformed into an array
+
+# Get the number of samples and number of time step defined in the parameter.py script
 nrOfSamples=parameters.getNrSamples()
 nrOfTimesteps=parameters.getNrTimesteps()
 
 sampleNumbers=range(1,nrOfSamples+1,1)
 timeSteps=range(1,nrOfTimesteps+1,1)
 
-obsSampleNumbers=range(1,20+1,1)
-obsTimeSteps = [10,16,22]
+# Get the observed time steps. Time steps relate to the year of the CLC data, where 1990 was time step 0.
+#obsSampleNumbers=range(1,20+1,1)
+obsTimeSteps = [10,16,22,28]
 
 
 def openPickledSamplesAndTimestepsAsNumpyArray(basename,samples,timesteps, \
