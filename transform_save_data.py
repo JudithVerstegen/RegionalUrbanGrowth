@@ -37,6 +37,13 @@ def openPickledSamplesAndTimestepsAsNumpyArray(basename,samples,timesteps, \
     allSamples=[]
     
     for sample in samples:
+      # Read in the parameters
+      pName = 'parameters_' + str(sample) + '.obj'
+      pFileName = os.path.join(resultFolder, str(sample), pName)
+      filehandler = open(pFileName, 'rb') 
+      pData = pickle.load(filehandler)
+      pArray = np.array(pData, ndmin=1)
+    
       # If we are working with the observed data (CLC data):
       if obs:
         name = generateNameT(basename, timestep)
@@ -62,8 +69,9 @@ def openPickledSamplesAndTimestepsAsNumpyArray(basename,samples,timesteps, \
       # add an extra dimension that would normally be y, if the data was a map
       # so that Derek's plot functions can be used
       array = array.reshape(len(array),1)
-      allSamples.append(array)
+      allSamples.append([pArray,array]) # test if this would work??????????????
     output.append(allSamples)
+
   outputAsArray=np.array(output)
   return outputAsArray
 
@@ -96,7 +104,8 @@ for aVariable in variables:
 for aVariable in variables:
   saveSamplesAndTimestepsAsNumpyArray(aVariable, obsSampleNumbers,obsTimeSteps, True)
 
-'''  
+np.load(os.path.join("results", country, 'fd.npy'))
+'''
 # TEST
 
 output = openPickledSamplesAndTimestepsAsNumpyArray('np', sampleNumbers, \
@@ -106,5 +115,7 @@ print('np:')
 # Output is indexed as array[time, sample, x, y]
 # So, all samples for time step 3 is output[2,:,:,0]
 # Last zero can also be :.
-print(output[:,-1,:,0])'''
+
+print(output[:,:,-1,:,0])
+'''
 
