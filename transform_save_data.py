@@ -18,31 +18,43 @@ sampleNumbers=range(1,nrOfSamples+1,1)
 timeSteps=range(1,nrOfTimesteps+1,1)
 
 # Get the observed time steps. Time steps relate to the year of the CLC data, where 1990 was time step 0.
-#obsSampleNumbers=range(1,20+1,1)
+obsSampleNumbers = [1] #range(1,20+1,1) <- for stochastic model
 obsTimeSteps = [10,16,22,28]
 
+# Path to the folder with the metrics stored
+country = parameters.getCountryName()
+resultFolder = os.path.join(os.getcwd(),'results',country)
+
+#################
+### FUNCTIONS ###
+#################
 
 def openPickledSamplesAndTimestepsAsNumpyArray(basename,samples,timesteps, \
                                                obs=False):
-  t=1
   output=[]
+  
   for timestep in timesteps:
-##    print 'timestep ' + str(timestep) + ' done,',
     allSamples=[]
+    
     for sample in samples:
+      # If we are working with the observed data (CLC data):
       if obs:
         name = generateNameT(basename, timestep)
-        fileName = os.path.join('observations', 'realizations', \
+        fileName = os.path.join('observations', country, 'realizations', \
                                 str(sample), name)
-        data = metrics.map2Array(fileName, 'input_data/sampPoint.col')
+        data = metrics.map2Array(fileName, os.path.join('input_data', country, 'sampPoint.col'))
+
+      # If we are working with the observed values:  
       else:
-        fileName = os.path.join(str(sample), basename + str(timestep) + '.obj')
+        theName = basename + str(timestep) + '.obj'
+        fileName = os.path.join(resultFolder, str(sample), theName)
         filehandler = open(fileName, 'rb') 
-        data=pickle.load(filehandler)
-        # if it is a dictionary, get the sugar cane parameters (lu type 6)
+        data = pickle.load(filehandler)
+        '''# Keep these lines for the later use:
+        if it is a dictionary, get the sugar cane parameters (lu type 6)
         if type(data) == dict:
           data = data.get(1)
-        filehandler.close()
+        filehandler.close()'''
       # if the loaded data was not yet an array, make it into one
       # minimum number of dimensions is one, to prevent a zero-dimension array
       # (not an array at all)
@@ -60,27 +72,39 @@ def saveSamplesAndTimestepsAsNumpyArray(basename, samples, timesteps, \
   output = openPickledSamplesAndTimestepsAsNumpyArray(basename, samples,\
                                                       timesteps, obs)
   if obs:
-    fileName = os.path.join("results", basename + '_obs')
+    fileName = os.path.join("results", country, basename + '_obs')
   else:
-    fileName = os.path.join("results", basename)
+    fileName = os.path.join("results", country, basename)
   np.save(fileName, output)
 
-##########
-
+#################################
+### SAVE OUTPUTS OF THE MODEL ###
+#################################
+  
 # now save all outputs of the model as one array per variable
 # so that we can delete all number folders
-variables = ['nr']
+ 
+variables = parameters.getSumStats()
+print("Save modelled and observed metrics: ", variables)
+
+# For the modelled metrics:
 for aVariable in variables:
   saveSamplesAndTimestepsAsNumpyArray(aVariable, sampleNumbers, \
                                       timeSteps)
-saveSamplesAndTimestepsAsNumpyArray('nr', obsSampleNumbers, \
-                                    obsTimeSteps, True)
-#test
-  
-##output = openPickledSamplesAndTimestepsAsNumpyArray('weights', sampleNumbers, \
-##                                                    timeSteps)
-##print output
-### Output is indexed as array[time, sample, x, y]
-### So, all samples for time step 3 is output[2,:,:,0]
-### Last zero can also be :.
-##print output[:,-1,:,0]
+
+# For the observed values:
+for aVariable in variables:
+  saveSamplesAndTimestepsAsNumpyArray(aVariable, obsSampleNumbers,obsTimeSteps, True)
+
+'''  
+# TEST
+
+output = openPickledSamplesAndTimestepsAsNumpyArray('np', sampleNumbers, \
+                                                    timeSteps)
+print('np:')
+#print(output)
+# Output is indexed as array[time, sample, x, y]
+# So, all samples for time step 3 is output[2,:,:,0]
+# Last zero can also be :.
+print(output[:,-1,:,0])'''
+
