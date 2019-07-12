@@ -35,11 +35,11 @@ coords_dict = {
     'PL':[5002510,3212710,5162510,3372710]
 }
 
-# current: Dublin
+# Set the country bounding box
 coords = coords_dict[country] 
 
 # zone size as a factor of the cell size
-zone_size = 300 # x 100 m = 30 000 m = 30 km 
+zone_size = 400 # x 100 m (cell size) = 40 000 m = 40 km. Test map, dividing area into 16 zones.
 # for creating observations
 realizations = 20
 # window size as a factor of the cell size
