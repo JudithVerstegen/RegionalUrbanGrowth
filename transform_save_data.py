@@ -142,4 +142,21 @@ for aVariable in variables:
   plt.savefig(os.path.join(output_mainfolder,"histogram_"+ aVariable +"_obs.png"))
   plt.clf()
 
+print('#####################################################################')
+zones = 16
+for aVariable in variables:
+  zonesModelled = np.load(os.path.join("results", country, 'metrics', aVariable + '.npy'))
+  for zone in range(0,zones):
+    zoneMetric = []
+    for timeStep in timeSteps:
+      zoneMetric.append(zonesModelled[timeStep-1][0][1][zone][0])
+    print(str(zone+1))
+    print(aVariable,timeSteps,zoneMetric)
+    
+    
+  
+  
+  
+  
+
 
