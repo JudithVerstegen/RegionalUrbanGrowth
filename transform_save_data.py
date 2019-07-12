@@ -6,16 +6,15 @@ import metrics
 import numpy as np
 import parameters
 from pcraster.framework import *
+import matplotlib.pyplot as plt
 
 #### Script to read in the metrics saved as the result of the LU_urb.py script.
 #### Metrics are transformed into an array
 
-# Get the number of samples and number of time step defined in the parameter.py script
-#nrOfSamples=parameters.getNrSamples()
+# Get the number of parameter iterations and number of time step defined in the parameter.py script
 nrOfTimesteps=parameters.getNrTimesteps()
 numberOfIterations = parameters.getNumberofIterations(parameters.getSuitFactorDict(), parameters.getParametersforCalibration())
 
-#sampleNumbers=range(1,nrOfSamples+1,1)
 iterations = range(1, numberOfIterations+1, 1)
 timeSteps=range(1,nrOfTimesteps+1,1)
 
@@ -26,6 +25,7 @@ obsTimeSteps = [10,16,22,28]
 # Path to the folder with the metrics stored
 country = parameters.getCountryName()
 resultFolder = os.path.join(os.getcwd(),'results',country)
+output_mainfolder = os.path.join(resultFolder, "metrics")
 
 #################
 ### FUNCTIONS ###
@@ -36,7 +36,7 @@ def openPickledSamplesAndTimestepsAsNumpyArray(basename,iterations,timesteps, \
   output=[]
   
   for timestep in timesteps:
-    allSamples=[]
+    allIterations=[]
     
     for i in iterations:
       # Read in the parameters
@@ -49,9 +49,9 @@ def openPickledSamplesAndTimestepsAsNumpyArray(basename,iterations,timesteps, \
       # If we are working with the observed data (CLC data):
       if obs:
         name = generateNameT(basename, timestep)
-        fileName = os.path.join('observations', country, 'realizations', \
-                                str(i), name)
+        fileName = os.path.join('observations', country, 'realizations', str(i), name)
         data = metrics.map2Array(fileName, os.path.join('input_data', country, 'sampPoint.col'))
+        print(name)
 
       # If we are working with the observed values:  
       else:
@@ -71,19 +71,23 @@ def openPickledSamplesAndTimestepsAsNumpyArray(basename,iterations,timesteps, \
       # add an extra dimension that would normally be y, if the data was a map
       # so that Derek's plot functions can be used
       array = array.reshape(len(array),1)
-      allSamples.append([pArray,array]) # test if this would work??????????????
-    output.append(allSamples)
-  outputAsArray=np.array(output)
+      allIterations.append([pArray,array])
+    output.append(allIterations)
+  outputAsArray = np.array(output)
   return outputAsArray
 
-def saveSamplesAndTimestepsAsNumpyArray(basename, iterations, timesteps, \
-                                        obs=False):
-  output = openPickledSamplesAndTimestepsAsNumpyArray(basename, iterations,\
-                                                      timesteps, obs)
+def saveSamplesAndTimestepsAsNumpyArray(basename, iterations, timesteps, obs=False):
+  output = openPickledSamplesAndTimestepsAsNumpyArray(basename, iterations, timesteps, obs)
+  
+  
+  if not os.path.isdir(output_mainfolder):
+      os.mkdir(output_mainfolder)
+  
   if obs:
-    fileName = os.path.join("results", country, basename + '_obs')
+    fileName = os.path.join(output_mainfolder, basename + '_obs')
   else:
-    fileName = os.path.join("results", country, basename)
+    fileName = os.path.join(output_mainfolder, basename)
+    
   np.save(fileName, output)
 
 #################################
@@ -98,24 +102,47 @@ print("Save modelled and observed metrics: ", variables)
 
 # Save for the modelled and observed metrics:
 for aVariable in variables:
-  saveSamplesAndTimestepsAsNumpyArray(aVariable, iterations, \
-                                      timeSteps)
+  saveSamplesAndTimestepsAsNumpyArray(aVariable, iterations, timeSteps)
   saveSamplesAndTimestepsAsNumpyArray(aVariable, obsSampleNumbers,obsTimeSteps, True)  
 
-test = np.load(os.path.join("results", country, 'fd.npy'))
-print('Set of parameters for metric np: ',test[0][0][0])
-print('np values for each zone: ', test[0][0][1])
-'''
-# TEST
+######################################
+### VISUALIZE OUTPUTS OF THE MODEL ###
+######################################
+  
+print('##### Save histograms ##### ')
+for aVariable in variables:
+  h = np.load(os.path.join("results", country, 'metrics', aVariable + '.npy'))
+  print("Parameter values are stored in 3 dimensional array [timestep, iteration, metric]")
+  print("timestep: year, iteration: set of parameters used, metric: value of the selected metric")
+  #print('e.g. timestep 1 (year 1991)')
+  #print(h[1,:,:])
+  print("#############################################")
+  for timeStep in timeSteps:
+    #print('time step:', timeStep)
+    #print('Set of parameters for metric:',h[timeStep-1][0][0])
+    #print('Parameter values for each zone:',h[timeStep-1][0][1])
 
-output = openPickledSamplesAndTimestepsAsNumpyArray('np', sampleNumbers, \
-                                                    timeSteps)
-print('np:')
-#print(output)
-# Output is indexed as array[time, sample, x, y]
-# So, all samples for time step 3 is output[2,:,:,0]
-# Last zero can also be :.
+    bins = numpy.linspace(-100, 100, 100)
+    hTitle = "Histogram for metric "+aVariable+" with 'auto' bins"
+    plt.title(hTitle)
+    plt.xlabel('Metric:' + aVariable)
+    plt.ylabel("Frequency")
+    plt.hist(h[timeStep-1][0][1], bins='auto', alpha=0.5, label='timestep: '+str(timeStep))
+    plt.legend(loc='upper right')
+  plt.savefig(os.path.join(output_mainfolder,"histogram_"+ aVariable +".png"))
+  plt.clf()
 
-print(output[:,:,-1,:,0])
-'''
+for aVariable in variables:
+  test = np.load(os.path.join("results", country, 'metrics', aVariable + '_obs.npy'))
+  print(len(obsTimeSteps))
+  for timeStep in range(1,len(obsTimeSteps)+1):
+    hTitle = "Histogram for metric "+aVariable+" with 'auto' bins"
+    plt.title(hTitle)
+    plt.xlabel('Metric:' + aVariable)
+    plt.ylabel("Frequency")
+    plt.hist(test[timeStep-1][0][1], bins='auto', alpha=0.5, label='timestep: '+str(obsTimeSteps[timeStep-1]))
+    plt.legend(loc='upper right')
+  plt.savefig(os.path.join(output_mainfolder,"histogram_"+ aVariable +"_obs.png"))
+  plt.clf()
+
 
