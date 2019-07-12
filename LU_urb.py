@@ -15,6 +15,7 @@ import metrics
 import numpy as np
 np.random.seed(10)
 import mcaveragevariance
+import time
 
 #######################################
 
@@ -338,7 +339,7 @@ class LandUse:
     """Construct a land use object with a nr of types and an environment."""
     self.types = types
     self.nrOfTypes = len(types)
-    print('\nnr of dynamic land use types is:', self.nrOfTypes)
+    #print('\nnr of dynamic land use types is:', self.nrOfTypes)
 ##    self.environment = environment
     # Map with 0 in study area and No Data outside, used for cover() functions
     self.nullMask = nullMask
@@ -593,6 +594,7 @@ class LandUseChangeModel(DynamicModel):
 ### MAIN ###
 ############
 
+start_time = time.time()
 nrOfTimeSteps = parameters.getNrTimesteps()
 #nrOfSamples = parameters.getNrSamples() # This variable is not being used as MC was eliminated from the model
 # Find the number of parameters to calibrate
@@ -604,9 +606,7 @@ inputfolder = os.path.join('input_data', parameters.getCountryName())
 nullMask = readmap(inputfolder + '/nullmask')
 
 landUseList = parameters.getLandUseList()
-print('Create preMCLandUse')
 preMCLandUse = LandUse(landUseList, nullMask)
-print('preMCLandUse created')
 stations = readmap(inputfolder + '/train_stations')
 preMCLandUse.determineDistanceToStations(stations)
 roads = readmap(inputfolder + '/roads')
@@ -643,7 +643,12 @@ param_steps = np.arange(min_p, max_p + 0.1, stepsize)
 for step in range(0,len(param_steps)):
     param_steps[step] = round(param_steps[step],1)
 
+print('\n################################################')
+print('Run LU_urb model')
 print('Number of iterations: ', nrOfIterations)
+print('Number of time steps: ', nrOfTimeSteps)
+print('Min parameter value: ', min_p, '. Max parameter value: ', max_p,'. Parameter steps: ', param_steps)
+
 
 for p1 in param_steps:
     for p2 in param_steps:
@@ -658,6 +663,8 @@ for p1 in param_steps:
                     myModel = LandUseChangeModel(loopCount, weights)
                     dynamicModel = DynamicFramework(myModel, nrOfTimeSteps)
                     dynamicModel.run()
+
+print("--- Program execution: %s seconds ---" % (time.time() - start_time))
 
 ## USED TO BE THE POSTLOOP; SAVED FOR LATER USE
 ##print('\nrunning postmcloop...')
