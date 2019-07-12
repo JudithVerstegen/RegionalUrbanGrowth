@@ -573,7 +573,6 @@ class LandUseChangeModel(DynamicModel):
     for aStat in self.sumStats: # All maps should be calculated for zones
       path = generateNameT(self.outputfolder + '/' + aStat, timeStep)
       if aStat in ['np', 'pd', 'mp', 'fd']:
-        print(aStat, ':')
         # these metrics result in one value per block (here 9 blocks)
         modelledAverageArray = metrics.map2Array(path, \
                               self.inputfolder + '/sampPoint.col')
@@ -664,7 +663,11 @@ for p1 in param_steps:
                     dynamicModel = DynamicFramework(myModel, nrOfTimeSteps)
                     dynamicModel.run()
 
-print("--- Program execution: %s seconds ---" % (time.time() - start_time))
+print('\n################################################')
+print("--- Number of iterations of a loop: %s ---" % (nrOfIterations))
+time_passed = str(int((time.time() - start_time))/60)
+print("--- Program execution: ", time_passed, " minutes ---")
+
 
 ## USED TO BE THE POSTLOOP; SAVED FOR LATER USE
 ##print('\nrunning postmcloop...')
