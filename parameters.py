@@ -6,9 +6,10 @@ Judith Verstegen and Katarzyna Goch 2019-06-07
 def getNrTimesteps():
   """Return nr of time steps.
 
-  e.g. 2005 to 2030 is 26 time steps."""
+  e.g. 2005 to 2030 is 26 time steps.
+  In the model 1990 - 2018 CLC data are used, thus 28 time steps."""
 
-  timesteps = 2 #22
+  timesteps = 2 #28
   return timesteps
 
 def getNrSamples():
