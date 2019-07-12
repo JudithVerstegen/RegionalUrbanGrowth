@@ -51,8 +51,7 @@ def openPickledSamplesAndTimestepsAsNumpyArray(basename,iterations,timesteps, \
         name = generateNameT(basename, timestep)
         fileName = os.path.join('observations', country, 'realizations', str(i), name)
         data = metrics.map2Array(fileName, os.path.join('input_data', country, 'sampPoint.col'))
-        print(name)
-
+        
       # If we are working with the observed values:  
       else:
         theName = basename + str(timestep) + '.obj'
@@ -110,13 +109,12 @@ for aVariable in variables:
 ######################################
   
 print('##### Save histograms ##### ')
+print("Parameter values are stored in 3 dimensional array [timestep, iteration, metric]")
+print("timestep: year, iteration: set of parameters used, metric: value of the selected metric")
 for aVariable in variables:
   h = np.load(os.path.join("results", country, 'metrics', aVariable + '.npy'))
-  print("Parameter values are stored in 3 dimensional array [timestep, iteration, metric]")
-  print("timestep: year, iteration: set of parameters used, metric: value of the selected metric")
   #print('e.g. timestep 1 (year 1991)')
   #print(h[1,:,:])
-  print("#############################################")
   for timeStep in timeSteps:
     #print('time step:', timeStep)
     #print('Set of parameters for metric:',h[timeStep-1][0][0])
@@ -134,7 +132,6 @@ for aVariable in variables:
 
 for aVariable in variables:
   test = np.load(os.path.join("results", country, 'metrics', aVariable + '_obs.npy'))
-  print(len(obsTimeSteps))
   for timeStep in range(1,len(obsTimeSteps)+1):
     hTitle = "Histogram for metric "+aVariable+" with 'auto' bins"
     plt.title(hTitle)
