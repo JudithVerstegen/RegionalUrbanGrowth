@@ -652,6 +652,7 @@ for p1 in param_steps:
                 sumOfParameters = p1+p2+p3+p4
                 if (sumOfParameters == 1):
                     loopCount = loopCount + 1
+                    print('\n################################################')
                     print('Model Run: ',loopCount,'. Parameters used: ',p1,p2,p3,p4,)
                     weights = [p1,p2,p3,p4]
                     myModel = LandUseChangeModel(loopCount, weights)
