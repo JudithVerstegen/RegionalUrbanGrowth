@@ -35,7 +35,7 @@ def map2Array(filename, rowColFile):
     array[j], mask[j] = cellvalue(amap, row, col)
     j += 1
 #  array = numpy.compress(mask, array)
-  print(array)
+  #print(array)
   return array
 
 def mySelectSArray(name, sampleNumbers, rowColFile, base=None):
