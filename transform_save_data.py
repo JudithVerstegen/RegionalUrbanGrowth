@@ -108,7 +108,6 @@ for aVariable in variables:
 ### VISUALIZE OUTPUTS OF THE MODEL ###
 ######################################
   
-print('##### Save histograms ##### ')
 print("Parameter values are stored in 3 dimensional array [timestep, iteration, metric]")
 print("timestep: year, iteration: set of parameters used, metric: value of the selected metric")
 for aVariable in variables:
@@ -142,16 +141,24 @@ for aVariable in variables:
   plt.savefig(os.path.join(output_mainfolder,"histogram_"+ aVariable +"_obs.png"))
   plt.clf()
 
-print('#####################################################################')
+##################################################################### ZONES
 zones = 16
 for aVariable in variables:
   zonesModelled = np.load(os.path.join("results", country, 'metrics', aVariable + '.npy'))
-  for zone in range(0,zones):
+  for zone in range(1,zones+1):
     zoneMetric = []
+    hTitle = "Histogram for metric "+aVariable+" with 'auto' bins. Zone: " + str(zone)
+    plt.title(hTitle)
+    plt.xlabel('Metric:' + aVariable)
+    plt.ylabel("Frequency")
+    
     for timeStep in timeSteps:
-      zoneMetric.append(zonesModelled[timeStep-1][0][1][zone][0])
-    print(str(zone+1))
-    print(aVariable,timeSteps,zoneMetric)
+      zoneMetric.append(zonesModelled[timeStep-1][0][1][zone-1][0])
+      plt.hist(zoneMetric, bins='auto', alpha=0.5, label='timestep: '+str(timeSteps[timeStep-1]))
+      plt.legend(loc='upper right')
+    
+    plt.savefig(os.path.join(output_mainfolder,"histogram_zones_"+ aVariable +str(zone)+".png"))
+    plt.clf()
     
     
   
