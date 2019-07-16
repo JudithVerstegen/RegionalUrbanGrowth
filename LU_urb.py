@@ -479,7 +479,7 @@ class LandUseChangeModel(DynamicModel):
 ##    setglobaloption('nondiagonal')
 
     # Save the parameters as a list to the folder with the calculated metrics
-    pName = 'parameters_' + str(nr) + '.obj'
+    pName = 'parameters_iteration_' + str(nr) + '.obj'
     pPath = os.path.join(self.outputfolder, pName)
     parametersFile = open(pPath, 'wb')
     pickle.dump(weights, parametersFile)
@@ -665,6 +665,7 @@ for p1 in param_steps:
 
 print('\n################################################')
 print("--- Number of iterations of a loop: %s ---" % (nrOfIterations))
+print("--- Number of timesteps: %s ---" % (nrOfTimeSteps))
 time_passed = str(int((time.time() - start_time))/60)
 print("--- Program execution: ", time_passed, " minutes ---")
 
