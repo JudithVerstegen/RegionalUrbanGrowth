@@ -109,7 +109,7 @@ for aVariable in variables:
 ######################################
   
 print("Parameter values are stored in 3 dimensional array [timestep, iteration, metric]")
-print("timestep: year, iteration: set of parameters used, metric: array of values \
+print("# timestep: year, \n# iteration: set of parameters used, \n# metric: array of values \
 of the selected metric for each zone for each set of parameters seperately")
 
 ######################################
@@ -151,12 +151,11 @@ for aVariable in variables:
 
 for aVariable in variables:
   zonesModelled = np.load(os.path.join("results", country, 'metrics', aVariable + '.npy'))
-  #zones = len(zonesModelled[0][0][1]) # number of zones
 
   for timeStep in range(0,len(zonesModelled)): # Loop data for each time step
     # Prepare the main plot for each timeStep
     fig, axes = plt.subplots(nrows=4, ncols=4) # Depending on number of zones!
-    hTitle = "Value of metric "+aVariable+" for timestep: " + str(timeStep + 1)
+    hTitle = "Histogram of metric "+aVariable+" for each zone in timestep: " + str(timeStep + 1)
     fig.suptitle(hTitle)
     fig.subplots_adjust(hspace=1)
     
@@ -167,14 +166,18 @@ for aVariable in variables:
 
       for i in range(0,len(zonesModelled[timeStep])): # Loop array to gest the metric for the time step in given zone
         metrics_for_parameters.append(zonesModelled[timeStep][i][1][zone][0]) # [0] gives the raw number
+
+      # Plot subplots
       axes.flatten()[zone].hist(metrics_for_parameters, bins = 'auto', )
       axes.flatten()[zone].set(title=zone+1)
 
       # bins=len(np.unique(data.data.T[0]))//2 MAYBE USE LATER
-        
+
+    # Save plot and clear    
     plt.savefig(os.path.join(output_mainfolder,'Histogram_' + aVariable + "_timestep_"+ str(timeStep+1) + ".png"))
     plt.clf()
-  
+
+print('Histograms for each zone and ech time step plotted.')  
 '''                      
     for zones_params in zonesModelled[timeStep]:
       #print(zone, zones_params[1][zone-1][0])
