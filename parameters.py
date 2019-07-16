@@ -9,7 +9,7 @@ def getNrTimesteps():
   e.g. 2005 to 2030 is 26 time steps.
   In the model 1990 - 2018 CLC data are used, thus 28 time steps."""
 
-  timesteps = 4 #28
+  timesteps = 10 #28
   return timesteps
 
 def getNrSamples():
@@ -103,8 +103,6 @@ def getNumberofIterations(getSuitFactorDict, getParametersforCalibration):
   k = nrParamteres - 1
   
   return factorial(n) // (factorial(k) * factorial(n - k))
-
-#print(getNumberofIterations(getSuitFactorDict(), getParametersforCalibration()))
 
 def getWeightDict():
   """Return dictionary how a type (key) weights (items) its suit factors.
