@@ -40,7 +40,7 @@ def openPickledSamplesAndTimestepsAsNumpyArray(basename,iterations,timesteps, \
     
     for i in iterations:
       # Read in the parameters
-      pName = 'parameters_' + str(i) + '.obj'
+      pName = 'parameters_iteration_' + str(i) + '.obj'
       pFileName = os.path.join(resultFolder, str(i), pName)
       filehandler = open(pFileName, 'rb') 
       pData = pickle.load(filehandler)
@@ -76,18 +76,26 @@ def openPickledSamplesAndTimestepsAsNumpyArray(basename,iterations,timesteps, \
   return outputAsArray
 
 def saveSamplesAndTimestepsAsNumpyArray(basename, iterations, timesteps, obs=False):
+  # Convert the output of the model into arrays
   output = openPickledSamplesAndTimestepsAsNumpyArray(basename, iterations, timesteps, obs)
   
-  
+  # Check if the directory exists. If not, create.
   if not os.path.isdir(output_mainfolder):
       os.mkdir(output_mainfolder)
-  
+      
+  # Set the name of the file
   if obs:
     fileName = os.path.join(output_mainfolder, basename + '_obs')
   else:
     fileName = os.path.join(output_mainfolder, basename)
-    
+
+  # Clear the directory if needed
+  if os.path.exists(fileName + '.npy'):
+      os.remove(fileName + '.npy')
+
+  # Save the data  
   np.save(fileName, output)
+  
 
 #################################
 ### SAVE OUTPUTS OF THE MODEL ###
@@ -119,10 +127,6 @@ for aVariable in variables:
   #print('e.g. timestep 1 (year 1991)')
   #print(h[1,:,:])
   for timeStep in timeSteps:
-    #print('time step:', timeStep)
-    #print('Set of parameters for metric:',h[timeStep-1][0][0])
-    #print('Parameter values for each zone:',h[timeStep-1][0][1])
-
     bins = numpy.linspace(-100, 100, 100)
     hTitle = "Histogram for metric "+aVariable+" with 'auto' bins"
     plt.title(hTitle)
@@ -130,7 +134,13 @@ for aVariable in variables:
     plt.ylabel("Frequency")
     plt.hist(h[timeStep-1][0][1], bins='auto', alpha=0.5, label='timestep: '+str(timeStep))
     plt.legend(loc='upper right')
-  plt.savefig(os.path.join(output_mainfolder,"histogram_"+ aVariable +".png"))
+    
+  # Set the name and clear the directory if needed
+  hNameAll = "histogram_"+ aVariable +".png"
+  if os.path.exists(hNameAll):
+      os.remove(hNameAll)
+  # Save
+  plt.savefig(os.path.join(output_mainfolder,hNameAll))
   plt.clf()
 
 for aVariable in variables:
@@ -142,7 +152,13 @@ for aVariable in variables:
     plt.ylabel("Frequency")
     plt.hist(test[timeStep-1][0][1], bins='auto', alpha=0.5, label='timestep: '+str(obsTimeSteps[timeStep-1]))
     plt.legend(loc='upper right')
-  plt.savefig(os.path.join(output_mainfolder,"histogram_"+ aVariable +"_obs.png"))
+
+  # Set the name and clear the directory if needed
+  hNameAllObs = "histogram_"+ aVariable +"_obs.png"
+  if os.path.exists(hNameAllObs):
+      os.remove(hNameAllObs)   
+  # Save
+  plt.savefig(os.path.join(output_mainfolder,hNameAllObs))
   plt.clf()
 
 
@@ -173,61 +189,17 @@ for aVariable in variables:
 
       # bins=len(np.unique(data.data.T[0]))//2 MAYBE USE LATER
 
+    # Set the name and clear the directory if needed
+    hName = 'Histogram_' + aVariable + "_timestep_"+ str(timeStep+1) + ".png"
+    if os.path.exists(hName):
+        os.remove(hName)
+
     # Save plot and clear    
-    plt.savefig(os.path.join(output_mainfolder,'Histogram_' + aVariable + "_timestep_"+ str(timeStep+1) + ".png"))
+    plt.savefig(os.path.join(output_mainfolder,hName))
     plt.clf()
 
 print('Histograms for each zone and ech time step plotted.')  
-'''                      
-    for zones_params in zonesModelled[timeStep]:
-      #print(zone, zones_params[1][zone-1][0])
-      metrics_for_parameters.append(zones_params[1][zone][0]) # values of metrics in each zone for each set of parameters. Want zone number 0
-    #print(timeStep) # times number zones
-    #print(metrics_for_parameters)
 
-    zoneMetric.append(metrics_for_parameters)
-    #print(zoneMetric)'''
-'''
-  zoneMetric
- 
-  # Plot plots
-  # bins=len(np.unique(data.data.T[0]))//2 MAYBE USE LATER
-  for ax, zone, count in zip(axes.flatten(), zoneMetric, enumerate(zoneMetric)):
-    ax.hist(zone, bins = 'auto')
-    ax.set(title=count[0]+1)
-  plt.savefig(os.path.join(output_mainfolder,'Histogram_' + aVariable + "_timestep_"+ timeStep + ".png"))
-  plt.clf()
-'''
-    
-    
-'''
-for aVariable in variables:
-  for timeStep in timeSteps:
-    zoneMetric = []
-    # Prepare the plot for the subplots
-    fig, axes = plt.subplots(nrows=4, ncols=4) # Depending on number of zones!
-    #ax0, ax1, ax2, ax3 = axes.flatten()    
-    hTitle = "Histogram for metric "+aVariable+" with 'auto' bins. Timestep" + str(timeSteps[timeStep-1])
-    fig.suptitle(hTitle)
-    fig.subplots_adjust(hspace=1.5)
-
-    # Prepare data for each zone to be plotted in one array
-    for zone in range(1,zones+1):
-      zoneMetric.append(zonesModelled[timeStep-1][0][1][zone-1][0])
-
-    # Plot plots
-    # bins=len(np.unique(data.data.T[0]))//2 MAYBE USE LATER
-    for ax, zone, count in zip(axes.flatten(), zoneMetric, enumerate(zoneMetric)):
-      ax.hist(zone, bins = 'auto')
-      ax.set(title=count[0]+1)
-    plt.savefig(os.path.join(output_mainfolder,"hist_" + aVariable + "_z_" + str(count[0]) + \
-                               "_timestep_" + str(timeStep) + ".png"))
-    plt.clf()
-'''
-      
-    
-    
-  
   
   
   
