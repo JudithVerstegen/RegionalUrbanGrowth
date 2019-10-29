@@ -105,7 +105,7 @@ def calculateSumStats(systemState, listOfSumStats, zones, validation=False):
       zone_area = areaarea(zones) # unit? zones are defined as 300, here they are calculated as 30 000
       patch_density = average_nr/zone_area
       listOfMaps.append(patch_density)
-    elif aStat == 'mp': # Mean patch size. If patch is in more than one zone it is assigned to one zone only...
+    elif aStat == 'mp': # Mean patch size in a zone. If patch is in more than one zone it is assigned to one zone only...
       patchSizes = areaarea(clumps)/parameters.getConversionUnit()
       patchSizeOneCell = ifthen(oneCellPerPatch, patchSizes)
       averagePatchSize = areaaverage(patchSizeOneCell, zones)
@@ -121,7 +121,10 @@ def calculateSumStats(systemState, listOfSumStats, zones, validation=False):
       fractalDimension = 2*ln(perimeter)/ln(patchSizes)
       patchFractalDimensionOneCell = ifthen(oneCellPerPatch, fractalDimension)
       averageFractalDimension = areaaverage(patchFractalDimensionOneCell, zones)
-      listOfMaps.append(averageFractalDimension) 
+      listOfMaps.append(averageFractalDimension)
+    elif aStat == 'cilp': # Compactness index of the largest patch (CILP)
+      patchSizes = areaarea(clumps)/parameters.getConversionUnit()
+      
     else:
       print('ERRRRRRRRRRRROR, unknown sum stat')
   return listOfMaps
