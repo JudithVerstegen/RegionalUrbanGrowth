@@ -91,10 +91,7 @@ def clip_and_convert(in_fn, coords, nodata, datatype):
     origin_y = geotransform[3]
     print('x, y:', origin_x, origin_y)
     data = clip(rast_data_source, coords)
-    print('Nominal?')
     themap = numpy2pcr(datatype, data, nodata)
-    print('Nominal')
-    ##print data
     del rast_data_source
     return themap
 
@@ -112,8 +109,8 @@ test_dir = os.path.join(data_dir, 'test_data')
 setclone('clone')
 
 print('-------------------- Create test map --------------------')
-test_patch = os.path.join(test_dir, 'PL_test_3patches_recl_clip1.tif')
-test_map = clip_and_convert(test_patch, coords, 0, Nominal)
+test_patch = os.path.join(test_dir, 'PL_test_3patches_recl.tif')
+test_map = clip_and_convert(test_patch, coords, 999, Nominal)
 nullmask = spatial(nominal(0))
 t_map=cover(nominal(test_map), nullmask)
 aguila(t_map)
