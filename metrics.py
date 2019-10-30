@@ -110,7 +110,8 @@ def calculateSumStats(systemState, listOfSumStats, zones, validation=False):
       patchSizeOneCell = ifthen(oneCellPerPatch, patchSizes)
       averagePatchSize = areaaverage(patchSizeOneCell, zones)
       averagePatchSizeScalar = cover(averagePatchSize, spatial(scalar(0)))
-      listOfMaps.append(averagePatchSizeScalar) 
+      listOfMaps.append(averagePatchSizeScalar)
+    #### BOTH FD AND CILP GIVE WRONG RESULTS FOR THE PATCHES TOUCHING THE BORDER OF THE STUDY AREA -> PERIMETER IS NOT CALCULATED PROPERLY
     elif aStat == 'fd': # Average fractal dimension of patches in one zone.
       ### Value of the metric is dependend on the unit used
       ### 'perimeter' and 'patchSizes' need to be higher than e = ~2.71
@@ -123,8 +124,15 @@ def calculateSumStats(systemState, listOfSumStats, zones, validation=False):
       averageFractalDimension = areaaverage(patchFractalDimensionOneCell, zones)
       listOfMaps.append(averageFractalDimension)
     elif aStat == 'cilp': # Compactness index of the largest patch (CILP)
+      scNegative = ifthenelse(boolean(systemState) == 1, boolean(0), boolean(1)) # the same as fd
+      borders = ifthen(boolean(systemState) == 1, window4total(scalar(scNegative))) # the same as fd
+      perimeter = areatotal(borders, nominal(clumps))*sqrt(cellarea()) # the same as fd
       patchSizes = areaarea(clumps)/parameters.getConversionUnit()
-      
+      biggestPatchSize = areamaximum(patchSizes,zones) # largest patch area in a given zone. One patch can be in more than one zone.
+      biggestPatchPerimeter = areamaximum(ifthen(patchSizes == biggestPatchSize, perimeter),zones) # perimeter of the largest patch area in a given zone.
+      CILP = (2 * numpy.pi * sqrt(biggestPatchSize / numpy.pi)) / biggestPatchPerimeter
+      aguila(zones,CILP)
+      listOfMaps.append(CILP)      
     else:
       print('ERRRRRRRRRRRROR, unknown sum stat')
   return listOfMaps
@@ -188,18 +196,19 @@ def makeCalibrationMask(rowColFile, zoneMap):
   report(blocksTrue, inputfolder + '/zones_selection.map')
   blocksTrue = lookupboolean(inputfolder + '/lookupTable_val.tbl', zoneMap)
   report(blocksTrue, inputfolder + '/zones_validation.map')
-'''
+
 # TEST
-""" Testing on the map with one zone: size 30 km x 30 km, with one patch: area 30 km2, perimeter 80 km"""
+""" Testing on the map with one zone: size 30 km x 30 km, with three patches: 700 km2, 200 km2, 100 km2 """
 test_map = os.path.join(os.getcwd(), 'data', 'test_data', 'metric_test_3patches_IE.map')
 #aguila(test_map)
 systemState = readmap(test_map) == 1 # select urban or predefined pattern
 zones_map = os.path.join(inputfolder, 'zones.map')
 zones = readmap(zones_map)
+
 # put HERE the name(s) of the metric(s) you want to test
-# ['np', 'pd', 'mp', 'fd']
-metrics = ['np', 'pd', 'mp', 'fd']
+# ['np', 'pd', 'mp', 'fd', 'cilp']
+metrics = ['cilp']
 listofmaps = calculateSumStats(systemState, metrics, zones)
 #aguila(listofmaps[0])
-'''
+
 
