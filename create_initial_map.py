@@ -1,7 +1,7 @@
 '''
 Judith Verstegen, May 2019
 
-This script takes 1) Corine data ('90, '00, '06 and '12) and
+This script takes 1) Corine data ('90, '00, '06, '12 and '18) and
 2) a map of roads to create all datasets necessary
 to generate inputs and calibration data for an urban growth model.
 
