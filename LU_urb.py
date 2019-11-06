@@ -576,10 +576,11 @@ class LandUseChangeModel(DynamicModel):
         # these metrics result in one value per block (here 9 blocks)
         modelledAverageArray = metrics.map2Array(path, \
                               self.inputfolder + '/sampPoint.col')
+      ''' As for now we do not use it:
       else:
         # other metrics result in one value for the whole study area
         modelledAverageArray = metrics.map2Array(path, \
-                              self.inputfolder + '/sampPointNr.col')
+                              self.inputfolder + '/sampPointNr.col')'''
       # metric is saved as a list
       name1 = aStat + str(timeStep) + '.obj'
       path1 = os.path.join(self.outputfolder, name1)
@@ -632,7 +633,7 @@ preMCLandUse.determineSpeedRoads(roads)
 sumOfParameters = 0
 loopCount = 0
 
-# Set step size for calibration, put in parameters file?
+# Set step size for calibration
 min_p = parameters.getParametersforCalibration()[0]
 max_p = parameters.getParametersforCalibration()[1]
 stepsize = parameters.getParametersforCalibration()[2]
