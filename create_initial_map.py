@@ -39,7 +39,7 @@ coords_dict = {
 coords = coords_dict[country] 
 
 # zone size as a factor of the cell size
-zone_size = 400 # x 100 m (cell size) = 40 000 m = 40 km. Test map, dividing area into 16 zones.
+zone_size = 400 # x 100 m (cell size) = 40 000 m = 40 km. Test map, dividing area into 16 zones. ## The transform_save_data.py script didn't work for 4 zones
 # for creating observations
 realizations = 20
 # window size as a factor of the cell size
