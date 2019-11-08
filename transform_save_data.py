@@ -23,7 +23,7 @@ timeSteps=range(1,nrOfTimesteps+1,1)
 
 # Get the observed time steps. Time steps relate to the year of the CLC data, where 1990 was time step 0.
 obsSampleNumbers = [1] #range(1,20+1,1) <- for stochastic model
-obsTimeSteps = [10,16] # for a whole run should be amended. Maybe should go to parameters?
+obsTimeSteps = [10] # for a whole run should be amended. Maybe should go to parameters?
 
 # Path to the folder with the metrics stored
 country = parameters.getCountryName()
@@ -100,12 +100,16 @@ def saveSamplesAndTimestepsAsNumpyArray(basename, iterations, timesteps, obs=Fal
   np.save(fileName, output)
 
 def histogramsModelledMetrics(theMetrics):
+  #('number of time steps: ',len(zonesModelled))
+  #('number of parameter configurations: ',len(zonesModelled[0]))                     
+  #('number of zones: ',len(zonesModelled[0][0][1]))
+
   for aVariable in theMetrics:
     zonesModelled = np.load(os.path.join("results", country, 'metrics', aVariable + '.npy'))
     
     for timeStep in timeSteps: # Loop data for each time step
       # Prepare the main plot for each timeStep
-      fig, axes = plt.subplots(nrows=4, ncols=4) # Depending on number of zones!
+      fig, axes = plt.subplots(nrows=4, ncols=4, sharex=True, sharey = True) # Depending on number of zones!
       hTitle = "Histogram of modelled metric "+aVariable+" for each zone in timestep: " + str(timeStep)
       fig.suptitle(hTitle)
       fig.subplots_adjust(hspace=1)
@@ -114,12 +118,13 @@ def histogramsModelledMetrics(theMetrics):
         # Prepare data for each zone to be plotted in each subplot
         metrics_for_histogram = []
 
-        for i in range(0,len(zonesModelled[timeStep-1])): # Loop array to gest the metric for the time step in given zone
+        for i in range(0,len(zonesModelled[timeStep-1])): # Loop array to get metrics for each parameter configuration
           metrics_for_histogram.append(zonesModelled[timeStep-1][i][1][zone][0]) # [0] gives the raw number
-
+          
         # Plot subplots
         axes.flatten()[zone].hist(metrics_for_histogram, bins = 'auto', )
-        axes.flatten()[zone].set(title=zone)
+        axes.flatten()[zone].set(title=zone+1)
+        axes.flatten()[zone].ticklabel_format(axis='x', style='sci', scilimits=(-4,4))
 
         # bins=len(np.unique(data.data.T[0]))//2 MAYBE USE LATER
 
@@ -135,50 +140,6 @@ def histogramsModelledMetrics(theMetrics):
       # Close all open figures
       plt.close('all')
     
-
-'''def createHistograms(metrics,metricsValues,typeOfMetric): # To be fixed!
-  # metrics - names of metrics saved
-  # metricsValues - npy file with metric values for each zone
-  # typeOfMetric = ['mod','obs']
-  for aMetric in metrics:
-    metricsValues = np.load(os.path.join("results", country, 'metrics', aMetric + '.npy'))
-    
-    for timeStep in range(0,len(metricsValues)): # Loop data for each time step
-      # Prepare the main plot for each timeStep
-      fig, axes = plt.subplots(nrows=4, ncols=4) # Depending on number of zones!
-      hTitle = "Histogram of modelled metric "+aMetric+" for each zone in timestep: " + str(timeStep + 1)
-      fig.suptitle(hTitle)
-      fig.subplots_adjust(hspace=1)
-      
-      for zone in range(0, len(metricsValues[timeStep][0][1])): # Loop array to extraxt data for each zone
-        # Prepare data for each zone to be plotted in each subplot
-        zoneMetric = []
-        metrics_for_histogram = []
-
-        for i in range(0,len(metricsValues[timeStep])): # Loop array to gest the metric for the time step in given zone
-          metrics_for_histogram.append(metricsValues[timeStep][i][1][zone][0]) # [0] gives the raw number
-
-        # Plot subplots
-        axes.flatten()[zone].hist(metrics_for_histogram, bins = 'auto', )
-        axes.flatten()[zone].set(title=zone+1)
-
-        # bins=len(np.unique(data.data.T[0]))//2 MAYBE USE LATER
-
-    # Set the name and clear the directory if needed
-    hName = 'Histogram_' + aMetric + "_modelled_timestep_"+ str(timeStep+1) + ".png"
-    if os.path.exists(hName):
-        os.remove(hName)
-
-    # Save plot and clear    
-    plt.savefig(os.path.join(output_mainfolder,hName))
-    plt.clf()
-
-    # Close all open figures
-    plt.close('all')
-    
-  print('Histograms created')'''
-  
-
 #################################
 ### SAVE OUTPUTS OF THE MODEL ###
 #################################
@@ -187,10 +148,11 @@ def histogramsModelledMetrics(theMetrics):
 # so that we can delete all number folders
  
 print("Save modelled and observed metrics: ", metricNames)
-print("Parameter values are stored in 3 dimensional array [timestep, iteration, metric]")
+print("Parameter values are stored in 3 dimensional array [timestep, iteration, metric value for a given zone]")
 print("# timestep: year, \n# iteration: set of parameters used, \n# metric: array of values \
 of the selected metric for each zone for each set of parameters seperately")
 
+    
 # Save for the modelled and observed metrics:
 for aVariable in metricNames:
   saveSamplesAndTimestepsAsNumpyArray(aVariable, iterations, timeSteps)
@@ -201,45 +163,12 @@ for aVariable in metricNames:
 ######################################
 
 # Create histograms of metric values for different parameters per zone per timestep
-histogramsModelledMetrics(metricNames)
-
-
-'''# One histogram of observed metric values per zone per timestep
-
-for aVariable in metricNames:
-  zonesObserved = np.load(os.path.join("results", country, 'metrics', aVariable + '_obs.npy'))
-
-  for timeStep in range(0,len(obsTimeSteps)):
-    # Prepare the main plot for each timeStep
-    fig, axes = plt.subplots(nrows=4, ncols=4) # Depending on number of zones!
-    hTitle = "Histogram of observed metric "+aVariable+" for each zone in timestep: " + str(timeStep + 1)
-    fig.suptitle(hTitle)
-    fig.subplots_adjust(hspace=1)
-
-    for zone in range(0, len(zonesObserved[timeStep][0][1])): # Loop array to extraxt data for each zone
-      # Prepare data for each zone to be plotted in each subplot
-      zoneMetric = []
-      metrics_for_histogram = []
-
-      for i in range(0,len(zonesObserved[timeStep])): # Loop array to gest the metric for the time step in given zone
-        metrics_for_histogram.append(zonesObserved[timeStep][i][1][zone][0]) # [0] gives the raw number
-        #print(aVariable,'timestep:',obsTimeSteps[timeStep],'zone:',zone,zonesObserved[timeStep][i][1][zone][0])
-
-      # Plot subplots
-      axes.flatten()[zone].hist(metrics_for_histogram, bins = 'auto', )
-      axes.flatten()[zone].set(title=zone)
-
-    # Set the name and clear the directory if needed
-    hName = 'Histogram_' + aVariable + "_obs_timestep_"+ str(timeStep+1) + ".png"
-    if os.path.exists(hName):
-        os.remove(hName)
-
-    # Save plot and clear    
-    plt.savefig(os.path.join(output_mainfolder,hName))
-    plt.clf()
-
-    # Close all open figures
-    plt.close('all')'''
+zonesModelled = np.load(os.path.join("results", country, 'metrics', metricNames[0] + '.npy'))
+print(zonesModelled)
+print('number of time steps: ',len(zonesModelled))
+print('number of parameter configurations: ',len(zonesModelled[0]))                     
+print('number of zones: ',len(zonesModelled[0][0][1]))
+#histogramsModelledMetrics(metricNames)
 
 print('Histograms for each zone and ech time step plotted.')  
 
