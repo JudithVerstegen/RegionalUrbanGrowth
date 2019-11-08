@@ -65,18 +65,32 @@ for aVariable in metricList:
   allParameters = getParameterConfigurations(zonesModelled)
   noParameterConfigurations = zonesModelled.shape[1]
   
-  # 2. Create an array to store the difference between modelled and observed metrics value
-  differenceArray = np.zeros((len(obsTimeSteps),noParameterConfigurations,16,1)) # change this!!!!!
-  #print(differenceArray)
-
-  # 2. Store the metric value for selected timestep
+  # 2. Create an array to store the modelled metrics values for the observation time steps
+  modelledArray = np.zeros((len(obsTimeSteps),noParameterConfigurations,16,1))# change this!!!!! to number of zones
+  differenceArray = np.zeros((len(obsTimeSteps),noParameterConfigurations,16,1))# change this!!!!!
+  obsArray = np.zeros((len(obsTimeSteps),1,16,1))# change this!!!!!
+  
+  # Store the metric value for selected timestep
   for obsTimeStep in obsTimeSteps:
     rowIndex = 0
     for p in range(0,noParameterConfigurations):
-      differenceArray[rowIndex,p] = zonesModelled[obsTimeStep-1,p][1]
+      modelledArray[rowIndex,p] = zonesModelled[obsTimeStep-1,p][1]
     rowIndex = rowIndex+1
+  
+  # 3. Create an array to store the observed metrics values
+  zonesObserved = np.load(os.path.join("results", country, 'metrics', aVariable + '_obs.npy'))
+  rowIndex = 0
+  for obsTimeStep in range(0,len(obsTimeSteps)):
+    obsArray[rowIndex,0] = zonesObserved[obsTimeStep,0][1]
+    rowIndex = rowIndex+1
+  
+  # 4. Create difference array
+  differenceArray = numpy.subtract(modelledArray,obsArray)
   print(differenceArray)
-                                                  
+  
+  
+
+
   
 
 
