@@ -9,7 +9,7 @@ def getNrTimesteps():
   e.g. 2005 to 2030 is 26 time steps.
   In the model 1990 - 2018 CLC data are used, thus 28 time steps."""
 
-  timesteps = 16 #28
+  timesteps = 10 #28
   return timesteps
 
 def getNrSamples():
@@ -25,7 +25,7 @@ def getParametersforCalibration():
      minParameter needs to be >= 0
      maxParameter needs to be <= 1
     [minParameter, maxParameter, stepSize] """
-  return [0.0, 1.0, 0.5]
+  return [0.0, 1.0, 1.0]
 
 def getCountryName():
   """ Returns the case study symbol """
