@@ -23,7 +23,7 @@ timeSteps=range(1,nrOfTimesteps+1,1)
 
 # Get the observed time steps. Time steps relate to the year of the CLC data, where 1990 was time step 0.
 obsSampleNumbers = [1] #range(1,20+1,1) <- for stochastic model
-obsTimeSteps = [10] # for a whole run should be amended. Maybe should go to parameters?
+obsTimeSteps = parameters.getObsTimesteps()
 
 # Path to the folder with the metrics stored
 country = parameters.getCountryName()
