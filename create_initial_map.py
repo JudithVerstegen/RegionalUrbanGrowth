@@ -634,7 +634,8 @@ for i in range(1, realizations + 1):
     randmap = windowaverage(uniform(1), corr_window_size * celllength())
     base = os.path.join('observations', country, 'realizations')
     prev = None
-    for year in [('90', 0), ('00', 10), ('06', 16), ('12', 22), ('18', 28)]:
+    # Year numbers are adjusted to the time step numbers
+    for year in [('90', 1), ('00', 11), ('06', 17), ('12', 23), ('18', 29)]: 
         amap = readmap(os.path.join(os.getcwd(), 'observations', \
                                     country, 'urb' + year[0] + '.map'))
         # change some of the NEW urban cells, not the existing ones
