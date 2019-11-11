@@ -7,10 +7,20 @@ def getNrTimesteps():
   """Return nr of time steps.
 
   e.g. 2005 to 2030 is 26 time steps.
-  In the model 1990 - 2018 CLC data are used, thus 28 time steps."""
+  In the model 1990 - 2018 CLC data are used, including starting and ending date, thus 29 time steps.
+  Time step nr 1 is 1990"""
 
-  timesteps = 10 #28
+  timesteps = 17 #29
   return timesteps
+
+def getObsTimesteps():
+  """Return the time steps used for calibration and validation.
+
+  e.g. 2000 in time step nr 11.
+  In the model 2000 and 2006 data are used for calibration, and 2012 and 2018 are used for validation."""
+  
+  obsTimeSteps = [11,17] #[11,17,23,29]
+  return obsTimeSteps
 
 def getNrSamples():
   """Return nr of Monte Carlo samples required.
