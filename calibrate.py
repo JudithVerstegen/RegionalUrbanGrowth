@@ -11,7 +11,8 @@ import matplotlib.pyplot as plt
 #### Script to find calibrate LU model
 
 # Get metrics
-metricList = parameters.getSumStats() 
+#metricList = parameters.getSumStats() 
+metricList = ['np'] # FOR TESTING
 
 # Get the number of parameter iterations and number of time step defined in the parameter.py script
 nrOfTimesteps=parameters.getNrTimesteps()
@@ -33,82 +34,62 @@ arrayFolder = os.path.join(os.getcwd(),'results',country,'metrics')
 ### FUNCTIONS ###
 #################
 
+# Create a list of parametr configurations
 def getParameterConfigurations(metricsArray):
   allParameters = []
   for i in range(0,len(metricsArray[0])):
     allParameters.append(metricsArray[0][i][0])
+  print('Number of parameter configurations: ',metricsArray.shape[1])
   return allParameters
-
-def createZeroArray(obsTimeSteps,zonesModelled, obs=False):
-  # Get the number of parameter configurations
-  noParameterConfigurations = zonesModelled.shape[1]
-  # Get the number of zones
-  numberZones = len(zonesModelled[0][0][1])
-  if obs:
-    theArray = np.zeros((len(obsTimeSteps),1,numberZones,1))
-  else:
-    theArray = np.zeros((len(obsTimeSteps),noParameterConfigurations,numberZones,1))
-  return theArray
-
-def storeMetricValues(theArray,obsTimeSteps,zonesModelled, obs=False):
-  rowIndex = 0
-  if obs:
-    for obsTimeStep in range(0,len(obsTimeSteps)):
-      theArray[rowIndex,0] = zonesObserved[obsTimeStep,0][1]
-      rowIndex = rowIndex+1
-  else:
-    for obsTimeStep in obsTimeSteps:
-      rowIndex = 0
-      for p in range(0,zonesModelled.shape[1]): # Loop the parameter configurations
-        theArray[rowIndex,p] = zonesModelled[obsTimeStep-1,p][1]
-      rowIndex = rowIndex+1
-
-def saveTheArray(output, resultFolder, metricName): 
-  # Set the name of the file
-  fileName = os.path.join(resultFolder, metricName + '_diff')
-
-  # Clear the directory if needed
-  if os.path.exists(fileName + '.npy'):
-      os.remove(fileName + '.npy')
-
-  # Save the data  
-  np.save(fileName, output)
-
-  print('Difference between modelled and observed values are stored in ', metricName + '_diff.npy')
-
+def subsetParameters(metricsArray):
+  
+  print(metricsArray[:,0])
+  return 'done'
 
 ###########################
 ### CALIBRATE THE MODEL ###
 ###########################
  
-print("CALIBRATE THE MODEL")
+print("Parameter values are stored in 3 dimensional array [timestep, iteration, metric]")
+print("# timestep: year \n# iteration: set of parameters used \n# metric: array of values \
+of the selected metric for each zone for each set of parameters seperately")
+
 
 # Calibration of the modell will be based on finding
 # minimum root-mean-square error between the metrics modelled and observed.
 
 for aVariable in metricList:
-  print('Metric: ',aVariable)
   zonesModelled = np.load(os.path.join("results", country, 'metrics', aVariable + '.npy'))
-  zonesObserved = np.load(os.path.join("results", country, 'metrics', aVariable + '_obs.npy'))
-  print('Number of parameter configurations: ',zonesModelled.shape[1])
   
-  # 1. Create a list containing possible parameter configurations
+  # 1. Create a list containing possible paramter configurations
   allParameters = getParameterConfigurations(zonesModelled)
+  noParameterConfigurations = zonesModelled.shape[1]
   
-  # 2. Create the arrays to store the modelled, the observed and the difference metrics values
-  modelledArray = createZeroArray(obsTimeSteps,zonesModelled)
-  obsArray = createZeroArray(obsTimeSteps,zonesModelled,obs=True)
-
-  # 3. Store the metric values 
-  storeMetricValues(modelledArray,obsTimeSteps,zonesModelled)
-  storeMetricValues(obsArray,obsTimeSteps,zonesModelled,obs=True)
+  # 2. Create an array to store the modelled metrics values for the observation time steps
+  modelledArray = np.zeros((len(obsTimeSteps),noParameterConfigurations,16,1))# change this!!!!! to number of zones
+  differenceArray = np.zeros((len(obsTimeSteps),noParameterConfigurations,16,1))# change this!!!!!
+  obsArray = np.zeros((len(obsTimeSteps),1,16,1))# change this!!!!!
   
-  # 4. Store the difference
+  # Store the metric value for selected timestep
+  for obsTimeStep in obsTimeSteps:
+    rowIndex = 0
+    for p in range(0,noParameterConfigurations):
+      modelledArray[rowIndex,p] = zonesModelled[obsTimeStep-1,p][1]
+    rowIndex = rowIndex+1
+  
+  # 3. Create an array to store the observed metrics values
+  zonesObserved = np.load(os.path.join("results", country, 'metrics', aVariable + '_obs.npy'))
+  rowIndex = 0
+  for obsTimeStep in range(0,len(obsTimeSteps)):
+    obsArray[rowIndex,0] = zonesObserved[obsTimeStep,0][1]
+    rowIndex = rowIndex+1
+  
+  # 4. Create difference array
   differenceArray = numpy.subtract(modelledArray,obsArray)
-  #print(differenceArray)
+  print(differenceArray)
   
-  # 5. Save the data
-  saveTheArray(differenceArray, arrayFolder, aVariable)
+  
+
 
   
 
@@ -116,7 +97,27 @@ for aVariable in metricList:
 # 1. Calculate Mean Squared Error
 numberOfDataPoints = 1 # number of observations. Here: 2000
 
- 
+# Get the modelled values corresponding to the observed values
+
+'''print(zonesModelled)
+  metricValueArray = [] # [metric name, parameter set, timestep, zone, metric value]
+  metricsArray = [] # array to store matricValueArray[] for each zone for each timestep for each metric
+  
+  for timeStep in timeSteps: # Loop data for each time step
+    for zone in range(0, len(zonesModelled[timeStep-1][0][1])): # Loop array to extraxt data for each zone
+      for i in range(0,len(zonesModelled[timeStep-1])): # get the metric for the time step in given zone
+        for obsTimeStep in obsTimeSteps:
+          if timeStep == obsTimeStep:
+            metricValueArray = [aVariable,zonesModelled[timeStep-1][i][0],timeStep,zone,zonesModelled[timeStep-1][i][1][zone][0]]
+            metricsArray.append(metricValueArray)
+            metricValueArray = []'''
+
+
+
+
+
+
+  
   
   
 
