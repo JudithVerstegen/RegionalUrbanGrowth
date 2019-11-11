@@ -158,19 +158,12 @@ for aVariable in metricNames:
   saveSamplesAndTimestepsAsNumpyArray(aVariable, iterations, timeSteps)
   saveSamplesAndTimestepsAsNumpyArray(aVariable, obsSampleNumbers,obsTimeSteps, True)  
 
-######################################
-### VISUALIZE OUTPUTS OF THE MODEL ###
-######################################
-
-# Create histograms of metric values for different parameters per zone per timestep
+# Print data description
 zonesModelled = np.load(os.path.join("results", country, 'metrics', metricNames[0] + '.npy'))
-print(zonesModelled)
 print('number of time steps: ',len(zonesModelled))
 print('number of parameter configurations: ',len(zonesModelled[0]))                     
 print('number of zones: ',len(zonesModelled[0][0][1]))
-#histogramsModelledMetrics(metricNames)
 
-print('Histograms for each zone and ech time step plotted.')  
 
   
   
