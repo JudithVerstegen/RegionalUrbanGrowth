@@ -15,7 +15,7 @@ metricNames = parameters.getSumStats()
 zones = 16 # Maybe to parameters??
 
 # Get the number of parameter iterations and number of time step defined in the parameter.py script
-nrOfTimesteps = 10 #parameters.getNrTimesteps()
+nrOfTimesteps = parameters.getNrTimesteps()
 timeSteps=range(1,nrOfTimesteps+1,1)
 
 # Get the observed time steps. Time steps relate to the year of the CLC data, where 1990 was time step 0.
@@ -71,7 +71,7 @@ def histogramsModelledMetrics(theMetrics):
       plt.close('all')
 
 def transformArray(theArray):
-  # Create an array storing absolute difference values for each zone for each parameter set
+  # Create an array storing absolute difference values in the shape of the zones
   numberZones = len(theArray[0][0])
   parameterSets = len(theArray[0])
   # Create array
@@ -85,32 +85,35 @@ def transformArray(theArray):
       newArray[pSet][i][j] = theArray[0][pSet][zone]
   return newArray
 
-def plotAbsoluteDifference(differenceArray, metric, obsTimeStep):
-  array = transformArray(differenceArray)
-  parameterSets = len(differenceArray[0])
-  
-  fig = plt.figure(figsize=(12, 8))
-  
-  for pSet in range(0,parameterSets):
-    plt.subplot(parameterSets/2,2,pSet+1)
-    plt.imshow(array[pSet], cmap='Purples')
-    plt.xlabel('Parameter set: '+ str(pSet+1))
-    plt.axis('off')
-    plt.title('Parameter set: '+ str(pSet+1))
+def plotAbsoluteDifference(metricNames, obsTimeStep):
+  for aMetric in metricNames:
+    differenceArray = np.load(os.path.join(resultFolder, aMetric + '_diff.npy'))
+    array = transformArray(differenceArray)
+    parameterSets = len(differenceArray[0])
+    NoRows = int(np.ceil(parameterSets/4))
+        
+    fig = plt.figure(figsize=(12, 40))
+    
+    for pSet in range(0,parameterSets):
+      plt.subplot(NoRows,4,pSet+1)
+      plt.imshow(array[pSet], cmap='Purples')
+      plt.xlabel('Parameter set: '+ str(pSet+1))
+      plt.axis('off')
+      plt.title('Parameter set: '+ str(pSet+1))
 
-  plt.subplots_adjust(bottom=0.2, right=0.8, top=0.9, wspace=0.2)
-  cax = plt.axes([0.125, 0.10, 0.675, 0.025])
-  plt.colorbar(cax = cax,orientation='horizontal')
-  
-  # Set the name and clear the directory if needed
-  pName = 'Difference_' + metric + "_timestep_"+ str(obsTimeStep) + ".png"
-  pPath = os.path.join(resultFolder, pName)
-  if os.path.exists(pPath):
-      os.remove(pPath)
-      
-  # Save plot and clear    
-  plt.savefig(os.path.join(resultFolder,pPath))
-  plt.close('all')
+    plt.subplots_adjust(bottom=0.2, right=0.8, top=0.9, wspace=0.2)
+    cax = plt.axes([0.125, 0.10, 0.675, 0.025])
+    plt.colorbar(cax = cax,orientation='horizontal')
+    
+    # Set the name and clear the directory if needed
+    pName = 'Difference_' + aMetric + "_timestep_"+ str(obsTimeStep) + ".png"
+    pPath = os.path.join(resultFolder, pName)
+    if os.path.exists(pPath):
+        os.remove(pPath)
+        
+    # Save plot and clear    
+    plt.savefig(os.path.join(resultFolder,pPath))
+    plt.close('all')
 
 
 ######################################
@@ -119,21 +122,15 @@ def plotAbsoluteDifference(differenceArray, metric, obsTimeStep):
 
 ##### Create histograms of metric values for different parameters per zone per timestep
 zonesModelled = np.load(os.path.join(resultFolder, metricNames[0] + '.npy'))
-
-print('number of time steps: ',len(zonesModelled))
-print('number of parameter configurations: ',len(zonesModelled[0]))                     
-print('number of zones: ',len(zonesModelled[0][0][1]))
-#histogramsModelledMetrics(metricNames)
+histogramsModelledMetrics(metricNames)
 
 print('1. Histograms for each zone and ech time step plotted.')  
 
 ##### Create colormap with absolute difference values
 
 # Create an array corresponding to the zones
-for aMetric in metricNames:
-  print('Metric: ',aMetric)
-  differenceArray = np.load(os.path.join(resultFolder, aMetric + '_diff.npy')) 
-  plotAbsoluteDifference(differenceArray,aMetric,'2000')
+plotAbsoluteDifference(metricNames,'2000')
+print('2. Difference betweeen the observed and modelled for each zone and ONE time step plotted.') 
 
 
 
