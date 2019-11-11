@@ -19,7 +19,7 @@ def getObsTimesteps():
   e.g. 2000 in time step nr 11.
   In the model 2000 and 2006 data are used for calibration, and 2012 and 2018 are used for validation."""
   
-  obsTimeSteps = [11,17] #[11,17,23,29]
+  obsTimeSteps = [1,11,17] #[1,11,17,23,29]
   return obsTimeSteps
 
 def getNrSamples():
@@ -35,7 +35,7 @@ def getParametersforCalibration():
      minParameter needs to be >= 0
      maxParameter needs to be <= 1
     [minParameter, maxParameter, stepSize] """
-  return [0.0, 1.0, 1.0]
+  return [0.0, 1.0, 0.25]
 
 def getCountryName():
   """ Returns the case study symbol """
