@@ -638,10 +638,10 @@ min_p = parameters.getParametersforCalibration()[0]
 max_p = parameters.getParametersforCalibration()[1]
 stepsize = parameters.getParametersforCalibration()[2]
 
-# Assure that steps in the loop have decimal place only
-param_steps = np.arange(min_p, max_p + 0.1, stepsize)
+# Assure that steps in the loop have 3 decimal place only
+param_steps = np.arange(min_p, max_p + 0.100, stepsize)
 for step in range(0,len(param_steps)):
-    param_steps[step] = round(param_steps[step],1)
+    param_steps[step] = round(param_steps[step],3)
 
 print('\n################################################')
 print('Run LU_urb model')
