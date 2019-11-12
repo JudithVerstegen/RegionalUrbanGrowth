@@ -88,7 +88,7 @@ print('Observation time steps:',obsTimeSteps)
 
 # Calibration of the modell will be based on finding
 # minimum root-mean-square error between the metrics modelled and observed.
-
+'''
 for aVariable in metricList:
   zonesModelled = np.load(os.path.join("results", country, 'metrics', aVariable + '.npy'))
   zonesObserved = np.load(os.path.join("results", country, 'metrics', aVariable + '_obs.npy'))
@@ -106,9 +106,13 @@ for aVariable in metricList:
   RMSE = calcRMSE(dArray, aVariable)
   # Save the data
   saveTheArray(RMSE, aVariable, '_RMSE')
-  print('RMSE calculated')
-  
+  print('RMSE calculated')'''
 
+zonesModelled = np.load(os.path.join("results", country, 'metrics', 'cilp' + '.npy'))
+zonesObserved = np.load(os.path.join("results", country, 'metrics', 'cilp' + '_obs.npy'))
+  
+print(zonesModelled[16,2])
+print(zonesObserved[0,0])
  
   
   
