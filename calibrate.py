@@ -51,12 +51,25 @@ def createDiffArray(modelled,observed):
   for row in range(0,len(obsTimeSteps)):
     for col in range(0,noParameterConfigurations):
       for zone in range(0,numberZones):
-        theArray[row,col][zone][0] = modelled[obsTimeSteps[row]-1,col][1][zone] - observed[row,0][1][zone]  
+        theArray[row,col][zone][0] = modelled[obsTimeSteps[row]-1,col][1][zone][0] - observed[row,0][1][zone][0]  
   return theArray
   
-def saveTheArray(output, resultFolder, metricName): 
+def calcRMSE(diffArray, aVariable):
+  pSets = diffArray.shape[1]
+  zones = diffArray.shape[2]
+  # Create empty array. Rows = nr of observed timesteps, columns = nr of parameter sets
+  rmseArray = np.zeros((diffArray.shape[0],diffArray.shape[1]))
+
+  # Calculate RMSE for each timestep and parameter set. Number of observations = number of zones
+  for row in range(0,len(obsTimeSteps)):
+    for col in range(0,pSets):
+      rmseArray[row,col] = np.sqrt(np.mean((diffArray[row,col].flatten())**2))
+
+  return rmseArray
+
+def saveTheArray(output, metricName, fileEnd): 
   # Set the name of the file
-  fileName = os.path.join(resultFolder, metricName + '_diff')
+  fileName = os.path.join(arrayFolder, metricName + fileEnd)
 
   # Clear the directory if needed
   if os.path.exists(fileName + '.npy'):
@@ -64,10 +77,7 @@ def saveTheArray(output, resultFolder, metricName):
 
   # Save the data  
   np.save(fileName, output)
-
-  print('Difference between modelled and observed values are stored in', metricName + '_diff.npy')
-
-
+  
 ###########################
 ### CALIBRATE THE MODEL ###
 ###########################
@@ -86,13 +96,18 @@ for aVariable in metricList:
   print('.')
   print('Metric: ',aVariable)
 
-  # Create the arrays to store the difference between the modelled and the observed and metrics values
+  #. 1. Create an array storing differences between the modelled and observed values
   dArray = createDiffArray(zonesModelled,zonesObserved)
   # Save the data
-  saveTheArray(dArray, arrayFolder, aVariable)
+  saveTheArray(dArray, aVariable, '_diff')
+  print('Difference calculated')
 
-# 1. Calculate Mean Squared Error
-numberOfDataPoints = 1 # number of observations. Here: 2000
+  # 2. Calculate Root Mean Squared Error (RMSE)
+  RMSE = calcRMSE(dArray, aVariable)
+  # Save the data
+  saveTheArray(RMSE, aVariable, '_RMSE')
+  print('RMSE calculated')
+  
 
  
   
