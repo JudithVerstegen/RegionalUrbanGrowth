@@ -7,6 +7,7 @@ import parameters
 from pcraster.framework import *
 import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import AxesGrid
+import calibrate
 
 # Get metrics
 metricNames = parameters.getSumStats()
@@ -19,7 +20,7 @@ nrOfTimesteps = parameters.getNrTimesteps()
 timeSteps=range(1,nrOfTimesteps+1,1)
 
 # Get the observed time steps. Time steps relate to the year of the CLC data, where 1990 was time step 0.
-obsTimeSteps = [10] #parameters.getObsTimesteps
+obsTimeSteps = parameters.getObsTimesteps()
 
 # Path to the folder with the metrics stored
 country = parameters.getCountryName()
@@ -72,23 +73,25 @@ def histogramsModelledMetrics(theMetrics):
 
 def transformArray(theArray):
   # Create an array storing absolute difference values in the shape of the zones
+  rowNo = len(obsTimeSteps) # Number of rows is equal to number of observed years
   numberZones = len(theArray[0][0])
   parameterSets = len(theArray[0])
   # Create array
   n = int(np.sqrt(numberZones))
-  newArray = np.zeros((parameterSets,n,n))
+  newArray = np.zeros((rowNo,parameterSets,n,n))
   # Fill with values
-  for pSet in range(0,parameterSets):
-    for zone in range(0,numberZones):
-      i = np.floor_divide(zone,4)
-      j = np.remainder(zone,4)
-      newArray[pSet][i][j] = theArray[0][pSet][zone]
+  for row in range(0,rowNo):
+    for pSet in range(0,parameterSets):
+      for zone in range(0,numberZones):
+        i = np.floor_divide(zone,n)
+        j = np.remainder(zone,n)
+        newArray[row][pSet][i][j] = theArray[row][pSet][zone] 
   return newArray
 
 def plotAbsoluteDifference(metricNames, obsTimeStep):
   for aMetric in metricNames:
     differenceArray = np.load(os.path.join(resultFolder, aMetric + '_diff.npy'))
-    array = transformArray(differenceArray)
+    array = transformArray(differenceArray)[1] # here [1] for year '2000' to be changed
     parameterSets = len(differenceArray[0])
     NoRows = int(np.ceil(parameterSets/4))
         
@@ -114,6 +117,41 @@ def plotAbsoluteDifference(metricNames, obsTimeStep):
     # Save plot and clear    
     plt.savefig(os.path.join(resultFolder,pPath))
     plt.close('all')
+    
+def plotRMSE(metricNames):
+  for oneMetric in metricNames:
+    differenceArray = np.load(os.path.join(resultFolder, oneMetric + '_RMSE.npy'))
+    plt.title('metric '+oneMetric)
+    plt.ylabel('root mean square error')
+    observations = [1990,2000,2006]
+    
+    fitList = calibrate.findBestFit(differenceArray)
+    fitIndices = []
+    for y in fitList:
+      fitIndices.append(y[1])
+    for pSet in range(differenceArray.shape[1]):
+      if pSet in fitIndices:
+        print('fit')      
+        myLabel = "parameter set = %s"%(pSet);
+        lw = 2.0
+      else:
+        myLabel = None;
+        lw = 0.5
+      plt.plot(observations,differenceArray[:,pSet],'--o', linewidth = lw, label = myLabel)
+    plt.legend()
+    
+    # Set the name and clear the directory if needed
+    rName = 'RMSE_' + oneMetric + '.png'
+    rPath = os.path.join(resultFolder, rName)
+    if os.path.exists(rPath):
+        os.remove(rPath)
+
+    # Save plot and clear    
+    plt.savefig(os.path.join(resultFolder,rPath))
+    plt.close('all')
+
+    
+  
 
 
 ######################################
@@ -121,16 +159,21 @@ def plotAbsoluteDifference(metricNames, obsTimeStep):
 ######################################
 
 ##### Create histograms of metric values for different parameters per zone per timestep
-zonesModelled = np.load(os.path.join(resultFolder, metricNames[0] + '.npy'))
-histogramsModelledMetrics(metricNames)
-
+#histogramsModelledMetrics(metricNames)
 print('1. Histograms for each zone and ech time step plotted.')  
 
+''' Leave this for later use
 ##### Create colormap with absolute difference values
-
 # Create an array corresponding to the zones
 plotAbsoluteDifference(metricNames,'2000')
-print('2. Difference betweeen the observed and modelled for each zone and ONE time step plotted.') 
+print('2. Difference betweeen the observed and modelled for each zone and ONE time step plotted.')
+'''
+##### Plot RMSE   
+plotRMSE(metricNames)#metricNames
+print('2. RMSE plotted.')
+
+
+
 
 
 
