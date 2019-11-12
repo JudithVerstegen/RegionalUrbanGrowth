@@ -89,13 +89,19 @@ def selectSArrayMultipleRasters(names,sampleNumbers,rowColFiles, base=None):
 def calculateSumStats(systemState, listOfSumStats, zones, validation=False):
   """Return a list of sum stat maps for the sum stat"""
   listOfMaps = []
-##  mask = readmap(inputfolder + '/zones_selection')
-##  if validation == True: mask = readmap(inputfolder + '/zones_validation')
-##  systemState = ifthen(mask, systemState)
+  ##  mask = readmap(inputfolder + '/zones_selection')
+  ##  if validation == True: mask = readmap(inputfolder + '/zones_validation')
+  ##  systemState = ifthen(mask, systemState)
+
+  # Create maps common for more than one metric
   unique = uniqueid(boolean(spatial(scalar(1))))
   clumps = ifthen(boolean(systemState) == 1, clump(boolean(systemState)))
   #numberMap = areadiversity(clumps, spatial(nominal(1))) # doesnt work for test map
   oneCellPerPatch = pcreq(areamaximum(unique, clumps), unique) # gets the cell in the right bottom corner of a patch
+  scNegative = ifthenelse(boolean(systemState) == 1, boolean(0), boolean(1)) 
+  borders = ifthen(boolean(systemState) == 1, window4total(scalar(scNegative))) 
+  perimeter = areatotal(borders, nominal(clumps))*sqrt(cellarea()) 
+
   for aStat in listOfSumStats:
     if aStat == 'np': # Number of patches in one zone
       average_nr = cover(areadiversity(clumps, zones), spatial(scalar(0)))  
@@ -115,18 +121,12 @@ def calculateSumStats(systemState, listOfSumStats, zones, validation=False):
     elif aStat == 'fd': # Average fractal dimension of patches in one zone.
       ### Value of the metric is dependend on the unit used
       ### 'perimeter' and 'patchSizes' need to be higher than e = ~2.71
-      scNegative = ifthenelse(boolean(systemState) == 1, boolean(0), boolean(1))
-      borders = ifthen(boolean(systemState) == 1, window4total(scalar(scNegative)))
-      perimeter = areatotal(borders, nominal(clumps))*sqrt(cellarea())
       patchSizes = areaarea(clumps) # no conversion to km, as we are using meters
       fractalDimension = 2*ln(perimeter)/ln(patchSizes)
       patchFractalDimensionOneCell = ifthen(oneCellPerPatch, fractalDimension)
       averageFractalDimension = areaaverage(patchFractalDimensionOneCell, zones)
       listOfMaps.append(averageFractalDimension)
     elif aStat == 'cilp': # Compactness index of the largest patch (CILP) in one zone
-      scNegative = ifthenelse(boolean(systemState) == 1, boolean(0), boolean(1)) # the same as fd
-      borders = ifthen(boolean(systemState) == 1, window4total(scalar(scNegative))) # the same as fd
-      perimeter = areatotal(borders, nominal(clumps))*sqrt(cellarea()) # the same as fd
       patchSizes = areaarea(clumps)#/parameters.getConversionUnit()
       biggestPatchSize = areamaximum(patchSizes,zones) # largest patch area in a given zone. One patch can be in more than one zone.
       biggestPatchPerimeter = areamaximum(ifthen(patchSizes == biggestPatchSize, perimeter),zones) # perimeter of the largest patch area in a given zone.
