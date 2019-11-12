@@ -98,47 +98,6 @@ def saveSamplesAndTimestepsAsNumpyArray(basename, iterations, timesteps, obs=Fal
 
   # Save the data  
   np.save(fileName, output)
-
-def histogramsModelledMetrics(theMetrics):
-  #('number of time steps: ',len(zonesModelled))
-  #('number of parameter configurations: ',len(zonesModelled[0]))                     
-  #('number of zones: ',len(zonesModelled[0][0][1]))
-
-  for aVariable in theMetrics:
-    zonesModelled = np.load(os.path.join("results", country, 'metrics', aVariable + '.npy'))
-    
-    for timeStep in timeSteps: # Loop data for each time step
-      # Prepare the main plot for each timeStep
-      fig, axes = plt.subplots(nrows=4, ncols=4, sharex=True, sharey = True) # Depending on number of zones!
-      hTitle = "Histogram of modelled metric "+aVariable+" for each zone in timestep: " + str(timeStep)
-      fig.suptitle(hTitle)
-      fig.subplots_adjust(hspace=1)
-      
-      for zone in range(0, len(zonesModelled[timeStep-1][0][1])): # Loop array to extraxt data for each zone
-        # Prepare data for each zone to be plotted in each subplot
-        metrics_for_histogram = []
-
-        for i in range(0,len(zonesModelled[timeStep-1])): # Loop array to get metrics for each parameter configuration
-          metrics_for_histogram.append(zonesModelled[timeStep-1][i][1][zone][0]) # [0] gives the raw number
-          
-        # Plot subplots
-        axes.flatten()[zone].hist(metrics_for_histogram, bins = 'auto', )
-        axes.flatten()[zone].set(title=zone+1)
-        axes.flatten()[zone].ticklabel_format(axis='x', style='sci', scilimits=(-4,4))
-
-        # bins=len(np.unique(data.data.T[0]))//2 MAYBE USE LATER
-
-      # Set the name and clear the directory if needed
-      hName = 'Histogram_' + aVariable + "_modelled_timestep_"+ str(timeStep) + ".png"
-      if os.path.exists(hName):
-          os.remove(hName)
-
-      # Save plot and clear    
-      plt.savefig(os.path.join(output_mainfolder,hName))
-      plt.clf()
-
-      # Close all open figures
-      plt.close('all')
     
 #################################
 ### SAVE OUTPUTS OF THE MODEL ###
@@ -163,6 +122,7 @@ zonesModelled = np.load(os.path.join("results", country, 'metrics', metricNames[
 print('number of time steps: ',len(zonesModelled))
 print('number of parameter configurations: ',len(zonesModelled[0]))                     
 print('number of zones: ',len(zonesModelled[0][0][1]))
+print('Done.')
 
 
   
