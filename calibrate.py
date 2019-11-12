@@ -67,6 +67,21 @@ def calcRMSE(diffArray, aVariable):
 
   return rmseArray
 
+def findBestFit(rmseArray):
+  fitList = []
+  
+  for year in range(1,len(obsTimeSteps)):
+    index = 0
+    base = [rmseArray[year,:][0],index]
+    for r in rmseArray[year,:]:
+      if np.absolute(r) < np.absolute(base[0]):
+        base[0] = r
+        base[1] = index
+      index = index+1
+    fitList.append(base)
+
+  return(fitList)
+    
 def saveTheArray(output, metricName, fileEnd): 
   # Set the name of the file
   fileName = os.path.join(arrayFolder, metricName + fileEnd)
@@ -88,8 +103,8 @@ print('Observation time steps:',obsTimeSteps)
 
 # Calibration of the modell will be based on finding
 # minimum root-mean-square error between the metrics modelled and observed.
-'''
-for aVariable in metricList:
+
+for aVariable in metricList:#metricList:
   zonesModelled = np.load(os.path.join("results", country, 'metrics', aVariable + '.npy'))
   zonesObserved = np.load(os.path.join("results", country, 'metrics', aVariable + '_obs.npy'))
 
@@ -106,13 +121,17 @@ for aVariable in metricList:
   RMSE = calcRMSE(dArray, aVariable)
   # Save the data
   saveTheArray(RMSE, aVariable, '_RMSE')
-  print('RMSE calculated')'''
+  print('RMSE calculated')
 
+  # 3. Find the parameter set with the smallest RMSE
+  fitArray = findBestFit(RMSE)
+  
+'''
 zonesModelled = np.load(os.path.join("results", country, 'metrics', 'cilp' + '.npy'))
 zonesObserved = np.load(os.path.join("results", country, 'metrics', 'cilp' + '_obs.npy'))
   
 print(zonesModelled[16,2])
-print(zonesObserved[0,0])
+print(zonesObserved[0,0])'''
  
   
   
