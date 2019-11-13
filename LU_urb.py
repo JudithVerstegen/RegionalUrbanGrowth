@@ -572,10 +572,8 @@ class LandUseChangeModel(DynamicModel):
 
     for aStat in self.sumStats: # All maps should be calculated for zones
       path = generateNameT(self.outputfolder + '/' + aStat, timeStep)
-      if aStat in ['np', 'pd', 'mp', 'fd']:
-        # these metrics result in one value per block (here 9 blocks)
-        modelledAverageArray = metrics.map2Array(path, \
-                              self.inputfolder + '/sampPoint.col')
+      # these metrics result in one value per block (here 9 blocks)
+      modelledAverageArray = metrics.map2Array(path, self.inputfolder + '/sampPoint.col')
       ''' As for now we do not use it:
       else:
         # other metrics result in one value for the whole study area
