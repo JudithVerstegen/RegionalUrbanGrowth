@@ -121,9 +121,10 @@ def plotAbsoluteDifference(metricNames, obsTimeStep):
 def plotRMSE(metricNames):
   for oneMetric in metricNames:
     differenceArray = np.load(os.path.join(resultFolder, oneMetric + '_RMSE.npy'))
+    plt.show()
     plt.title('metric '+oneMetric)
     plt.ylabel('root mean square error')
-    observations = [1990,2000,2006]
+    observations = [1990,2000,2006,2012,2018] # depends on the observation dates!!
     
     fitList = calibrate.findBestFit(differenceArray)
     fitIndices = []
@@ -131,7 +132,6 @@ def plotRMSE(metricNames):
       fitIndices.append(y[1])
     for pSet in range(differenceArray.shape[1]):
       if pSet in fitIndices:
-        print('fit')      
         myLabel = "parameter set = %s"%(pSet);
         lw = 2.0
       else:
