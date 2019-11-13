@@ -10,7 +10,7 @@ def getNrTimesteps():
   In the model 1990 - 2018 CLC data are used, including starting and ending date, thus 29 time steps.
   Time step nr 1 is 1990"""
 
-  timesteps = 17 #29
+  timesteps = 29 #29
   return timesteps
 
 def getObsTimesteps():
@@ -19,7 +19,7 @@ def getObsTimesteps():
   e.g. 2000 in time step nr 11.
   In the model 2000 and 2006 data are used for calibration, and 2012 and 2018 are used for validation."""
   
-  obsTimeSteps = [1,11,17] #[1,11,17,23,29]
+  obsTimeSteps = [1,11,17,23,29] #[1,11,17,23,29]
   return obsTimeSteps
 
 def getNrSamples():
