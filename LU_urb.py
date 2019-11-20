@@ -564,7 +564,7 @@ class LandUseChangeModel(DynamicModel):
     listOfSumStats = metrics.calculateSumStats(scalar(urban), \
                                             self.sumStats, self.zones)
 
-    j=0 # What is the aim of the j?
+    j=0
     for aname in self.sumStats:
         modelledmap = listOfSumStats[j]
         self.report(modelledmap, os.path.join(self.outputfolder, aname))
@@ -572,7 +572,7 @@ class LandUseChangeModel(DynamicModel):
 
     for aStat in self.sumStats: # All maps should be calculated for zones
       path = generateNameT(self.outputfolder + '/' + aStat, timeStep)
-      # these metrics result in one value per block (here 9 blocks)
+      # these metrics result in one value per block (here 16 blocks)
       modelledAverageArray = metrics.map2Array(path, self.inputfolder + '/sampPoint.col')
       ''' As for now we do not use it:
       else:
@@ -587,6 +587,9 @@ class LandUseChangeModel(DynamicModel):
       file_object1.close()
       # the map with the metric is removed to save disk space
       os.remove(path)
+
+    # save the urban land use as a pickle list, but do not remove the maps <- TO DO!
+    
 
 ############
 ### MAIN ###
