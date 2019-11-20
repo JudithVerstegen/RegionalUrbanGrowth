@@ -111,22 +111,36 @@ print("Parameter values are stored in 3 dimensional array [timestep, iteration, 
 print("# timestep: year, \n# iteration: set of parameters used, \n# metric: array of values \
 of the selected metric for each zone for each set of parameters seperately")
 
-    
+   
 # Save for the modelled and observed metrics:
 for aVariable in metricNames:
   saveSamplesAndTimestepsAsNumpyArray(aVariable, iterations, timeSteps)
-  saveSamplesAndTimestepsAsNumpyArray(aVariable, obsSampleNumbers,obsTimeSteps, True)  
+  saveSamplesAndTimestepsAsNumpyArray(aVariable, obsSampleNumbers,obsTimeSteps, True)
 
-# Print data description
-zonesModelled = np.load(os.path.join("results", country, 'metrics', metricNames[0] + '.npy'))
-print('number of time steps: ',len(zonesModelled))
-print('number of parameter configurations: ',len(zonesModelled[0]))                     
-print('number of zones: ',len(zonesModelled[0][0][1]))
-print('Done.')
+# Save the observed urban areas
+saveSamplesAndTimestepsAsNumpyArray('urb', obsSampleNumbers,obsTimeSteps, True)
+
+#Transform modelled urban maps:
+########################################### This should go to the LU_urb.py :
+outputfolder = os.path.join(os.getcwd(), 'results', country, str(nr))
+inputfolder = os.path.join('input_data', country)
+
+path = generateNameT(outputfolder + '/' + 'urb', timeStep)
+modelledAverageArray = metrics.map2Array(path, inputfolder + '/sampPoint.col')
+name1 = 'urb' + str(timeStep) + '.obj'
+path1 = os.path.join(outputfolder, name1)
+file_object1 = open(path1, 'wb')
+pickle.dump(modelledAverageArray, file_object1)
+file_object1.close()
+########################################### 
+
+# Save the modelled urban areas
+saveSamplesAndTimestepsAsNumpyArray('urb', iterations,TimeSteps)
+
 
 
   
-  
+
   
 
 
