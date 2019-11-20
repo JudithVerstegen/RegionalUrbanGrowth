@@ -100,7 +100,8 @@ def calculateSumStats(systemState, listOfSumStats, zones, validation=False):
   oneCellPerPatch = pcreq(areamaximum(unique, clumps), unique) # gets the cell in the right bottom corner of a patch
   scNegative = ifthenelse(boolean(systemState) == 1, boolean(0), boolean(1)) 
   borders = ifthen(boolean(systemState) == 1, window4total(scalar(scNegative))) 
-  perimeter = areatotal(borders, nominal(clumps))*sqrt(cellarea()) 
+  perimeter = areatotal(borders, nominal(clumps))*sqrt(cellarea())
+  patchSizes = areaarea(clumps)
 
   for aStat in listOfSumStats:
     if aStat == 'np': # Number of patches in one zone
@@ -112,8 +113,8 @@ def calculateSumStats(systemState, listOfSumStats, zones, validation=False):
       patch_density = average_nr/zone_area
       listOfMaps.append(patch_density)
     elif aStat == 'mp': # Mean patch size in a zone. If patch is in more than one zone it is assigned to one zone only...
-      patchSizes = areaarea(clumps)/parameters.getConversionUnit()
-      patchSizeOneCell = ifthen(oneCellPerPatch, patchSizes)
+      patchSizes_c = patchSizes/parameters.getConversionUnit()
+      patchSizeOneCell = ifthen(oneCellPerPatch, patchSizes_c)
       averagePatchSize = areaaverage(patchSizeOneCell, zones)
       averagePatchSizeScalar = cover(averagePatchSize, spatial(scalar(0)))
       listOfMaps.append(averagePatchSizeScalar)
@@ -121,13 +122,11 @@ def calculateSumStats(systemState, listOfSumStats, zones, validation=False):
     elif aStat == 'fd': # Average fractal dimension of patches in one zone.
       ### Value of the metric is dependend on the unit used
       ### 'perimeter' and 'patchSizes' need to be higher than e = ~2.71
-      patchSizes = areaarea(clumps) # no conversion to km, as we are using meters
       fractalDimension = 2*ln(perimeter)/ln(patchSizes)
       patchFractalDimensionOneCell = ifthen(oneCellPerPatch, fractalDimension)
       averageFractalDimension = areaaverage(patchFractalDimensionOneCell, zones)
       listOfMaps.append(averageFractalDimension)
     elif aStat == 'cilp': # Compactness index of the largest patch (CILP) in one zone
-      patchSizes = areaarea(clumps)#/parameters.getConversionUnit()
       biggestPatchSize = areamaximum(patchSizes,zones) # largest patch area in a given zone. One patch can be in more than one zone.
       biggestPatchPerimeter = areamaximum(ifthen(patchSizes == biggestPatchSize, perimeter),zones) # perimeter of the largest patch area in a given zone.
       CILP = (2 * numpy.pi * sqrt(biggestPatchSize / numpy.pi)) / biggestPatchPerimeter
