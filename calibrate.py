@@ -33,10 +33,17 @@ arrayFolder = os.path.join(os.getcwd(),'results',country,'metrics')
 ### FUNCTIONS ###
 #################
 
+def getModelledArray(metric):
+  return np.load(os.path.join(arrayFolder, metric + '.npy'))
+
+def getObservedArray(metric):
+  return np.load(os.path.join(arrayFolder, metric + '_obs.npy'))
+  
+
 def getParameterConfigurations(metricsArray):
   allParameters = []
   for i in range(0,len(metricsArray[0])):
-    allParameters.append(metricsArray[0][i][0])
+    allParameters.append(metricsArray[0][i][0].tolist())
   return allParameters
 
 def createDiffArray(modelled,observed):
@@ -44,13 +51,14 @@ def createDiffArray(modelled,observed):
   noParameterConfigurations = modelled.shape[1]
   # Get the number of zones
   numberZones = len(modelled[0][0][1])
-  # Create an array: no of rows = no of observed timesteps, no of columns = no of parameter sets
-  # Each cell store the values for the zones
+  # Create a 3D array: no of rows = no of observed timesteps, no of columns = no of parameter sets
+  # Each cell store: the parameter set and the values of zones
   theArray = np.zeros((len(obsTimeSteps),noParameterConfigurations,numberZones,1))
   
   for row in range(0,len(obsTimeSteps)):
     for col in range(0,noParameterConfigurations):
       for zone in range(0,numberZones):
+        #theArray[row,col][zone][0] = [999]#modelled[obsTimeSteps[0]-1,0][0]
         theArray[row,col][zone][0] = modelled[obsTimeSteps[row]-1,col][1][zone][0] - observed[row,0][1][zone][0]  
   return theArray
   
@@ -67,31 +75,54 @@ def calcRMSE(diffArray, aVariable):
 
   return rmseArray
 
-def findBestFit(rmseArray):
+def smallestErrorInObsYear(rmseArr):
   fitList = []
   
   for year in range(1,len(obsTimeSteps)):
     index = 0
-    base = [rmseArray[year,:][0],index]
-    for r in rmseArray[year,:]:
+    base = [rmseArr[year,:][0],index]
+    for r in rmseArr[year,:]:
       if np.absolute(r) < np.absolute(base[0]):
         base[0] = r
         base[1] = index
       index = index+1
-    fitList.append(base)
-
+    # Create a list storing a liast of observed timestep and index of parameter set)
+    fitList.append([obsTimeSteps[year],base[1]])
   return(fitList)
-    
+
+def smallestMeanErrorIndex(aRMSE):
+  mBase = [np.absolute(np.mean(aRMSE[:,0])),0]
+  # Loop parameter configurations to find the one with the smalles abs mean value for all years
+  for p in range(len(aRMSE[0,:])):
+    mRMSE = np.absolute(np.mean(aRMSE[:,p]))
+    if mRMSE < mBase[0]:
+      mBase[0] = mRMSE
+      mBase[1] = p
+  return mBase[1]
+
+def smallestMeanErrorIndex_2000_2006(theRMSE):
+  mBase = [np.absolute(np.mean(theRMSE[1:3,0])),0]
+  # Loop parameter configurations to find the one with the smalles abs mean value for years 2000 and 2006
+  for p in range(len(theRMSE[0,:])):
+    mRMSE = np.absolute(np.mean(theRMSE[1:3,p]))
+    if mRMSE < mBase[0]:
+      mBase[0] = mRMSE
+      mBase[1] = p
+  return mBase[1]
+
 def saveTheArray(output, metricName, fileEnd): 
   # Set the name of the file
   fileName = os.path.join(arrayFolder, metricName + fileEnd)
 
   # Clear the directory if needed
   if os.path.exists(fileName + '.npy'):
-      os.remove(fileName + '.npy')
+    os.remove(fileName + '.npy')
 
   # Save the data  
   np.save(fileName, output)
+
+def calculateKappa():
+  print('done.')
   
 ###########################
 ### CALIBRATE THE MODEL ###
@@ -99,41 +130,36 @@ def saveTheArray(output, metricName, fileEnd):
  
 print("CALIBRATE THE MODEL")
 print('Observation time steps:',obsTimeSteps)
+print('.')
 
 
 # Calibration of the modell will be based on finding
 # minimum root-mean-square error between the metrics modelled and observed.
 
-for aVariable in metricList:#metricList:
-  zonesModelled = np.load(os.path.join("results", country, 'metrics', aVariable + '.npy'))
-  zonesObserved = np.load(os.path.join("results", country, 'metrics', aVariable + '_obs.npy'))
-
-  print('.')
+for aVariable in metricList:
   print('Metric: ',aVariable)
+  zonesModelled = getModelledArray(aVariable)
+  zonesObserved = getObservedArray(aVariable)
 
-  #. 1. Create an array storing differences between the modelled and observed values
+  # 0. Get the parameter sets
+  parameterSets = getParameterConfigurations(zonesModelled)
+
+  # 1. Create an array storing differences between the modelled and observed values
   dArray = createDiffArray(zonesModelled,zonesObserved)
-  # Save the data
-  saveTheArray(dArray, aVariable, '_diff')
-  print('Difference calculated')
 
   # 2. Calculate Root Mean Squared Error (RMSE)
   RMSE = calcRMSE(dArray, aVariable)
-  # Save the data
   saveTheArray(RMSE, aVariable, '_RMSE')
-  print('RMSE calculated')
 
-  # 3. Find the parameter set with the smallest RMSE
-  fitArray = findBestFit(RMSE)
-  
-'''
-zonesModelled = np.load(os.path.join("results", country, 'metrics', 'cilp' + '.npy'))
-zonesObserved = np.load(os.path.join("results", country, 'metrics', 'cilp' + '_obs.npy'))
-  
-print(zonesModelled[16,2])
-print(zonesObserved[0,0])'''
- 
-  
-  
+  # 3. Find the parameter sets with the smallest RMSE
+  print('Smallest RMSE in each year parameter sets [year time step, set]:',smallestErrorInObsYear(RMSE))
+  print('Smallest mean RMSE parameter set:',smallestMeanErrorIndex(RMSE))
+
+  # 4. Find the fitting parameter set for calibration for years 2000 and 2006
+  fittingSet = smallestMeanErrorIndex_2000_2006(RMSE)
+  print('Smallest mean RMSE for 2000 (timestep 11) and 2006 (timestep 17) parameter set:', fittingSet,
+        parameterSets[fittingSet])
+
+  # 5. Calculate Kappa statistic
 
 
