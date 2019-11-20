@@ -10,7 +10,7 @@ def getNrTimesteps():
   In the model 1990 - 2018 CLC data are used, including starting and ending date, thus 29 time steps.
   Time step nr 1 is 1990"""
 
-  timesteps = 29 #29
+  timesteps = 29
   return timesteps
 
 def getObsTimesteps():
@@ -19,8 +19,24 @@ def getObsTimesteps():
   e.g. 2000 in time step nr 11.
   In the model 2000 and 2006 data are used for calibration, and 2012 and 2018 are used for validation."""
   
-  obsTimeSteps = [1,11,17,23,29] #[1,11,17,23,29]
+  obsTimeSteps = [1,11,17,23,29]
   return obsTimeSteps
+
+def getObsYears():
+  obsYearsDict = {
+    getObsTimesteps()[0]:1990,
+    getObsTimesteps()[1]:2000,
+    getObsTimesteps()[2]:2006,
+    getObsTimesteps()[3]:2012,
+    getObsTimesteps()[4]:2018
+    }
+  return obsYearsDict
+
+def getNumberOfZones():
+  """ Returns the number of zones, in which the case study area will be divided. Metrics will be calculated for each zone seperately. """
+  
+  numberofZones = 16
+  return numberofZones
 
 def getNrSamples():
   """Return nr of Monte Carlo samples required.
@@ -35,7 +51,7 @@ def getParametersforCalibration():
      minParameter needs to be >= 0
      maxParameter needs to be <= 1
     [minParameter, maxParameter, stepSize] """
-  return [0.0, 1.0, 0.25]
+  return [0.0, 1.0, 0.1]
 
 def getCountryName():
   """ Returns the case study symbol """
