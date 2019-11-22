@@ -22,7 +22,7 @@ timeSteps=range(1,nrOfTimesteps+1,1)
 
 # Get the observed time steps. Time steps relate to the year of the CLC data, where 1990 was time step 0.
 obsSampleNumbers = [1] #range(1,20+1,1) <- for stochastic model
-obsTimeSteps = parameters.getObsTimesteps() # [1,11,17]
+obsTimeSteps = [1,11,17]#parameters.getObsTimesteps() # [1,11,17]
 
 # Path to the folder with the metrics npy arrays stored
 country = parameters.getCountryName()
@@ -160,6 +160,7 @@ for aVariable in metricList:
   print('Smallest mean RMSE for 2000 (timestep 11) and 2006 (timestep 17) parameter set:', fittingSet,
         parameterSets[fittingSet])
 
-  # 5. Calculate Kappa statistic
+# 5. Calculate Kappa statistic
+
 
 
