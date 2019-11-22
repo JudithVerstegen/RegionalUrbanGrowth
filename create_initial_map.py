@@ -600,6 +600,14 @@ command = 'map2col --unitcell ' + os.path.join(country_dir, 'sampPoint.map') + \
           ' ' + os.path.join(country_dir, 'sampPoint.col')
 os.system(command)
 
+# Create sample points for each cell (for Kappa statistic calculation in calibration)
+samplePointsNr = unique
+report(samplePointsNr, os.path.join(country_dir, 'sampPointNr.map'))
+command = 'map2col --unitcell ' + os.path.join(country_dir, 'sampPointNr.map') + \
+          ' ' + os.path.join(country_dir, 'sampPointNr.col')
+os.system(command)
+
+
 # 9. summary statistics with no stochasticity
 print('---------------------- Statistics ----------------------')
 print('------------ CLC area ------------')
