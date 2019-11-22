@@ -10,7 +10,7 @@ def getNrTimesteps():
   In the model 1990 - 2018 CLC data are used, including starting and ending date, thus 29 time steps.
   Time step nr 1 is 1990"""
 
-  timesteps = 29
+  timesteps = 17#29
   return timesteps
 
 def getObsTimesteps():
@@ -23,14 +23,7 @@ def getObsTimesteps():
   return obsTimeSteps
 
 def getObsYears():
-  obsYearsDict = {
-    getObsTimesteps()[0]:1990,
-    getObsTimesteps()[1]:2000,
-    getObsTimesteps()[2]:2006,
-    getObsTimesteps()[3]:2012,
-    getObsTimesteps()[4]:2018
-    }
-  return obsYearsDict
+  return {1:1990,11:2000,17:2006,23:2012,29:2018}
 
 def getNumberOfZones():
   """ Returns the number of zones, in which the case study area will be divided. Metrics will be calculated for each zone seperately. """
@@ -51,7 +44,7 @@ def getParametersforCalibration():
      minParameter needs to be >= 0
      maxParameter needs to be <= 1
     [minParameter, maxParameter, stepSize] """
-  return [0.0, 1.0, 0.1]
+  return [0.0, 1.0, 0.5]
 
 def getCountryName():
   """ Returns the case study symbol """
@@ -67,13 +60,15 @@ def getCovarOn():
   return on
 
 def getSumStats():
-  # 'np': Number of patches
+  # 'np': Number of patches <- equal to patch density 'pd'
   # 'mp': Mean patch size
   # 'pd': Patch density
-  # 'fd': Fractal dimension
+  # 'fdi': Fractal dimension index
   # 'cilp': Compactness index of the largest patch
+  # 'wfdi': Area weighted mean patch fractal dimension index
   
-  sumStats = ['np', 'mp', 'pd', 'fd', 'cilp']
+  
+  sumStats = ['mp', 'pd', 'fdi', 'cilp', 'wfdi']
   return sumStats
 
 def getCovarName():
@@ -117,16 +112,23 @@ def getSuitFactorDict():
 
 def getNumberofIterations(getSuitFactorDict, getParametersforCalibration):
   """ Returns number of iterations depnded on the number, min, max and step of the parameters"""
-  from math import factorial
-
-  nrParamteres = len(getSuitFactorDict[1])
-  pmin = getParametersforCalibration[0]
-  pmax = getParametersforCalibration[1]
-  pstep = getParametersforCalibration[2]
-  n = int(1/pstep + nrParamteres - 1)
-  k = nrParamteres - 1
-  
-  return factorial(n) // (factorial(k) * factorial(n - k))
+  import numpy as np
+  suma = 0
+  count = 0
+  min_p = getParametersforCalibration[0]
+  max_p = getParametersforCalibration[1]
+  stepsize = getParametersforCalibration[2]
+  param_steps = np.arange(min_p, max_p + 0.1, stepsize)
+  for step in range(0,len(param_steps)):
+      param_steps[step] = round(param_steps[step],1)
+  for p1 in param_steps:
+      for p2 in param_steps:
+          for p3 in param_steps:
+              for p4 in param_steps:
+                  suma = p1+p2+p3+p4
+                  if (suma==1):
+                      count = count + 1
+  return count
 
 def getWeightDict():
   """Return dictionary how a type (key) weights (items) its suit factors.
@@ -168,7 +170,7 @@ def getVariableSuperDict():
   variableDict1[1] = [1000, 0.7]
   variableDict1[2] = [0.5]
   variableDict1[3] = [0.5]
-  variableDict1[4] = {1:0, 2:0, 3:0.5, 4:1}
+  variableDict1[4] = {1:0, 2:0, 3:0.5, 4:1} 
   variableSuperDict[1] = variableDict1
   return variableSuperDict
 
