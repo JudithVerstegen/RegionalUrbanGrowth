@@ -32,8 +32,6 @@ coords_dict = {
     'IT':[4172280,2403670,4332280,2563670],
     'PL':[5002510,3212710,5162510,3372710]
 }
-
-# current: IE
 coords = coords_dict[country] 
 
 #################
@@ -109,9 +107,19 @@ test_dir = os.path.join(data_dir, 'test_data')
 setclone('clone')
 
 print('-------------------- Create test map --------------------')
-test_patch = os.path.join(test_dir, 'PL_test_3patches_recl.tif')
+'''test_patch = os.path.join(test_dir, 'PL_test_3patches_recl.tif')
 test_map = clip_and_convert(test_patch, coords, 999, Nominal)
 nullmask = spatial(nominal(0))
 t_map=cover(nominal(test_map), nullmask)
-aguila(t_map)
-report(t_map, os.path.join(test_dir, 'metric_test_3patches_PL.map'))
+#aguila(t_map)
+#report(t_map, os.path.join(test_dir, 'metric_test_3patches_PL.map'))'''
+
+null_mask = spatial(scalar(0))
+one_mask = boolean(null_mask + 1)
+unique = uniqueid(one_mask)
+sampleCells = unique
+aguila(sampleCells)
+report(sampleCells, os.path.join(test_dir, 'sampPointNr.map'))
+command = 'map2col --unitcell ' + os.path.join(test_dir, 'sampPointNr.map') + \
+          ' ' + os.path.join(test_dir, 'sampPointNr.col')
+os.system(command)
