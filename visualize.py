@@ -27,8 +27,8 @@ nrOfTimesteps = parameters.getNrTimesteps()
 timeSteps=range(1,nrOfTimesteps+1,1)
 
 # Get the observed time steps. Time steps relate to the year of the CLC data, where 1990 was time step 0.
-obsTimeSteps = parameters.getObsTimesteps()
-observedYears = [parameters.getObsYears()[i] for i in obsTimeSteps]
+obsTimeSteps = [1,11,17]#parameters.getObsTimesteps()
+observedYears = [parameters.getObsYears()[y] for y in obsTimeSteps]
 
 # Path to the folder with the metrics stored
 country = parameters.getCountryName()
@@ -57,6 +57,17 @@ tickDict = {
 ### FUNCTIONS ###
 #################
 
+def setNameClearSave(figName):
+  # Set the name and clear the directory if needed
+  wPath = os.path.join(resultFolder, figName)
+  if os.path.exists(wPath):
+      os.remove(wPath)
+
+  # Save plot and clear    
+  plt.savefig(os.path.join(resultFolder,wPath), bbox_inches = "tight",dpi=300)
+  plt.close('all')
+  
+
 def histogramsModelledMetrics(aVariable, zonesModelled):
   #('number of time steps: ',len(zonesModelled))
   #('number of parameter configurations: ',len(zonesModelled[0]))                     
@@ -82,17 +93,8 @@ def histogramsModelledMetrics(aVariable, zonesModelled):
       axes.flatten()[zone].ticklabel_format(axis='x', style='sci', scilimits=(-4,4))
 
     # Set the name and clear the directory if needed
-    hName = 'Histogram_' + aVariable + "_modelled_timestep_"+ str(timeStep) + ".png"
-    if os.path.exists(hName):
-        os.remove(hName)
-
-    # Save plot and clear    
-    plt.savefig(os.path.join(resultFolder,hName))
-    plt.clf()
-
-    # Close all open figures
-    plt.close('all')
-
+    setNameClearSave('Histogram_' + aVariable + "_modelled_timestep_"+ str(timeStep) + ".png")
+    
 ''' Maybe for later
 def transformArray(theArray):
   # Create an array storing absolute difference values in the shape of the zones
@@ -132,21 +134,12 @@ def plotAbsoluteDifference(metricNames, obsTimeStep):
     plt.colorbar(cax = cax,orientation='horizontal')
     
     # Set the name and clear the directory if needed
-    pName = 'Difference_' + aMetric + "_timestep_"+ str(obsTimeStep) + ".png"
-    pPath = os.path.join(resultFolder, pName)
-    if os.path.exists(pPath):
-        os.remove(pPath)
-        
-    # Save plot and clear    
-    plt.savefig(os.path.join(resultFolder,pPath))
-    plt.close('all')'''
+    setNameClearSave('Difference_' + aMetric + "_timestep_"+ str(obsTimeStep) + ".png")
+    '''
     
 def getRMSEArray(m):
   rmseArray = np.load(os.path.join(resultFolder, m + '_RMSE.npy'))
   return rmseArray
-
-def plotRMSEwithMeanRMSE_allMetrics():
-  return None
 
 def plotRMSEwithMeanRMSE(rArray, oneMetric, observations, parameterSets):
   # Values of metric np and pd give highly different results, so plot them using brakes in y axis:
@@ -232,14 +225,7 @@ def plotRMSEwithMeanRMSE(rArray, oneMetric, observations, parameterSets):
     plt.ylabel('root mean square error')
 
   # Set the name and clear the directory if needed
-  rName = 'RMSE_' + oneMetric + '.png'
-  rPath = os.path.join(resultFolder, rName)
-  if os.path.exists(rPath):
-      os.remove(rPath)
-
-  # Save plot and clear    
-  plt.savefig(os.path.join(resultFolder,rPath), bbox_inches = "tight",dpi=300)
-  plt.close('all')
+  setNameClearSave('RMSE_' + oneMetric + '.png')
   
 def plotBestparameterSets(arrayR, oneMetric,observations):
   # Find and plot parameter sets with the smallest RMSE
@@ -257,7 +243,7 @@ def plotBestparameterSets(arrayR, oneMetric,observations):
   for i in range(len(fitIndices)):
     for y in fitList:
       if y[1] == fitIndices[i]:
-        labels.append(parameters.getObsYears()[y[0]])
+        labels.append(parameters.getObsYears()[y[0]])  
     theLabels.append(labels)
     labels=[]
 
@@ -267,16 +253,9 @@ def plotBestparameterSets(arrayR, oneMetric,observations):
     plt.xticks(observations)
     plt.xlabel('observed years')
     plt.legend()
-  
+   
   # Set the name and clear the directory if needed
-  rName = 'RMSE_best_sets_' + oneMetric + '.png'
-  rPath = os.path.join(resultFolder, rName)
-  if os.path.exists(rPath):
-      os.remove(rPath)
-
-  # Save plot and clear    
-  plt.savefig(os.path.join(resultFolder,rPath),bbox_inches = "tight",dpi=300)
-  plt.close('all')
+  setNameClearSave('RMSE_best_sets_' + oneMetric + '.png')
 
 
 def plotObservedAndCalibratedMetrics(aMetric, observedYearArray, zonesObserved, zonesModelled, indexCalibratedSet):
@@ -312,8 +291,8 @@ def plotObservedAndCalibratedMetrics(aMetric, observedYearArray, zonesObserved, 
     # Plot modelled values. Create and array and fill with values for each time step:
     modelledValues = []
     for year in range(len(zonesModelled[:,0])):    
-      modelledValues.append(zonesModelled[year,indexCalibratedSet,1][z][0]) 
-    ax2.plot(np.arange(1990,2018+1),modelledValues,'-o',linewidth = 0.7,
+      modelledValues.append(zonesModelled[year,indexCalibratedSet,1][z][0])
+    ax2.plot(np.arange(observedYears[0],observedYears[-1:][0]+1),modelledValues,'-o',linewidth = 0.7,
             markersize=1, label = 'Zone '+str(z),c=zoneColors[z])
 
   # place a text box in upper left in axes coords
@@ -330,66 +309,45 @@ def plotObservedAndCalibratedMetrics(aMetric, observedYearArray, zonesObserved, 
     ncol=8)
   
   # Set the name and clear the directory if needed
-  oName = aMetric + '_calc_and_obs.png'
-  oPath = os.path.join(resultFolder, oName)
-  if os.path.exists(oPath):
-      os.remove(oPath)
-
-  # Save plot and clear    
-  plt.savefig(os.path.join(resultFolder,oPath), bbox_inches = "tight",dpi=300)
-  plt.close('all')
+  setNameClearSave(aMetric + '_calc_and_obs.png')
 
 def plotParameterValules():
-  #print(plt.style.available)
-  #plt.style.use('bmh')
+  # Number of metrics:
+  nParams = len(parameters.getSuitFactorDict()[1])
+  N = len(metricNames)
+  
+  # Create figure
   fig = plt.figure(figsize=(4,3.2))
   # Create list to store the lists of parameters
-  p1=[]
-  p2=[]
-  p3=[]
-  p4=[]
+  weights = [[] for i in range(N)]
 
   for m in metricNames:
     zonesModelled = calibrate.getModelledArray(m)
     rmseArray = getRMSEArray(m)
-    parameterSets = calibrate.getParameterConfigurations(zonesModelled) # gives the parameter sets
+    parameterSets = np.array(calibrate.getParameterConfigurations(zonesModelled)) # gives the parameter sets
     calibratedIndex = calibrate.smallestMeanErrorIndex_2000_2006(rmseArray) # gives the index of the best parameter set
-    print(parameterSets[calibratedIndex])
-    p1.append(parameterSets[calibratedIndex][0])
-    p2.append(parameterSets[calibratedIndex][1])
-    p3.append(parameterSets[calibratedIndex][2])
-    p4.append(parameterSets[calibratedIndex][3])
+    for j in range(nParams):
+      weights[j].append(parameterSets[calibratedIndex][j])
 
-  # Number of metrics:
-  N = len(metricNames)
-  
   ind = np.arange(N)    # the x locations for the groups
-  #width = 0.35       # the width of the bars: can also be len(x) sequence
-  
-  weight1 = plt.bar(ind, p1, label='NeighborSuitability', alpha=0.5)#, color=pColors[0])
-  weight2 = plt.bar(ind, p2, bottom=p1,label='DistanceSuitability', alpha=0.5)#,color=pColors[1])
-  weight3 = plt.bar(ind, p3, bottom=[0.75,0.75,0.75,0.25,0.0],label='TravelTimeCityBorder', alpha=0.5)#,color=pColors[2])
-  weight4 = plt.bar(ind, p4, bottom=[0.75,0.75,0.75,0.50,0.5],label='CurrentLandUseSuitability', alpha=0.5)#,color=pColors[3])
+  alpha = 0.5
+  bottom = 0
+  c = ['green','red','purple','orange']
+  labels = ['NeighborSuitability', 'DistanceSuitability', 'TravelTimeCityBorder', 'CurrentLandUseSuitability']
+  for bar in range(nParams):
+    plt.bar(ind, weights[bar],
+                    label=labels[bar], bottom = bottom, alpha=alpha, color=c[bar])
+    bottom = bottom + np.array(weights[bar])
 
   plt.title("Calibrated parameters", fontweight='bold')
-  plt.ylabel('Parameters')
-  plt.xlabel('Metrics')
+  plt.ylabel('parameters')
+  plt.xlabel('metrics')
   plt.xticks(ind, metricNames)
-  plt.yticks(np.arange(0, 1.4, 0.25),[0,0.25,0.5,0.75,1])
+  plt.yticks(np.arange(0, 1.5, 0.1),np.arange(0,1,0.1))
   plt.legend(ncol=2)
+
+  setNameClearSave('metric_weights.png')  
   
-
-  # Set the name and clear the directory if needed
-  wName = 'metric_weights.png'
-  wPath = os.path.join(resultFolder, wName)
-  if os.path.exists(wPath):
-      os.remove(wPath)
-
-  # Save plot and clear    
-  plt.savefig(os.path.join(resultFolder,wPath), bbox_inches = "tight",dpi=300)
-  plt.close('all')
-  
-
 ######################################
 ### VISUALIZE OUTPUTS OF THE MODEL ###
 ######################################
@@ -412,9 +370,9 @@ def plotParameterValules():
   print('2. Difference betweeen the observed and modelled for each zone and ONE time step plotted.')
   """
   ##### Plot RMSE
-  plotRMSEwithMeanRMSE(rmseArray, theMetric, observedYears, parameterSets)
+  #plotRMSEwithMeanRMSE(rmseArray, theMetric, observedYears, parameterSets)
   
-  plotBestparameterSets(rmseArray,theMetric,observedYears)
+  #plotBestparameterSets(rmseArray,theMetric,observedYears)
   print('2. RMSE plotted.')
   
 
@@ -422,8 +380,14 @@ def plotParameterValules():
   plotObservedAndCalibratedMetrics(theMetric, observedYears, zonesObserved, zonesModelled, calibratedIndex)
   print('3. Observed and fitted metrics ploted.')'''
 
-plotRMSEwithMeanRMSE_allMetrics()
+
 plotParameterValules()
+urb_obs = np.load(os.path.join(resultFolder, 'urb_obs.npy'))
+B = np.reshape(urb_obs[3,0,1], (1600,1600))
+fig,ax = plt.subplots()
+ax.imshow(B)
+plt.show()
+
 
   
   
