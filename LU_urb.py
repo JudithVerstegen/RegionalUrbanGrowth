@@ -88,7 +88,8 @@ class LandUseType:
     # NEW
     # f [0,1]
     f = variableList[1]
-    neighborSuitability = -1*(nrNeighborsSameLU**2) + f * 2 * maxNr *\
+    # Test of reversing the sign of the square function coefficient
+    neighborSuitability = 1*(nrNeighborsSameLU**2) + f * 2 * maxNr *\
                                nrNeighborsSameLU
     neighborSuitability = self.normalizeMap(neighborSuitability)
     report(neighborSuitability, 'suit_neigh' + str(self.typeNr))
@@ -510,8 +511,8 @@ class LandUseChangeModel(DynamicModel):
     self.variableSuperDict = parameters.getVariableSuperDict()
     self.noGoLanduseList = parameters.getNoGoLanduseTypes() 
 
-    # Uniform map of very small numbers, used to avoid equal suitabilities
-    self.noise = uniform(1)/10000
+    # Uniform map of small numbers, used to avoid equal suitabilities
+    self.noise = uniform(1)/100 # Increase the noise from 1/10000
     
     # This part used to be the initial
     # Set seeds to be able to reproduce results
@@ -589,6 +590,15 @@ class LandUseChangeModel(DynamicModel):
       os.remove(path)
 
     # save the urban land use as a pickle list, but do not remove the maps <- TO DO!
+    path = generateNameT(self.outputfolder + '/' + 'urb', timeStep)
+    # this result in one value per cell
+    modelledCellArray = metrics.map2Array(path, self.inputfolder + '/sampPointNr.col')
+    # cell value is saved as a list
+    name1 = 'urb' + str(timeStep) + '.obj'
+    path1 = os.path.join(self.outputfolder, name1)
+    file_object1 = open(path1, 'wb')
+    pickle.dump(modelledAverageArray, file_object1)
+    file_object1.close()
     
 
 ############
