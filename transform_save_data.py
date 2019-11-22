@@ -16,6 +16,7 @@ metricNames = parameters.getSumStats()
 
 # Get the number of parameter iterations and number of time step defined in the parameter.py script
 nrOfTimesteps=parameters.getNrTimesteps()
+
 numberOfIterations = parameters.getNumberofIterations(parameters.getSuitFactorDict(), parameters.getParametersforCalibration())
 
 iterations = range(1, numberOfIterations+1, 1)
@@ -51,9 +52,13 @@ def openPickledSamplesAndTimestepsAsNumpyArray(basename,iterations,timesteps, \
           
       # If we are working with the observed data (CLC data):
       if obs:
+        if basename == 'urb':
+          refArray = 'sampPointNr.col' # Array with an unique ID for each cell
+        else:
+          refArray = 'sampPoint.col' # Array with an unique ID for each zone
         name = generateNameT(basename, timestep)
         fileName = os.path.join('observations', country, 'realizations', str(i), name)
-        data = metrics.map2Array(fileName, os.path.join('input_data', country, 'sampPoint.col'))
+        data = metrics.map2Array(fileName, os.path.join('input_data', country, refArray))
         
       # If we are working with the observed values:  
       else:
@@ -122,6 +127,7 @@ saveSamplesAndTimestepsAsNumpyArray('urb', obsSampleNumbers,obsTimeSteps, True)
 
 #Transform modelled urban maps:
 ########################################### This should go to the LU_urb.py :
+'''
 outputfolder = os.path.join(os.getcwd(), 'results', country, str(nr))
 inputfolder = os.path.join('input_data', country)
 
@@ -132,10 +138,11 @@ path1 = os.path.join(outputfolder, name1)
 file_object1 = open(path1, 'wb')
 pickle.dump(modelledAverageArray, file_object1)
 file_object1.close()
+'''
 ########################################### 
 
 # Save the modelled urban areas
-saveSamplesAndTimestepsAsNumpyArray('urb', iterations,TimeSteps)
+#saveSamplesAndTimestepsAsNumpyArray('urb', iterations,timeSteps)
 
 
 
