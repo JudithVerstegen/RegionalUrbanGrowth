@@ -27,7 +27,7 @@ nrOfTimesteps = parameters.getNrTimesteps()
 timeSteps=range(1,nrOfTimesteps+1,1)
 
 # Get the observed time steps. Time steps relate to the year of the CLC data, where 1990 was time step 0.
-obsTimeSteps = [1,11,17]#parameters.getObsTimesteps()
+obsTimeSteps = parameters.getObsTimesteps()
 observedYears = [parameters.getObsYears()[y] for y in obsTimeSteps]
 
 # Path to the folder with the metrics stored
@@ -137,10 +137,6 @@ def plotAbsoluteDifference(metricNames, obsTimeStep):
     setNameClearSave('Difference_' + aMetric + "_timestep_"+ str(obsTimeStep) + ".png")
     '''
     
-def getRMSEArray(m):
-  rmseArray = np.load(os.path.join(resultFolder, m + '_RMSE.npy'))
-  return rmseArray
-
 def plotRMSEwithMeanRMSE(rArray, oneMetric, observations, parameterSets):
   # Values of metric np and pd give highly different results, so plot them using brakes in y axis:
   if oneMetric in ['np', 'pd']:
@@ -346,47 +342,74 @@ def plotParameterValules():
   plt.yticks(np.arange(0, 1.5, 0.1),np.arange(0,1,0.1))
   plt.legend(ncol=2)
 
-  setNameClearSave('metric_weights.png')  
+  setNameClearSave('metric_weights.png')
+
+def plotUrb():
+  # Plot the observed urban arreas
+  ncol = 3
+  nrows = int(np.ceil(len(observedYears)/ncol))
+  # Load observed urb
+  urb_obs = np.load(os.path.join(resultFolder, 'urb_obs.npy'))
+  # Create figure
+  fig = plt.figure(figsize=(7.14,3*nrows)) # Figure size set to give 16 cm of width
+  fig.suptitle('Observed urban areas',fontweight='bold', y=0.95)
+  # Create subplots
+
+
+  for index, oYear in enumerate(observedYears):
+    ax1 = plt.subplot(nrows,ncol,index+1)
+    ax1.get_xaxis().set_visible(False)
+    ax1.get_yaxis().set_visible(False)
+    ax1.set_title(oYear)
+    urbMatrix1 = np.reshape(urb_obs[index,0,1], (1600,1600))
+    ax1.xticks = ([])
+    ax1.imshow(urbMatrix1)
+  
+  setNameClearSave('urb_observed.png')
   
 ######################################
 ### VISUALIZE OUTPUTS OF THE MODEL ###
 ######################################
-'''for theMetric in metricNames:
+print('1. Visualize the outputs of metrics')
+
+for theMetric in metricNames:
+  print('METRIC: ',theMetric)
   zonesModelled = calibrate.getModelledArray(theMetric)
   zonesObserved = calibrate.getObservedArray(theMetric)
-  rmseArray = getRMSEArray(theMetric)
+  rmseArray = calibrate.calcRMSE(calibrate.createDiffArray(zonesModelled,zonesObserved), theMetric)
   parameterSets = calibrate.getParameterConfigurations(zonesModelled) # gives the parameter sets
   calibratedIndex = calibrate.smallestMeanErrorIndex_2000_2006(rmseArray) # gives the index of the best parameter set
   
   ##### Create histograms of metric values for different parameters per zone per timestep
   
   #histogramsModelledMetrics(theMetric, zonesModelled)
-  print('1. Histograms for each zone and ech time step plotted.')  
+  print('a. Histograms for each zone and ech time step plotted.')  
 
   """ Leave this for later use
   ##### Create colormap with absolute difference values
   # Create an array corresponding to the zones
   plotAbsoluteDifference(metricNames,'2000')
-  print('2. Difference betweeen the observed and modelled for each zone and ONE time step plotted.')
+  print('b. Difference betweeen the observed and modelled for each zone and ONE time step plotted.')
   """
   ##### Plot RMSE
-  #plotRMSEwithMeanRMSE(rmseArray, theMetric, observedYears, parameterSets)
+  print('Smallest mean RMSE for 2000 (timestep 11) and 2006 (timestep 17) parameter set:', calibratedIndex,
+        parameterSets[calibratedIndex])
+  plotRMSEwithMeanRMSE(rmseArray, theMetric, observedYears, parameterSets)
   
-  #plotBestparameterSets(rmseArray,theMetric,observedYears)
-  print('2. RMSE plotted.')
+  plotBestparameterSets(rmseArray,theMetric,observedYears)
+  print('c. RMSE plotted.')
   
 
   ##### Plot values of modelled and observed metrics
   plotObservedAndCalibratedMetrics(theMetric, observedYears, zonesObserved, zonesModelled, calibratedIndex)
-  print('3. Observed and fitted metrics ploted.')'''
+  print('d. Observed and fitted metrics ploted.')
 
-
+###
 plotParameterValules()
-urb_obs = np.load(os.path.join(resultFolder, 'urb_obs.npy'))
-B = np.reshape(urb_obs[3,0,1], (1600,1600))
-fig,ax = plt.subplots()
-ax.imshow(B)
-plt.show()
+print('1. Visualize the outputs of urban areas')
+plotUrb()
+
+
 
 
   
