@@ -589,7 +589,7 @@ class LandUseChangeModel(DynamicModel):
       # the map with the metric is removed to save disk space
       os.remove(path)
 
-    # save the urban land use as a pickle list, but do not remove the maps <- TO DO!
+    # save the urban land use as a pickle list, but do not remove the maps <- Check whether 16 or 1600^2 zones!!
     path = generateNameT(self.outputfolder + '/' + 'urb', timeStep)
     # this result in one value per cell
     modelledCellArray = metrics.map2Array(path, self.inputfolder + '/sampPointNr.col')
@@ -597,7 +597,7 @@ class LandUseChangeModel(DynamicModel):
     name1 = 'urb' + str(timeStep) + '.obj'
     path1 = os.path.join(self.outputfolder, name1)
     file_object1 = open(path1, 'wb')
-    pickle.dump(modelledAverageArray, file_object1)
+    pickle.dump(modelledCellArray, file_object1)
     file_object1.close()
     
 
