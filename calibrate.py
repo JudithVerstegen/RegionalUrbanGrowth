@@ -22,7 +22,7 @@ timeSteps=range(1,nrOfTimesteps+1,1)
 
 # Get the observed time steps. Time steps relate to the year of the CLC data, where 1990 was time step 0.
 obsSampleNumbers = [1] #range(1,20+1,1) <- for stochastic model
-obsTimeSteps = [1,11,17]#parameters.getObsTimesteps() # [1,11,17]
+obsTimeSteps = parameters.getObsTimesteps() # [1,11,17]
 
 # Path to the folder with the metrics npy arrays stored
 country = parameters.getCountryName()
@@ -137,7 +137,6 @@ print('.')
 # minimum root-mean-square error between the metrics modelled and observed.
 
 for aVariable in metricList:
-  print('Metric: ',aVariable)
   zonesModelled = getModelledArray(aVariable)
   zonesObserved = getObservedArray(aVariable)
 
@@ -152,13 +151,11 @@ for aVariable in metricList:
   saveTheArray(RMSE, aVariable, '_RMSE')
 
   # 3. Find the parameter sets with the smallest RMSE
-  print('Smallest RMSE in each year parameter sets [year time step, set]:',smallestErrorInObsYear(RMSE))
-  print('Smallest mean RMSE parameter set:',smallestMeanErrorIndex(RMSE))
+  #print('Smallest RMSE in each year parameter sets [year time step, set]:',smallestErrorInObsYear(RMSE))
+  #print('Smallest mean RMSE parameter set:',smallestMeanErrorIndex(RMSE))
 
   # 4. Find the fitting parameter set for calibration for years 2000 and 2006
   fittingSet = smallestMeanErrorIndex_2000_2006(RMSE)
-  print('Smallest mean RMSE for 2000 (timestep 11) and 2006 (timestep 17) parameter set:', fittingSet,
-        parameterSets[fittingSet])
 
 # 5. Calculate Kappa statistic
 
