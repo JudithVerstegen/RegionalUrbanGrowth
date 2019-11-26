@@ -49,18 +49,20 @@ def openPickledSamplesAndTimestepsAsNumpyArray(basename,iterations,timesteps, \
       filehandler = open(pFileName, 'rb') 
       pData = pickle.load(filehandler)
       pArray = np.array(pData, ndmin=1)
+
+      # If we are working with urban data, then we are using array for each cell. Else, array for each zone:
+      if basename == 'urb':
+        refArray = 'sampPointNr.col' # Array with an unique ID for each cell
+      else:
+        refArray = 'sampPoint.col' # Array with an unique ID for each zone
           
       # If we are working with the observed data (CLC data):
       if obs:
-        if basename == 'urb':
-          refArray = 'sampPointNr.col' # Array with an unique ID for each cell
-        else:
-          refArray = 'sampPoint.col' # Array with an unique ID for each zone
         name = generateNameT(basename, timestep)
         fileName = os.path.join('observations', country, 'realizations', str(i), name)
         data = metrics.map2Array(fileName, os.path.join('input_data', country, refArray))
         
-      # If we are working with the observed values:  
+      # If we are working with the modelled values:  
       else:
         theName = basename + str(timestep) + '.obj'
         fileName = os.path.join(resultFolder, str(i), theName)
@@ -81,6 +83,7 @@ def openPickledSamplesAndTimestepsAsNumpyArray(basename,iterations,timesteps, \
       allIterations.append([pArray,array])
     output.append(allIterations)
   outputAsArray = np.array(output)
+    
   return outputAsArray
 
 def saveSamplesAndTimestepsAsNumpyArray(basename, iterations, timesteps, obs=False):
@@ -112,37 +115,43 @@ def saveSamplesAndTimestepsAsNumpyArray(basename, iterations, timesteps, obs=Fal
 # so that we can delete all number folders
  
 print("Save modelled and observed metrics: ", metricNames)
-print("Parameter values are stored in 3 dimensional array [timestep, iteration, metric value for a given zone]")
-print("# timestep: year, \n# iteration: set of parameters used, \n# metric: array of values \
-of the selected metric for each zone for each set of parameters seperately")
 
-   
+# Parameter values are stored in 3 dimensional array [timestep, iteration, metric value for a given zone]
+# + timestep: year,
+# + iteration: set of parameters used,
+# + metric: array of values f the selected metric for each zone for each set of parameters seperately
+'''
 # Save for the modelled and observed metrics:
 for aVariable in metricNames:
   saveSamplesAndTimestepsAsNumpyArray(aVariable, iterations, timeSteps)
   saveSamplesAndTimestepsAsNumpyArray(aVariable, obsSampleNumbers,obsTimeSteps, True)
 
 # Save the observed urban areas
-saveSamplesAndTimestepsAsNumpyArray('urb', obsSampleNumbers,obsTimeSteps, True)
+saveSamplesAndTimestepsAsNumpyArray('urb', obsSampleNumbers,obsTimeSteps, True)'''
 
-#Transform modelled urban maps:
-########################################### This should go to the LU_urb.py :
-'''
-outputfolder = os.path.join(os.getcwd(), 'results', country, str(nr))
-inputfolder = os.path.join('input_data', country)
+# Sabe the modelled urban areas for the observed years
+obsYearsIndex = np.array(parameters.getObsTimesteps())-1
+print(obsYearsIndex)
+urbModObsArray = openPickledSamplesAndTimestepsAsNumpyArray(
+  'urb', iterations, timeSteps)[obsYearsIndex,:]
+# Check if the directory exists. If not, create.
+if not os.path.isdir(output_mainfolder):
+    os.mkdir(output_mainfolder)
+    
+# Set the name of the file
+fileName = os.path.join(output_mainfolder, 'urbModInObsYears')
 
-path = generateNameT(outputfolder + '/' + 'urb', timeStep)
-modelledAverageArray = metrics.map2Array(path, inputfolder + '/sampPoint.col')
-name1 = 'urb' + str(timeStep) + '.obj'
-path1 = os.path.join(outputfolder, name1)
-file_object1 = open(path1, 'wb')
-pickle.dump(modelledAverageArray, file_object1)
-file_object1.close()
-'''
-########################################### 
+# Clear the directory if needed
+if os.path.exists(fileName + '.npy'):
+    os.remove(fileName + '.npy')
 
-# Save the modelled urban areas
-#saveSamplesAndTimestepsAsNumpyArray('urb', iterations,timeSteps)
+# Save the data  
+np.save(fileName, urbModObsArray)
+
+
+
+
+
 
 
 
