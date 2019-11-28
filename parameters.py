@@ -68,7 +68,7 @@ def getSumStats():
   # 'wfdi': Area weighted mean patch fractal dimension index
   
   
-  sumStats = ['mp', 'pd', 'fdi', 'cilp', 'wfdi']
+  sumStats = ['cilp', 'fdi', 'wfdi', 'pd']
   return sumStats
 
 def getCovarName():
