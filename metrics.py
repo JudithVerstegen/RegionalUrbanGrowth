@@ -112,7 +112,8 @@ def calculateSumStats(systemState, listOfSumStats, zones, validation=False):
       average_nr = cover(areadiversity(clumps, zones), spatial(scalar(0)))
       patch_density = average_nr/zone_area
       listOfMaps.append(patch_density)
-    elif aStat == 'mp': # Mean patch size in a zone. If patch is in more than one zone it is assigned to one zone only...
+    elif aStat == 'mp': # Mean patch size in a zone.
+      # If patch is in more than one zone it is assigned to one zone only...
       patchSizes_c = patchSizes/parameters.getConversionUnit()
       patchSizeOneCell = ifthen(oneCellPerPatch, patchSizes_c)
       averagePatchSize = areaaverage(patchSizeOneCell, zones)
