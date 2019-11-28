@@ -129,24 +129,8 @@ for aVariable in metricNames:
 # Save the observed urban areas
 saveSamplesAndTimestepsAsNumpyArray('urb', obsSampleNumbers,obsTimeSteps, True)'''
 
-# Sabe the modelled urban areas for the observed years
-obsYearsIndex = np.array(parameters.getObsTimesteps())-1
-print(obsYearsIndex)
-urbModObsArray = openPickledSamplesAndTimestepsAsNumpyArray(
-  'urb', iterations, timeSteps)[obsYearsIndex,:]
-# Check if the directory exists. If not, create.
-if not os.path.isdir(output_mainfolder):
-    os.mkdir(output_mainfolder)
-    
-# Set the name of the file
-fileName = os.path.join(output_mainfolder, 'urbModInObsYears')
-
-# Clear the directory if needed
-if os.path.exists(fileName + '.npy'):
-    os.remove(fileName + '.npy')
-
-# Save the data  
-np.save(fileName, urbModObsArray)
+# Save the modelled urban areas <- takes a while and lots of RAM (around 16GB)
+#saveSamplesAndTimestepsAsNumpyArray('urb', iterations, timeSteps)
 
 
 
