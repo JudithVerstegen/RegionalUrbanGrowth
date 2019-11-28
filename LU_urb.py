@@ -71,7 +71,7 @@ class LandUseType:
   
   ## 1
   def getNeighborSuitability(self):
-    """Return suitability map based on nr of neighors with a related type."""
+    """Return suitability map based on nr of neighbors with a related type."""
     booleanSelf = pcreq(self.environment, self.typeNr)
     for aType in self.relatedTypeList:
       booleanMap = pcreq(self.environment, aType)
@@ -101,7 +101,7 @@ class LandUseType:
 
   ## 2
   def getDistanceSuitability(self, spreadMap):
-    """Return suitability map based on distance to roads."""
+    """Return suitability map based on distance to train stations."""
     variableList = self.variableDict.get(2)
     a = variableList[0]
     normalized = self.normalizeMap(spreadMap)
@@ -111,7 +111,7 @@ class LandUseType:
 
   ## 3
   def getTravelTimeCityBorder(self):
-    """Return suitability map based on distance to large cities."""
+    """Return suitability map based on distance to the largest city."""
     booleanSelf = pcreq(self.environment, self.typeNr)
     clumps = clump(ifthen(booleanSelf == 1, boolean(1)))
     sizes = areaarea(clumps)
