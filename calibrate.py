@@ -16,6 +16,7 @@ metricList = parameters.getSumStats()
 # Get the number of parameter iterations and number of time step defined in the parameter.py script
 nrOfTimesteps=parameters.getNrTimesteps()
 numberOfIterations = parameters.getNumberofIterations(parameters.getSuitFactorDict(), parameters.getParametersforCalibration())
+nrOfCells = 2560000
 
 iterations = range(1, numberOfIterations+1, 1)
 timeSteps=range(1,nrOfTimesteps+1,1)
@@ -58,10 +59,89 @@ def createDiffArray(modelled,observed):
   for row in range(0,len(obsTimeSteps)):
     for col in range(0,noParameterConfigurations):
       for zone in range(0,numberZones):
-        #theArray[row,col][zone][0] = [999]#modelled[obsTimeSteps[0]-1,0][0]
         theArray[row,col][zone][0] = modelled[obsTimeSteps[row]-1,col][1][zone][0] - observed[row,0][1][zone][0]  
   return theArray
+
+def calculateKappa():
+  # Create an array to store the comparison between the observed and modelled urban areas.
   
+  # Create array to store transition states:
+  transArray = np.zeros((len(obsTimeSteps),numberOfIterations,nrOfCells,1))
+  # Create array to store Kappa
+  kappaArray = np.zeros((len(obsTimeSteps),numberOfIterations))
+    
+  # Load data:
+  urbObs = getObservedArray('urb')
+  urbMod = np.load(os.path.join(arrayFolder, 'urbModInObsYears.npy'))
+
+  # Loop years:
+  for row in range(0,len(obsTimeSteps)):
+    
+    # Loop parameter sets:
+    for col in range(0,numberOfIterations):
+      # For year 1990 (row 0) there is a perfect agreement:
+      if row == 0:
+        kappaArray[row,col] = 1.0
+        
+      else:
+        # Define conditions
+        obs1 = (urbObs[row,0,1] == 1)
+        obs0 = (urbObs[row,0,1] == 0)
+        mod1 = (urbMod[row,col,1] == 1)
+        mod0 = (urbMod[row,col,1] == 0)
+
+        # Find states. Each cell has only one of four states.
+        # Observed -> modelled
+        # 1. urban -> urban
+        # 2. urban -> non-urban
+        # 3. non-urban -> urban
+        # 4. non-urban -> non-urban
+        state1 = np.where(obs1 & mod1,1,0)
+        state2 = np.where(obs1 & mod0,2,0)
+        state3 = np.where(obs0 & mod1,3,0)
+        state4 = np.where(obs0 & mod0,4,0) 
+
+        # Save state of each cell into the array
+        allStates = state1+state2+state3+state4
+
+        # Create contingency table, full of zeros
+        cArray = np.zeros((3,3))
+
+        # Fill the contingency table:
+        cArray[0,0] = sum(allStates == 1)/nrOfCells
+        cArray[0,1] = sum(allStates == 2)/nrOfCells
+        cArray[1,0] = sum(allStates == 3)/nrOfCells
+        cArray[1,1] = sum(allStates == 4)/nrOfCells
+        cArray[0,2] = (sum(allStates == 1)+sum(allStates == 2))/nrOfCells
+        cArray[1,2] = (sum(allStates == 3)+sum(allStates == 4))/nrOfCells
+        cArray[2,0] = (sum(allStates == 1)+sum(allStates == 3))/nrOfCells
+        cArray[2,1] = (sum(allStates == 2)+sum(allStates == 4))/nrOfCells
+        cArray[2,2] = 1
+
+        # Calculate fractions of agreement:
+        P0 = cArray[0,0] + cArray[1,1]
+        PE = cArray[0,2]*cArray[2,0] + cArray[1,2]*cArray[2,1]
+        PMAX = np.minimum(cArray[0,2],cArray[2,0]) + np.minimum(cArray[1,2],cArray[2,1])           
+
+        # Calculate Kappa
+        Kappa = (P0 - PE) / (1 - PE)
+        print(row,col,Kappa)
+        # Save Kapa in array
+        kappaArray[row,col] = Kappa
+
+  # Set the name of the file
+  fileName = os.path.join(arrayFolder, 'kappa')
+
+  # Clear the directory if needed
+  if os.path.exists(fileName + '.npy'):
+      os.remove(fileName + '.npy')
+
+  # Save the data  
+  np.save(fileName, kappaArray)
+  
+  print(kappaArray)
+  return kappaArray
+
 def calcRMSE(diffArray, aVariable):
   pSets = diffArray.shape[1]
   zones = diffArray.shape[2]
@@ -110,19 +190,31 @@ def smallestMeanErrorIndex_2000_2006(theRMSE):
       mBase[1] = p
   return mBase[1]
 
-def saveTheArray(output, metricName, fileEnd): 
-  # Set the name of the file
-  fileName = os.path.join(arrayFolder, metricName + fileEnd)
+def biggestKappaInObsYear(kappaArr):
+  fitList = []
+  
+  for year in range(1,len(obsTimeSteps)):
+    index = 0
+    base = [kappaArr[year,:][0],index]
+    for r in kappaArr[year,:]:
+      if r > base[0]:
+        base[0] = r
+        base[1] = index
+      index = index+1
+    # Create a list storing a liast of observed timestep and index of parameter set)
+    fitList.append([obsTimeSteps[year],base[1]])
+  return(fitList)
 
-  # Clear the directory if needed
-  if os.path.exists(fileName + '.npy'):
-    os.remove(fileName + '.npy')
+def biggestKappa_2000_2006(kappaArr):
+  kBase = [np.mean(kappaArr[1:3,0]),0]
+  # Loop parameter configurations to find the one with the best mean value for years 2000 and 2006
+  for p in range(len(kappaArr[0,:])):
+    mKappa = np.mean(kappaArr[1:3,p])
+    if mKappa > kBase[0]:
+      kBase[0] = mKappa
+      kBase[1] = p
+  return kBase[1]
 
-  # Save the data  
-  np.save(fileName, output)
-
-def calculateKappa():
-  print('done.')
   
 ###########################
 ### CALIBRATE THE MODEL ###
@@ -135,7 +227,7 @@ print('.')
 
 # Calibration of the modell will be based on finding
 # minimum root-mean-square error between the metrics modelled and observed.
-
+'''
 for aVariable in metricList:
   zonesModelled = getModelledArray(aVariable)
   zonesObserved = getObservedArray(aVariable)
@@ -148,7 +240,6 @@ for aVariable in metricList:
 
   # 2. Calculate Root Mean Squared Error (RMSE)
   RMSE = calcRMSE(dArray, aVariable)
-  saveTheArray(RMSE, aVariable, '_RMSE')
 
   # 3. Find the parameter sets with the smallest RMSE
   #print('Smallest RMSE in each year parameter sets [year time step, set]:',smallestErrorInObsYear(RMSE))
@@ -158,6 +249,7 @@ for aVariable in metricList:
   fittingSet = smallestMeanErrorIndex_2000_2006(RMSE)
 
 # 5. Calculate Kappa statistic
+#calculateKappa()'''
 
 
 
