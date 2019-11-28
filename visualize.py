@@ -307,51 +307,56 @@ def plotObservedAndCalibratedMetrics(aMetric, observedYearArray, zonesObserved, 
   # Set the name and clear the directory if needed
   setNameClearSave(aMetric + '_calc_and_obs.png')
 
-def plotParameterValules():
+def plotParameterValues(kapppaInx):
   # Number of metrics:
   nParams = len(parameters.getSuitFactorDict()[1])
-  N = len(metricNames)
+  N = len(metricNames)+1 # = plus Kappa!
+
   
   # Create figure
   fig = plt.figure(figsize=(4,3.2))
   # Create list to store the lists of parameters
-  weights = [[] for i in range(N)]
+  weights = [[] for i in range(nParams)]
 
-  for m in metricNames:
+  for m in metricNames: 
     zonesModelled = calibrate.getModelledArray(m)
-    rmseArray = getRMSEArray(m)
+    zonesObserved = calibrate.getObservedArray(m)
+    rmseArray = calibrate.calcRMSE(calibrate.createDiffArray(zonesModelled,zonesObserved), m)
     parameterSets = np.array(calibrate.getParameterConfigurations(zonesModelled)) # gives the parameter sets
     calibratedIndex = calibrate.smallestMeanErrorIndex_2000_2006(rmseArray) # gives the index of the best parameter set
     for j in range(nParams):
       weights[j].append(parameterSets[calibratedIndex][j])
+  # Add Kappa
+  for j in range(nParams):
+    weights[j].append(parameterSets[kapppaInx][j])
+
 
   ind = np.arange(N)    # the x locations for the groups
   alpha = 0.5
   bottom = 0
   c = ['green','red','purple','orange']
   labels = ['NeighborSuitability', 'DistanceSuitability', 'TravelTimeCityBorder', 'CurrentLandUseSuitability']
-  for bar in range(nParams):
-    plt.bar(ind, weights[bar],
-                    label=labels[bar], bottom = bottom, alpha=alpha, color=c[bar])
+  for bar in range(len(weights)):
+    plt.bar(ind, weights[bar],label=labels[bar], bottom = bottom, alpha=alpha, color=c[bar])
     bottom = bottom + np.array(weights[bar])
 
   plt.title("Calibrated parameters", fontweight='bold')
   plt.ylabel('parameters')
   plt.xlabel('metrics')
-  plt.xticks(ind, metricNames)
-  plt.yticks(np.arange(0, 1.5, 0.1),np.arange(0,1,0.1))
+  plt.xticks(ind, metricNames + ['kappa'])
+  plt.yticks(np.arange(0, 1.5, 0.25),np.arange(0,1.1,0.25))
   plt.legend(ncol=2)
 
   setNameClearSave('metric_weights.png')
 
-def plotUrb():
+def plotUrbObs():
   # Plot the observed urban arreas
   ncol = 3
   nrows = int(np.ceil(len(observedYears)/ncol))
   # Load observed urb
   urb_obs = np.load(os.path.join(resultFolder, 'urb_obs.npy'))
   # Create figure
-  fig = plt.figure(figsize=(7.14,3*nrows)) # Figure size set to give 16 cm of width
+  fig = plt.figure(figsize=(7.14,2.5*nrows)) # Figure size set to give 16 cm of width
   fig.suptitle('Observed urban areas',fontweight='bold', y=0.95)
   # Create subplots
 
@@ -366,11 +371,87 @@ def plotUrb():
     ax1.imshow(urbMatrix1)
   
   setNameClearSave('urb_observed.png')
+
+def plotUrbMod(theIndex, parameterSets):
+  # Plot the modelled urban arreas
+  ncol = 3
+  nrows = int(np.ceil(len(observedYears)/ncol))
+  # Load modelled urb
+  urb_mod = np.load(os.path.join(resultFolder, 'urbModInObsYears.npy'))
+  # Create figure
+  fig = plt.figure(figsize=(7.14,2.5*nrows)) # Figure size set to give 16 cm of width
+  fig.suptitle(
+    'Modelled urban areas for parameter set '+str(theIndex)+': '+str(parameterSets[theIndex])
+    ,fontweight='bold', y=0.95)
+  
+  # Create subplots
+  for index, oYear in enumerate(observedYears):
+    ax1 = plt.subplot(nrows,ncol,index+1)
+    ax1.get_xaxis().set_visible(False)
+    ax1.get_yaxis().set_visible(False)
+    ax1.set_title(oYear)
+    urbMatrix1 = np.reshape(urb_mod[index,theIndex,1], (1600,1600))
+    ax1.xticks = ([])
+    ax1.imshow(urbMatrix1)
+  
+  setNameClearSave('urb_modelled_'+str(theIndex)+'_.png')
+  
+
+def plotKappaEachYear():
+  # Plot the kappa statistic for the best parameter sets for each year
+
+  # Load data
+  kappaArray = np.load(os.path.join(resultFolder, 'kappa.npy'))
+  # Create the figure
+  fig = plt.figure(figsize=(3.2,3.2)) # Figure size set to give 8 cm of width
+  plt.title('Kappa coefficient of agreement',fontweight='bold')
+  plt.ylabel('Kappa')
+  # Create a list for      
+  fitList = calibrate.biggestKappaInObsYear(kappaArray)
+  fitIndices = []
+  for y in fitList:
+    if y[1] not in fitIndices:
+      fitIndices.append(y[1])
+  labels = []
+  theLabels =[]
+  for i in range(len(fitIndices)):
+    for y in fitList:
+      if y[1] == fitIndices[i]:
+        labels.append(parameters.getObsYears()[y[0]])  
+    theLabels.append(labels)
+    labels=[]
+
+  for year in range(len(fitIndices)):
+    itsLabel = 'set %s: max Kappa in %s'%(fitIndices[year],theLabels[year])
+    plt.plot(observedYears,kappaArray[:,fitIndices[year]],'--o', label = itsLabel, linewidth = 1, markersize = 3)
+    plt.xticks(observedYears)
+    plt.xlabel('observed years')
+    plt.legend()
+   
+  # Set the name and clear the directory if needed
+  setNameClearSave('Kappa_best_sets.png')
+
+# This goes to visualize.py :
+'''import matplotlib.patches as mpatches
+
+transArray = state1+state2+state3+state4
+new = np.reshape(transArray,(1600,1600))
+
+plt.figure(figsize=(8,4))
+im = plt.imshow(new, interpolation='none')
+
+values = np.unique(new.ravel())
+labels = ['1. urban -> urban', '2. urban -> non-urban', '3. non-urban -> urban', '4. non-urban -> non-urban]']
+colors = [ im.cmap(im.norm(value)) for value in values]
+patches = [ mpatches.Patch(color=colors[i], label="State {l}".format(l=labels[i]) ) for i in range(len(values)) ]
+# put those patched as legend-handles into the legend
+plt.legend(handles=patches, bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0. )
+plt.show()'''
   
 ######################################
 ### VISUALIZE OUTPUTS OF THE MODEL ###
 ######################################
-print('1. Visualize the outputs of metrics')
+print('1. Visualize the outputs of calculating the metrics')
 
 for theMetric in metricNames:
   print('METRIC: ',theMetric)
@@ -379,35 +460,47 @@ for theMetric in metricNames:
   rmseArray = calibrate.calcRMSE(calibrate.createDiffArray(zonesModelled,zonesObserved), theMetric)
   parameterSets = calibrate.getParameterConfigurations(zonesModelled) # gives the parameter sets
   calibratedIndex = calibrate.smallestMeanErrorIndex_2000_2006(rmseArray) # gives the index of the best parameter set
+
   
   ##### Create histograms of metric values for different parameters per zone per timestep
   
   #histogramsModelledMetrics(theMetric, zonesModelled)
-  print('a. Histograms for each zone and ech time step plotted.')  
+  #print('a. Histograms for each zone and ech time step plotted.')  
 
   """ Leave this for later use
   ##### Create colormap with absolute difference values
   # Create an array corresponding to the zones
   plotAbsoluteDifference(metricNames,'2000')
-  print('b. Difference betweeen the observed and modelled for each zone and ONE time step plotted.')
+  print('Difference betweeen the observed and modelled for each zone and ONE time step plotted.')
   """
   ##### Plot RMSE
   print('Smallest mean RMSE for 2000 (timestep 11) and 2006 (timestep 17) parameter set:', calibratedIndex,
         parameterSets[calibratedIndex])
-  plotRMSEwithMeanRMSE(rmseArray, theMetric, observedYears, parameterSets)
+  #plotRMSEwithMeanRMSE(rmseArray, theMetric, observedYears, parameterSets)
   
-  plotBestparameterSets(rmseArray,theMetric,observedYears)
-  print('c. RMSE plotted.')
+  #plotBestparameterSets(rmseArray,theMetric,observedYears)
+  print('b. RMSE plotted.')
   
 
   ##### Plot values of modelled and observed metrics
-  plotObservedAndCalibratedMetrics(theMetric, observedYears, zonesObserved, zonesModelled, calibratedIndex)
-  print('d. Observed and fitted metrics ploted.')
+  #plotObservedAndCalibratedMetrics(theMetric, observedYears, zonesObserved, zonesModelled, calibratedIndex)
+  print('c. Observed and fitted metrics ploted.')
+
+  ##### Plot modelled urban areas
+  #plotUrbMod(calibratedIndex, parameterSets)
 
 ###
-plotParameterValules()
-print('1. Visualize the outputs of urban areas')
-plotUrb()
+
+print('2. Visualize the outputs of modelling the urban areas')
+# Run Kappa calculation
+#calibrate.calculateKappa()
+kappaArray = np.load(os.path.join(resultFolder, 'kappa.npy'))
+kapppaIndex = calibrate.biggestKappa_2000_2006(kappaArray)
+#print('calibrated index using kappa',parameterSets[kapppaIndex])
+#plotUrbObs()
+#plotKappaEachYear()
+plotParameterValues(kapppaIndex)
+
 
 
 
