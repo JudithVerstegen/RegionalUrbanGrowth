@@ -373,6 +373,8 @@ def reproject_resample_tif(in_raster, out_raster, ref_raster):
 ############
 ### main ###
 ############
+setclone('clone')
+
 
 # 0. clean the two directories (input_data and observations)
 # Folders input_data and observations have to exist
@@ -607,6 +609,16 @@ command = 'map2col --unitcell ' + os.path.join(country_dir, 'sampPointNr.map') +
           ' ' + os.path.join(country_dir, 'sampPointNr.col')
 os.system(command)
 
+# Create sample points for one cell in the study area (for one metric for the whole study area)
+samplePoint = pcreq(areaminimum(unique, one_mask), unique)
+aguila(samplePoint)
+samplePoint = ifthen(samplePoint == 1, boolean(1))
+samplePoint = uniqueid(samplePoint)
+report(samplePoint, os.path.join(country_dir, 'sampSinglePoint.map'))
+command = 'map2col --unitcell ' + os.path.join(country_dir, 'sampSinglePoint.map') + \
+          ' ' + os.path.join(country_dir, 'sampSinglePoint.col')
+os.system(command)
+
 
 # 9. summary statistics with no stochasticity
 print('---------------------- Statistics ----------------------')
@@ -689,3 +701,7 @@ print(mins)
 print(maxs)
 print(avs)
 
+
+# 11. create random unfirom map
+uniformMap = uniform(1)
+report(uniformMap, os.path.join(country_dir, 'uniform.map'))
