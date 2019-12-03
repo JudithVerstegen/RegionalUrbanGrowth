@@ -489,7 +489,9 @@ class LandUseChangeModel(DynamicModel):
   def initial(self):
     # create sample points
     self.nullMask = self.readmap(self.inputfolder + '/nullmask')
-    self.oneMask = self.readmap(self.inputfolder + '/onemask')   
+    self.oneMask = self.readmap(self.inputfolder + '/onemask')
+    # load a map with random uniform values
+    self.uniformMap = self.readmap(self.inputfolder + '/uniform')
     # AT SOME POINT WITH STOCHASTIC INPUT
     # in that case land use should not include urban
     self.landuse = self.readmap(self.inputfolder + '/init_lu')
@@ -512,7 +514,7 @@ class LandUseChangeModel(DynamicModel):
     self.noGoLanduseList = parameters.getNoGoLanduseTypes() 
 
     # Uniform map of small numbers, used to avoid equal suitabilities
-    self.noise = uniform(1)/100 # Increase the noise from 1/10000
+    self.noise = self.uniformMap/100 # Increase the noise from 1/10000
     
     # This part used to be the initial
     # Set seeds to be able to reproduce results
@@ -573,13 +575,13 @@ class LandUseChangeModel(DynamicModel):
 
     for aStat in self.sumStats: # All maps should be calculated for zones
       path = generateNameT(self.outputfolder + '/' + aStat, timeStep)
-      # these metrics result in one value per block (here 16 blocks)
-      modelledAverageArray = metrics.map2Array(path, self.inputfolder + '/sampPoint.col')
-      ''' As for now we do not use it:
+      if aStat in ['fdi', 'wfdi']:
+        # these metrics result in one value per block (here 16 blocks)
+        modelledAverageArray = metrics.map2Array(path, self.inputfolder + '/sampPoint.col')
       else:
         # other metrics result in one value for the whole study area
         modelledAverageArray = metrics.map2Array(path, \
-                              self.inputfolder + '/sampPointNr.col')'''
+                              self.inputfolder + '/sampSinglePoint.col')
       # metric is saved as a list
       name1 = aStat + str(timeStep) + '.obj'
       path1 = os.path.join(self.outputfolder, name1)
@@ -590,15 +592,17 @@ class LandUseChangeModel(DynamicModel):
       os.remove(path)
 
     # save the urban land use as a pickle list, but do not remove the maps <- Check whether 16 or 1600^2 zones!!
-    path = generateNameT(self.outputfolder + '/' + 'urb', timeStep)
+    path_urb = generateNameT(self.outputfolder + '/' + 'urb', timeStep)
     # this result in one value per cell
     modelledCellArray = metrics.map2Array(path, self.inputfolder + '/sampPointNr.col')
     # cell value is saved as a list
-    name1 = 'urb' + str(timeStep) + '.obj'
-    path1 = os.path.join(self.outputfolder, name1)
-    file_object1 = open(path1, 'wb')
-    pickle.dump(modelledCellArray, file_object1)
-    file_object1.close()
+    name1_urb = 'urb' + str(timeStep) + '.obj'
+    path1_urb = os.path.join(self.outputfolder, name1_urb)
+    file_object1_urb = open(path1_urb, 'wb')
+    pickle.dump(modelledCellArray, file_object1_urb)
+    file_object1_urb.close()
+    # the map with the urban area is removed to save disk space
+    os.remove(path_urb)
     
 
 ############
@@ -666,10 +670,10 @@ for p1 in param_steps:
         for p3 in param_steps:
             for p4 in param_steps:
                 sumOfParameters = p1+p2+p3+p4
-                if (sumOfParameters == 1):
+                if (sumOfParameters > 0.9999 and sumOfParameters < 1.0001):
                     loopCount = loopCount + 1
                     print('\n################################################')
-                    print('Model Run: ',loopCount,'. Parameters used: ',p1,p2,p3,p4,)
+                    print('Model Run: ',loopCount,'. Parameters used: ',p1,p2,p3,p4)
                     weights = [p1,p2,p3,p4]
                     myModel = LandUseChangeModel(loopCount, weights)
                     dynamicModel = DynamicFramework(myModel, nrOfTimeSteps)
