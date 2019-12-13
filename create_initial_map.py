@@ -42,7 +42,7 @@ coords = coords_dict[country]
 numberOfZones = parameters.getNumberOfZones()
 zone_size = int(np.sqrt(numberOfZones)*100) # 100 m (cell size) -> zone_size = 40 km. Test map, dividing area into 16 zones. ## The transform_save_data.py script didn't work for 4 zones
 # for creating observations
-realizations = 20
+realizations = 1 #20
 # window size as a factor of the cell size
 corr_window_size = 50
 omission = 10#52
@@ -421,7 +421,7 @@ for a_name in os.listdir(corine_dir):
             in_fn = os.path.join(corine_dir, a_name, a_name + '.tif')
         print(in_fn)
         setclone('clone')
-        lu = clip_and_convert(in_fn, coords, 999, Nominal)
+        lu = clip_and_convert(in_fn, coords, -32768, Nominal)
         report(lu, os.path.join('observations', country, a_name[13:15] + '.map'))
 
         # 2. urban map
@@ -521,12 +521,13 @@ protected_dir = os.path.join(data_dir, 'NATURA2000')
 ### 1. Rasterize the projected area shapefile
 # Select the input and output dir and name
 in_fn = os.path.join(protected_dir, 'Natura2000_end2018_epsg3035.shp')
-##raster_dir = os.path.join(protected_dir, 'raster')
 out_raster = os.path.join(data_dir, 'temporal_data','protected.tif')
 rasterize(in_fn, out_raster, ref_raster)
 
-### 2. Create the map file
+# Create the map file
 protected = clip_and_convert(out_raster, coords, 255, Nominal)
+
+### 2. Create no-go map
 report(cover(protected, nullmask), os.path.join(country_dir, 'NATURA2000.map'))
 print('Protected areas created.')
 
