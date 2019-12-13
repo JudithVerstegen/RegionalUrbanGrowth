@@ -5,6 +5,7 @@ import os
 import metrics
 import numpy as np
 import parameters
+import calibrate
 from pcraster.framework import *
 import matplotlib.pyplot as plt
 
@@ -35,6 +36,7 @@ output_mainfolder = os.path.join(resultFolder, "metrics")
 ### FUNCTIONS ###
 #################
 
+
 def openPickledSamplesAndTimestepsAsNumpyArray(basename,iterations,timesteps, \
                                                obs=False):
   output=[]
@@ -42,7 +44,7 @@ def openPickledSamplesAndTimestepsAsNumpyArray(basename,iterations,timesteps, \
   for timestep in timesteps:
     allIterations=[]
     
-    for i in iterations:
+    for i in iterations: # Loop parameters
       # Read in the parameters
       pName = 'parameters_iteration_' + str(i) + '.obj'
       pFileName = os.path.join(resultFolder, str(i), pName)
@@ -50,16 +52,20 @@ def openPickledSamplesAndTimestepsAsNumpyArray(basename,iterations,timesteps, \
       pData = pickle.load(filehandler)
       pArray = np.array(pData, ndmin=1)
 
-      # If we are working with urban data, then we are using array for each cell. Else, array for each zone:
+      # If we are working with urban data, then we are using an array for each cell.
+      # Metrics cilp and pd are calculate for the whole area.
+      # Other metrics are calculated for each zone:
       if basename == 'urb':
         refArray = 'sampPointNr.col' # Array with an unique ID for each cell
+      elif basename in ['cilp','pd']:
+        refArray = 'sampSinglePoint.col' # Array with an unique ID for the whole study area
       else:
         refArray = 'sampPoint.col' # Array with an unique ID for each zone
           
       # If we are working with the observed data (CLC data):
       if obs:
         name = generateNameT(basename, timestep)
-        fileName = os.path.join('observations', country, 'realizations', str(i), name)
+        fileName = os.path.join('observations', country, 'realizations', str(1), name) # for now only realization == 1
         data = metrics.map2Array(fileName, os.path.join('input_data', country, refArray))
         
       # If we are working with the modelled values:  
@@ -73,6 +79,8 @@ def openPickledSamplesAndTimestepsAsNumpyArray(basename,iterations,timesteps, \
         if type(data) == dict:
           data = data.get(1)
         filehandler.close()'''
+
+        
       # if the loaded data was not yet an array, make it into one
       # minimum number of dimensions is one, to prevent a zero-dimension array
       # (not an array at all)
@@ -83,13 +91,10 @@ def openPickledSamplesAndTimestepsAsNumpyArray(basename,iterations,timesteps, \
       allIterations.append([pArray,array])
     output.append(allIterations)
   outputAsArray = np.array(output)
-    
+
   return outputAsArray
 
-def saveSamplesAndTimestepsAsNumpyArray(basename, iterations, timesteps, obs=False):
-  # Convert the output of the model into arrays
-  output = openPickledSamplesAndTimestepsAsNumpyArray(basename, iterations, timesteps, obs)
-  
+def setNameClearSave(basename, output, obs=False):
   # Check if the directory exists. If not, create.
   if not os.path.isdir(output_mainfolder):
       os.mkdir(output_mainfolder)
@@ -110,34 +115,67 @@ def saveSamplesAndTimestepsAsNumpyArray(basename, iterations, timesteps, obs=Fal
 #################################
 ### SAVE OUTPUTS OF THE MODEL ###
 #################################
-  
-# now save all outputs of the model as one array per variable
-# so that we can delete all number folders
- 
-print("Save modelled and observed metrics: ", metricNames)
 
-# Parameter values are stored in 3 dimensional array [timestep, iteration, metric value for a given zone]
-# + timestep: year,
-# + iteration: set of parameters used,
-# + metric: array of values f the selected metric for each zone for each set of parameters seperately
-'''
-# Save for the modelled and observed metrics:
+########### Save the observed metrics and urban areas
+# Metrics:
+for aVariable in metricNames:  
+  output_obs = openPickledSamplesAndTimestepsAsNumpyArray(aVariable, obsSampleNumbers,obsTimeSteps, True)
+  setNameClearSave(aVariable, output_obs,obs=True)
+
+# Urban areas
+output_urb_obs = openPickledSamplesAndTimestepsAsNumpyArray('urb', obsSampleNumbers,obsTimeSteps, True)
+setNameClearSave('urb', output_urb_obs,obs=True)
+
+########### Save the modelled metrics and urban areas
+
+# Metrics:
 for aVariable in metricNames:
-  saveSamplesAndTimestepsAsNumpyArray(aVariable, iterations, timeSteps)
-  saveSamplesAndTimestepsAsNumpyArray(aVariable, obsSampleNumbers,obsTimeSteps, True)
+  output_mod = openPickledSamplesAndTimestepsAsNumpyArray(aVariable, iterations, timeSteps, False)
+  setNameClearSave(aVariable, output_mod,obs=False)
+  
+# Urban areas <- takes a while and lots of RAM (around 16GB)
+output_urb_mod = openPickledSamplesAndTimestepsAsNumpyArray('urb', iterations, timeSteps, False)
+setNameClearSave('urb', output_urb_mod,obs=False)
 
-# Save the observed urban areas
-saveSamplesAndTimestepsAsNumpyArray('urb', obsSampleNumbers,obsTimeSteps, True)'''
+# Subset the modellled urban areas only for the observation years
+subset_urb_mod = output_urb_mod[np.array(obsTimeSteps)-1,:]
+setNameClearSave('urb_subset', subset_urb_mod,obs=False)
 
-# Save the modelled urban areas <- takes a while and lots of RAM (around 16GB)
-#saveSamplesAndTimestepsAsNumpyArray('urb', iterations, timeSteps)
+# Parameter sets
+parameter_sets = subset_urb_mod[0,:,0]
+setNameClearSave('parameter_sets', parameter_sets, obs=False)
+
+print("Modelled and observed metrics and urban areas saved as npy files")
+
+'''
+########### Delete all number folders
+files = os.listdir(resultFolder)
+for f in files:
+    if f not in ['metrics']:
+      shutil.rmtree(os.path.join(resultFolder, f))
+print("All number folders deleted.")
+'''
+
+########### Calculate Kappa
+calibrate.calculateKappa()
+print("Kappa statistic calculated and saved as npy file")
 
 
+########### Get parameter values
+calibrate.saveResults(calibrate.getCalibratedParameters(1), 1, 'parameters.csv')
+calibrate.saveResults(calibrate.getCalibratedParameters(2), 2, 'parameters.csv')
 
+########### Calibrate model
+calibrate.saveResults(calibrate.calibrate(1),1,'calibration.csv')
+print("Model calibrated for 2000 - 2006")
+calibrate.saveResults(calibrate.calibrate(2),2,'calibration.csv')
+print("Model calibrated for 2012 - 2018")
 
-
-
-
+########### Validate model
+calibrate.saveResults(calibrate.validate(1),1,'validation.csv')
+print("Model validated for 2012 - 2018")
+calibrate.saveResults(calibrate.validate(2),2,'validation.csv')
+print("Model validated for 2000 - 2006")
 
   
 
