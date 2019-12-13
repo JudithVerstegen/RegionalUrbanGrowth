@@ -513,8 +513,8 @@ class LandUseChangeModel(DynamicModel):
     self.variableSuperDict = parameters.getVariableSuperDict()
     self.noGoLanduseList = parameters.getNoGoLanduseTypes() 
 
-    # Uniform map of small numbers, used to avoid equal suitabilities
-    self.noise = self.uniformMap/100 # Increase the noise from 1/10000
+    # Uniform map of small numbers, used to avoid equal suitabilities. The same uniform map is applied in each iteration.
+    self.noise = self.uniformMap/10000 # Increased the noise from 1/10000
     
     # This part used to be the initial
     # Set seeds to be able to reproduce results
@@ -591,10 +591,10 @@ class LandUseChangeModel(DynamicModel):
       # the map with the metric is removed to save disk space
       os.remove(path)
 
-    # save the urban land use as a pickle list, but do not remove the maps <- Check whether 16 or 1600^2 zones!!
+    # save the urban land use as a pickle list, then remove the maps
     path_urb = generateNameT(self.outputfolder + '/' + 'urb', timeStep)
     # this result in one value per cell
-    modelledCellArray = metrics.map2Array(path, self.inputfolder + '/sampPointNr.col')
+    modelledCellArray = metrics.map2Array(path_urb, self.inputfolder + '/sampPointNr.col')
     # cell value is saved as a list
     name1_urb = 'urb' + str(timeStep) + '.obj'
     path1_urb = os.path.join(self.outputfolder, name1_urb)
