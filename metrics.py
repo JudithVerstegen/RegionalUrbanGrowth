@@ -33,9 +33,13 @@ def map2Array(filename, rowColFile):
     col = math.ceil(float(attributes[0]))
 ##    print(row, col)
     array[j], mask[j] = cellvalue(amap, row, col)
+    if mask[j] == False:
+      array[j] = numpy.nan
     j += 1
-#  array = numpy.compress(mask, array)
-  #print(array)
+
+  #array = numpy.compress(mask, array)
+  #array = numpy.ma.array(array, mask = mask) <-- didn't work
+  #print(numpy.unique(array))
   return array
 
 def mySelectSArray(name, sampleNumbers, rowColFile, base=None):
@@ -94,49 +98,51 @@ def calculateSumStats(systemState, listOfSumStats, zones, validation=False):
   ##  systemState = ifthen(mask, systemState)
 
   # Create maps common for more than one metric
+
   unique = uniqueid(boolean(spatial(scalar(1))))
   clumps = ifthen(boolean(systemState) == 1, clump(boolean(systemState)))
   #numberMap = areadiversity(clumps, spatial(nominal(1))) # doesnt work for test map
   oneCellPerPatch = pcreq(areamaximum(unique, clumps), unique) # gets the cell in the right bottom corner of a patch
   scNegative = ifthenelse(boolean(systemState) == 1, boolean(0), boolean(1)) 
   borders = ifthen(boolean(systemState) == 1, window4total(scalar(scNegative))) 
-  perimeter = areatotal(borders, nominal(clumps))*sqrt(cellarea())
-  patchSizes = areaarea(clumps)
-  zone_area = areaarea(zones) # unit? zones are defined as 400, here they are calculated as 40 000
+  perimeter = areatotal(borders, nominal(clumps))*sqrt(cellarea()) # in [m]
+  patchSizes = areaarea(clumps)/cellarea() # in[m2]
+  zone_area = areaarea(zones)/cellarea() # in[m2]
 
   for aStat in listOfSumStats:
     if aStat == 'np': # Number of patches in one zone
       average_nr = cover(areadiversity(clumps, zones), spatial(scalar(0)))  
       listOfMaps.append(average_nr)
-    elif aStat == 'pd': # Patch density in a zone
-      average_nr = cover(areadiversity(clumps, zones), spatial(scalar(0)))
-      patch_density = average_nr/zone_area
+    elif aStat == 'pd': # Patch density in a whole study area
+      zero_mask = spatial(nominal(0))
+      patches_nr = areadiversity(clumps, zero_mask)
+      patch_density = patches_nr/maparea(zero_mask)
       listOfMaps.append(patch_density)
     elif aStat == 'mp': # Mean patch size in a zone.
       # If patch is in more than one zone it is assigned to one zone only...
-      patchSizes_c = patchSizes/parameters.getConversionUnit()
-      patchSizeOneCell = ifthen(oneCellPerPatch, patchSizes_c)
+      patchSizeOneCell = ifthen(oneCellPerPatch, patchSizes)
       averagePatchSize = areaaverage(patchSizeOneCell, zones)
       averagePatchSizeScalar = cover(averagePatchSize, spatial(scalar(0)))
       listOfMaps.append(averagePatchSizeScalar)
-    #### BOTH FD AND CILP GIVE WRONG RESULTS FOR THE PATCHES TOUCHING THE BORDER OF THE STUDY AREA -> PERIMETER IS NOT CALCULATED PROPERLY
     elif aStat == 'fdi': # Mean fractal dimension index of patches in one zone.
-      ### Value of the metric is dependend on the unit used
+      ### Value of the metric is dependent on the unit used
       ### 'perimeter' and 'patchSizes' need to be higher than e = ~2.71
       fractalDimension = 2*ln(0.25 * perimeter)/ln(patchSizes)
       patchFractalDimensionOneCell = ifthen(oneCellPerPatch, fractalDimension)
       averageFractalDimension = areaaverage(patchFractalDimensionOneCell, zones)
       listOfMaps.append(averageFractalDimension)
-    elif aStat == 'cilp': # Compactness index of the largest patch (CILP) in one zone
-      biggestPatchSize = areamaximum(patchSizes,zones) # largest patch area in a given zone. One patch can be in more than one zone.
-      biggestPatchPerimeter = areamaximum(ifthen(patchSizes == biggestPatchSize, perimeter),zones) # perimeter of the largest patch area in a given zone.
+    elif aStat == 'cilp': # Compactness index of the largest patch (CILP)
+      # This metric is calculated for one patch only.
+      # Saved as a one value for the whole map
+      biggestPatchSize = mapmaximum(patchSizes) # largest patch area
+      biggestPatchPerimeter = mapmaximum(
+        ifthen(patchSizes == biggestPatchSize, perimeter)) # perimeter of the largest patch
       CILP = (2 * numpy.pi * sqrt(biggestPatchSize / numpy.pi)) / biggestPatchPerimeter
-      #aguila(zones)
       listOfMaps.append(CILP)
     elif aStat == 'wfdi': # Area weighted mean patch fractal dimension index in one zone
-      fractalDimensionIndex = (2*ln(0.25 * perimeter)/ln(patchSizes))*(patchSizes/zone_area)
-      fractalDimensionIndexOneCell = ifthen(oneCellPerPatch, fractalDimensionIndex)
-      WFDI = areaaverage(fractalDimensionIndexOneCell, zones)
+      wFractalDimensionIndex = (2*ln(0.25 * perimeter)/ln(patchSizes))*(patchSizes/zone_area)
+      wFractalDimensionIndexOneCell = ifthen(oneCellPerPatch, wFractalDimensionIndex)
+      WFDI = areaaverage(wFractalDimensionIndexOneCell, zones)
       listOfMaps.append(WFDI)
     else:
       print('ERRRRRRRRRRRROR, unknown sum stat')
@@ -205,14 +211,13 @@ def makeCalibrationMask(rowColFile, zoneMap):
 '''# TEST
 """ Testing on the map with one zone: size 30 km x 30 km, with three patches: 700 km2, 200 km2, 100 km2 """
 test_map = os.path.join(os.getcwd(), 'data', 'test_data', 'metric_test_3patches_PL.map')
-systemState = readmap(test_map) == 1 # select urban or predefined pattern
+systemState = readmap(test_map) == 2 # select urban or predefined pattern
 zones_map = os.path.join(inputfolder, 'zones.map')
 zones = readmap(zones_map)
 
 # put HERE the name(s) of the metric(s) you want to test
 # ['np', 'pd', 'mp', 'fdi', 'wfdi', 'cilp']
-metrics = ['fdi','wfdi']
+metrics = ['pd']
 listofmaps = calculateSumStats(systemState, metrics, zones)
-aguila(listofmaps)'''
-
+aguila(test_map,listofmaps)'''
 
