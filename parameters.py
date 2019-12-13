@@ -26,7 +26,8 @@ def getObsYears():
   return {1:1990,11:2000,17:2006,23:2012,29:2018}
 
 def getNumberOfZones():
-  """ Returns the number of zones, in which the case study area will be divided. Metrics will be calculated for each zone seperately. """
+  """ Returns the number of zones, in which the case study area will be divided.
+      Some metrics will be calculated for each zone seperately. """
   
   numberofZones = 16
   return numberofZones
@@ -50,7 +51,7 @@ def getCountryName():
   """ Returns the case study symbol """
   # case studies: 'IT', 'IE', 'PL'
 
-  name = 'PL'
+  name = 'IE'
   return name
   
   
@@ -62,11 +63,10 @@ def getCovarOn():
 def getSumStats():
   # 'np': Number of patches <- equal to patch density 'pd'
   # 'mp': Mean patch size
-  # 'pd': Patch density
-  # 'fdi': Fractal dimension index
   # 'cilp': Compactness index of the largest patch
+  # 'fdi': Fractal dimension index
   # 'wfdi': Area weighted mean patch fractal dimension index
-  
+  # 'pd': Patch density
   
   sumStats = ['cilp', 'fdi', 'wfdi', 'pd']
   return sumStats
@@ -120,13 +120,14 @@ def getNumberofIterations(getSuitFactorDict, getParametersforCalibration):
   stepsize = getParametersforCalibration[2]
   param_steps = np.arange(min_p, max_p + 0.1, stepsize)
   for step in range(0,len(param_steps)):
-      param_steps[step] = round(param_steps[step],1)
+    # Round parameters to avoid issues with the precision
+    param_steps[step] = round(param_steps[step],4)
   for p1 in param_steps:
       for p2 in param_steps:
           for p3 in param_steps:
               for p4 in param_steps:
                   suma = p1+p2+p3+p4
-                  if (suma==1):
+                  if (suma>0.9999 and suma < 1.0001):
                       count = count + 1
   return count
 
