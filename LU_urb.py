@@ -215,6 +215,14 @@ class LandUseType:
       i += 1
     suitabilityMap += self.weightInitialSuitabilityMap * \
                       self.initialSuitabilityMap
+    # Add randomness from model by White/Garcia. Alfa (0,1) reflects the randomness level.
+    # In the noise (uniform) map change the zero values to very small values, to allow logarythmic function.
+    # Total suitability is multiplied by the randomness value v.
+    alpha = 0.9
+    v = ifthenelse(self.noise==0,1E-300, self.noise)
+    v = 1 + ((-ln(v))**alpha)
+    suitabilityMap = v * suitabilityMap
+    # Normalize the total suitability map and report
     self.totalSuitabilityMap = self.normalizeMap(suitabilityMap)
     report(self.totalSuitabilityMap, 'suit_tot' + str(self.typeNr))
     return self.totalSuitabilityMap
@@ -503,6 +511,8 @@ class LandUseChangeModel(DynamicModel):
     self.samplePoints = self.readmap(self.inputfolder + '/sampPoint')
     self.sumStats = parameters.getSumStats()
     self.yieldMap = scalar(self.oneMask)
+    self.calibrationMask = self.readmap(self.inputfolder + '/zones_calibration')
+    self.validationMask = self.readmap(self.inputfolder + '/zones_validation')
 
     # List of landuse types in order of 'who gets to choose first'
     self.landUseList = parameters.getLandUseList()
@@ -514,7 +524,7 @@ class LandUseChangeModel(DynamicModel):
     self.noGoLanduseList = parameters.getNoGoLanduseTypes() 
 
     # Uniform map of small numbers, used to avoid equal suitabilities. The same uniform map is applied in each iteration.
-    self.noise = self.uniformMap/10000 # Increased the noise from 1/10000
+    self.noise = self.uniformMap/10000 # Increased the noise 100 times from 1/10000
     
     # This part used to be the initial
     # Set seeds to be able to reproduce results
@@ -562,47 +572,63 @@ class LandUseChangeModel(DynamicModel):
     # save the map of urban / non-urban
     urban = pcreq(self.environment, 1)
     self.report(urban, os.path.join(self.outputfolder,'urb'))
+
+    # Select the urban areas only for the calibration and vlidation area
+    urban_cal = ifthen(self.calibrationMask, urban)
+    urban_val = ifthen(self.validationMask, urban)
     
     # save the metrics
     listOfSumStats = metrics.calculateSumStats(scalar(urban), \
-                                            self.sumStats, self.zones)
+                                            self.sumStats, self.zones)               
 
     j=0
+    part_metrics = []
+    
     for aname in self.sumStats:
-        modelledmap = listOfSumStats[j]
-        self.report(modelledmap, os.path.join(self.outputfolder, aname))
-        j = j + 1
+      modelledmap = listOfSumStats[j]
+      self.report(modelledmap, os.path.join(self.outputfolder, aname))
+      j = j + 1
 
-    for aStat in self.sumStats: # All maps should be calculated for zones
+      # Save the metrics for calibration and validation based on the area
+      # For metrics that are calculated for the whole map (pd) of for the biggest patch (cilp)
+      #if aname in ['cilp','fdi']:
+      
+      if aname in ['cilp','pd']:
+        stat_cal = metrics.calculateSumStats(scalar(urban_cal), \
+                                            self.sumStats, self.zones)
+        stat_val = metrics.calculateSumStats(scalar(urban_val), \
+                                            self.sumStats, self.zones)
+        self.report(stat_cal[0], os.path.join(self.outputfolder, aname+'_cal'))
+        self.report(stat_val[0], os.path.join(self.outputfolder, aname+'_val'))
+        part_metrics.append(aname+'_cal')
+        part_metrics.append(aname+'_val')
+    
+    # For each meric a value is saved for the preselected cell(s).
+    # The cell coordinates are created in create_initial_maps.py and saved in .col files:
+    col_files = {
+      'fdi': 'sampPoint.col',
+      'wfdi': 'sampPoint.col',
+      'cilp': 'sampSinglePoint.col',
+      'pd': 'sampSinglePoint.col',
+      'urb': 'sampPointNr.col',
+      'cilp_cal': 'sampPoint_cal.col',
+      'cilp_val': 'sampPoint_val.col',
+      'pd_cal': 'sampPoint_cal.col',
+      'pd_val': 'sampPoint_val.col'
+      }
+    
+    # Save the metric and urban areas as pickle objects
+    for aStat in self.sumStats + ['urb'] + part_metrics:
       path = generateNameT(self.outputfolder + '/' + aStat, timeStep)
-      if aStat in ['fdi', 'wfdi']:
-        # these metrics result in one value per block (here 16 blocks)
-        modelledAverageArray = metrics.map2Array(path, self.inputfolder + '/sampPoint.col')
-      else:
-        # other metrics result in one value for the whole study area
-        modelledAverageArray = metrics.map2Array(path, \
-                              self.inputfolder + '/sampSinglePoint.col')
-      # metric is saved as a list
+      modelledAverageArray = metrics.map2Array(path, self.inputfolder + '/' + col_files[aStat])    
+      # metric and urban areas are saved as a list
       name1 = aStat + str(timeStep) + '.obj'
       path1 = os.path.join(self.outputfolder, name1)
       file_object1 = open(path1, 'wb')
       pickle.dump(modelledAverageArray, file_object1)
       file_object1.close()
-      # the map with the metric is removed to save disk space
+      # the map with the metric or urban area is removed to save disk space
       os.remove(path)
-
-    # save the urban land use as a pickle list, then remove the maps
-    path_urb = generateNameT(self.outputfolder + '/' + 'urb', timeStep)
-    # this result in one value per cell
-    modelledCellArray = metrics.map2Array(path_urb, self.inputfolder + '/sampPointNr.col')
-    # cell value is saved as a list
-    name1_urb = 'urb' + str(timeStep) + '.obj'
-    path1_urb = os.path.join(self.outputfolder, name1_urb)
-    file_object1_urb = open(path1_urb, 'wb')
-    pickle.dump(modelledCellArray, file_object1_urb)
-    file_object1_urb.close()
-    # the map with the urban area is removed to save disk space
-    os.remove(path_urb)
     
 
 ############
