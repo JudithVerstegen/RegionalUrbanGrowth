@@ -162,22 +162,32 @@ print("Kappa statistic calculated and saved as npy file")
 
 
 ########### Get parameter values
-calibrate.saveResults(calibrate.getCalibratedParameters(1), 1, 'parameters.csv')
-calibrate.saveResults(calibrate.getCalibratedParameters(2), 2, 'parameters.csv')
+p1 = calibrate.getCalibratedParameters(1)
+p2 = calibrate.getCalibratedParameters(2)
+#p3 = calibrate.getCalibratedParameters(3)
+log = [
+  ['country: ',parameters.getCountryName()],
+  ['observed time steps: ', parameters.getObsTimesteps()],
+  ['parameters (min, max, step): ',parameters.getParametersforCalibration()],
+  ['noise: ','uniform()/10000']]
+  
+calibrate.saveResults(p1+log, 1, 'parameters.csv')
+calibrate.saveResults(p2+log, 2, 'parameters.csv')
 
 ########### Calibrate model
-calibrate.saveResults(calibrate.calibrate(1),1,'calibration.csv')
+calibrate.saveResults(calibrate.calibrate_validate(1),1,'calibration_validation.csv')
 print("Model calibrated for 2000 - 2006")
-calibrate.saveResults(calibrate.calibrate(2),2,'calibration.csv')
+calibrate.saveResults(calibrate.calibrate_validate(2),2,'calibration_validation.csv')
 print("Model calibrated for 2012 - 2018")
 
+
+'''
 ########### Validate model
 calibrate.saveResults(calibrate.validate(1),1,'validation.csv')
 print("Model validated for 2012 - 2018")
 calibrate.saveResults(calibrate.validate(2),2,'validation.csv')
-print("Model validated for 2000 - 2006")
+print("Model validated for 2000 - 2006")'''
 
-  
 
   
 
