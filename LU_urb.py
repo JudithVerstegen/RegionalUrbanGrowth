@@ -218,7 +218,7 @@ class LandUseType:
     # Add randomness from model by White. Alfa (0,1) reflects the randomness level.
     # In the noise (uniform) map change the zero values to very small values, to allow logarythmic function.
     # Total suitability is multiplied by the randomness value v.
-    alpha = 0.1
+    alpha = parameters.getAlphaValue()
     v = ifthenelse(self.noise==0,1E-300, self.noise)
     v = 1 + ((-ln(v))**alpha)
     report(v, 'v_alpha'+str(alpha)+'.map')
@@ -526,7 +526,7 @@ class LandUseChangeModel(DynamicModel):
 
     # Uniform map of small numbers, used to avoid equal suitabilities.
     # The same uniform map is applied in each iteration.
-    self.noise = self.uniformMap # TESting # Increased the noise 100 times from 1/10000
+    self.noise = self.uniformMap # noise added as a uniform map created in the create_initial_maps.py
     
     # This part used to be the initial
     # Set seeds to be able to reproduce results
