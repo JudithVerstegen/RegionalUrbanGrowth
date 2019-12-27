@@ -44,9 +44,9 @@ class LandUseType:
     self.suitFactorList = suitFactorList
     self.weightList = weightList
     self.variableDict = variableDict
+    self.noise = noise
     self.nullMask = nullMask
 
-    self.noise = noise
     self.toMeters = parameters.getConversionUnit()
     self.windowLengthRealization = windowLengthRealization
     
@@ -181,7 +181,7 @@ class LandUseType:
       i += 1
     print('weight of initial factors of', self.typeNr, \
           'is', self.weightInitialSuitabilityMap)
-    self.initialSuitabilityMap += self.noise
+    #self.initialSuitabilityMap += self.noise <==== instead trying to add noise in total suitability
 ##    report(self.initialSuitabilityMap, 'iniSuit' + str(self.typeNr))
 
   def getTotalSuitabilityMap(self):
@@ -215,12 +215,13 @@ class LandUseType:
       i += 1
     suitabilityMap += self.weightInitialSuitabilityMap * \
                       self.initialSuitabilityMap
-    # Add randomness from model by White/Garcia. Alfa (0,1) reflects the randomness level.
+    # Add randomness from model by White. Alfa (0,1) reflects the randomness level.
     # In the noise (uniform) map change the zero values to very small values, to allow logarythmic function.
     # Total suitability is multiplied by the randomness value v.
-    alpha = 0.9
+    alpha = 0.1
     v = ifthenelse(self.noise==0,1E-300, self.noise)
     v = 1 + ((-ln(v))**alpha)
+    report(v, 'v_alpha'+str(alpha)+'.map')
     suitabilityMap = v * suitabilityMap
     # Normalize the total suitability map and report
     self.totalSuitabilityMap = self.normalizeMap(suitabilityMap)
@@ -523,8 +524,9 @@ class LandUseChangeModel(DynamicModel):
     self.variableSuperDict = parameters.getVariableSuperDict()
     self.noGoLanduseList = parameters.getNoGoLanduseTypes() 
 
-    # Uniform map of small numbers, used to avoid equal suitabilities. The same uniform map is applied in each iteration.
-    self.noise = self.uniformMap/10000 # Increased the noise 100 times from 1/10000
+    # Uniform map of small numbers, used to avoid equal suitabilities.
+    # The same uniform map is applied in each iteration.
+    self.noise = self.uniformMap # TESting # Increased the noise 100 times from 1/10000
     
     # This part used to be the initial
     # Set seeds to be able to reproduce results
@@ -573,7 +575,7 @@ class LandUseChangeModel(DynamicModel):
     urban = pcreq(self.environment, 1)
     self.report(urban, os.path.join(self.outputfolder,'urb'))
 
-    # Select the urban areas only for the calibration and vlidation area
+    # Select the urban areas only for the calibration and validation area
     urban_cal = ifthen(self.calibrationMask, urban)
     urban_val = ifthen(self.validationMask, urban)
     
@@ -606,11 +608,11 @@ class LandUseChangeModel(DynamicModel):
     # For each meric a value is saved for the preselected cell(s).
     # The cell coordinates are created in create_initial_maps.py and saved in .col files:
     col_files = {
-      'fdi': 'sampPoint.col',
+      'fdi': 'sampPoint.col', # single point SHOULD BE ZONE
       'wfdi': 'sampPoint.col',
-      'cilp': 'sampSinglePoint.col',
+      'cilp': 'sampSinglePoint.col', # single point
       'pd': 'sampSinglePoint.col',
-      'urb': 'sampPointNr.col',
+      'urb': 'sampPointNr.col', # point for each cell
       'cilp_cal': 'sampPoint_cal.col',
       'cilp_val': 'sampPoint_val.col',
       'pd_cal': 'sampPoint_cal.col',
