@@ -10,7 +10,7 @@ def getNrTimesteps():
   In the model 1990 - 2018 CLC data are used, including starting and ending date, thus 29 time steps.
   Time step nr 1 is 1990"""
 
-  timesteps = 17#29
+  timesteps = 29
   return timesteps
 
 def getObsTimesteps():
@@ -19,10 +19,11 @@ def getObsTimesteps():
   e.g. 2000 in time step nr 11.
   In the model 2000 and 2006 data are used for calibration, and 2012 and 2018 are used for validation."""
   
-  obsTimeSteps = [1,11,17]#,23,29]
+  obsTimeSteps = [1,11,17,23,29]
   return obsTimeSteps
 
 def getObsYears():
+  """Returns a dictionairy containing years corresponding to the observation time steps."""
   return {1:1990,11:2000,17:2006,23:2012,29:2018}
 
 def getCalibrationPeriod():
@@ -35,10 +36,10 @@ def getCalibrationPeriod():
   period = {
     1: {
       'calibration': [1,2],
-      'validation': -2
+      'validation': [3,4]
       },
     2: {
-      'calibration': -2,
+      'calibration': [3,4],
       'validation': [1,2]
       },
     3: {
@@ -46,13 +47,6 @@ def getCalibrationPeriod():
       'validation': [1,2,3,4]
       }}
   return period
-
-def getCalibrationArea():
-  mask_zones = {
-    'calibration': [1,2,3,4,5,6,7,8],
-    'validation': [9,10,11,12,13,14,15,16]
-    }
-  return mask_zones
 
 def getNumberOfZones():
   """ Returns the number of zones, in which the case study area will be divided.
@@ -74,7 +68,7 @@ def getParametersforCalibration():
      minParameter needs to be >= 0
      maxParameter needs to be <= 1
     [minParameter, maxParameter, stepSize] """
-  return [0.0, 1.0, 0.5]
+  return [0.0, 1.0, 0.2]
 
 def getCountryName():
   """ Returns the case study symbol """
@@ -111,6 +105,18 @@ def getConversionUnit():
 
   toMeters = 10000
   return toMeters
+
+def getAlphaValue():
+  """alpha is a scalable parameter that controls the stochastic effect,
+  with −10 corresponding to almost no randomness and 1 to high randomness.
+  A value of 0.5 is usually acceptable for a fairly weak random effect.
+  Values between 0 and 1 are usually appropriate.
+
+  e.g. alpha = 0.6 was applied to reflect the urban sprawl effect in
+  (Barredo, Demicheli, Lavalle, Kasanko, & McCormick, 2004)"""
+  
+  alpha = 0.6
+  return alpha
 
 def getLandUseList():
   """Return list of landuse types in ORDER of 'who gets to choose first'."""
