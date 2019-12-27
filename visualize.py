@@ -232,7 +232,7 @@ def plotRMSE_eachTimeStep(arrayR, oneMetric,observations):
   plt.title('Smallest RMSE for the parameter sets\nfor metric '+oneMetric,fontweight='bold')
   plt.ylabel('root mean square error')
       
-  fitList = calibrate.smallestErrorInObsYear(arrayR)
+  fitList = calibrate.RMSEindex_eachTimeStep(arrayR)
   fitIndices = []
   for y in fitList:
     if y[1] not in fitIndices:
@@ -398,7 +398,7 @@ def plotParameterValues(kapppaInx):
     zonesModelled = calibrate.getModelledArray(m)
     zonesObserved = calibrate.getObservedArray(m)
     rmseArray = calibrate.calcRMSE(calibrate.createDiffArray(zonesModelled,zonesObserved), m)
-    parameterSets = np.array(calibrate.getParameterConfigurations(zonesModelled)) # gives the parameter sets
+    parameterSets = np.array(calibrate.getParameterConfigurations()) # gives the parameter sets
     calibratedIndex = calibrate.smallestMeanErrorIndex_2000_2006(rmseArray) # gives the index of the best parameter set
     for j in range(nParams):
       weights[j].append(parameterSets[calibratedIndex][j])
@@ -603,7 +603,7 @@ for theMetric in metricNames:
   zonesModelled = calibrate.getModelledArray(theMetric)
   zonesObserved = calibrate.getObservedArray(theMetric)
   rmseArray = calibrate.calcRMSE(calibrate.createDiffArray(zonesModelled,zonesObserved), theMetric)
-  parameterSets = calibrate.getParameterConfigurations(zonesModelled) # gives the parameter sets
+  parameterSets = calibrate.getParameterConfigurations() # gives the parameter sets
   calibratedIndex = calibrate.smallestMeanErrorIndex_2000_2006(rmseArray) # gives the index of the best parameter set
     
   ##### Create histograms of metric values for different parameters per zone per timestep
