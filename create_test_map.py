@@ -113,7 +113,7 @@ nullmask = spatial(nominal(0))
 t_map=cover(nominal(test_map), nullmask)
 #aguila(t_map)
 #report(t_map, os.path.join(test_dir, 'metric_test_3patches_PL.map'))'''
-
+'''
 null_mask = spatial(scalar(0))
 one_mask = boolean(null_mask + 1)
 unique = uniqueid(one_mask)
@@ -123,3 +123,37 @@ report(sampleCells, os.path.join(test_dir, 'sampPointNr.map'))
 command = 'map2col --unitcell ' + os.path.join(test_dir, 'sampPointNr.map') + \
           ' ' + os.path.join(test_dir, 'sampPointNr.col')
 os.system(command)
+
+
+alfa09 = os.path.join(test_dir,'v_alpha0.9')
+alfa05 = os.path.join(test_dir,'v_alpha0.5')
+alfa01 = os.path.join(test_dir,'v_alpha0.1')
+
+import metrics
+import matplotlib.pyplot as plt
+array09 = metrics.map2Array(alfa09, os.path.join('input_data', country, 'sampPointNr.col'))
+array05 = metrics.map2Array(alfa05, os.path.join('input_data', country, 'sampPointNr.col'))
+array01 = metrics.map2Array(alfa01, os.path.join('input_data', country, 'sampPointNr.col'))
+plt.hist(array09)
+plt.hist(array05)
+plt.hist(array01)
+plt.show()
+
+'''
+resultFolder = os.path.join(os.getcwd(),'results',country, 'metrics')
+
+kappa1alfa01 = np.load(resultFolder + '/uniform_1_alfa01' + '/kappa.npy')
+kappa1alfa05 = np.load(resultFolder + '/uniform_1_alfa05' + '/kappa.npy')
+kappa1alfa06 = np.load(resultFolder + '/uniform_1_alfa06' + '/kappa.npy')
+kappa1alfa09 = np.load(resultFolder + '/uniform_1_alfa09' + '/kappa.npy')
+#kappa100 = np.load(resultFolder + '/uniform_100' + '/kappa.npy')
+#kappa100000 = np.load(resultFolder + '/uniform_10000' + '/kappa.npy')
+#kappa100000alfa06 = np.load(resultFolder + '/uniform_10000_alfa06' + '/kappa.npy')
+#kappa100000alfa09 = np.load(resultFolder + '/uniform_10000_alfa09' + '/kappa.npy')
+
+results = [kappa1alfa01, kappa1alfa05, kappa1alfa06, kappa1alfa09]#, kappa100, kappa100000, kappa100000alfa06, kappa100000alfa09]
+for k in results:
+    print(np.max(k[1]),np.max(k[2]))
+
+
+
