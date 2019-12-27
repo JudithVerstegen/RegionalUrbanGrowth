@@ -8,11 +8,13 @@ to generate inputs and calibration data for an urban growth model.
 '''
 
 import gdal # version 2.3.3 for Python 3.6
+import metrics
 import numpy as np
 import os
 import osr
 import ogr
 import parameters
+import random
 from pcraster import *
 from pcraster.framework import *
 from matplotlib import pyplot as plt
@@ -48,8 +50,7 @@ realizations = 1 #20
 corr_window_size = 50
 omission = 10#52
 metric_names = parameters.getSumStats()
-# Define zones for calibration and validation
-mask_zones = parameters.getCalibrationArea()
+
 
 #################
 ### functions ###
@@ -585,12 +586,28 @@ os.remove('zones.map')
 os.remove('resamp.map')
 os.remove('unique.map')
 
-# 8. blocks
-null_mask = spatial(scalar(0)) # remove this later
-one_mask = boolean(null_mask + 1)  # remove this later
-import metrics
+# 8. blocks and calibration/validation masks
+
 unique = uniqueid(one_mask)
 zones = readmap(os.path.join(country_dir, 'zones.map'))
+samplePoints = pcreq(areaminimum(unique, zones), unique)
+samplePoints = uniqueid(samplePoints)
+
+""" Create a dictionairy containing numbers of zones for calibration and validation
+Zone numbers are assigned randomly"""
+
+zone_numbers = [*range(1,parameters.getNumberOfZones()+1)]
+# Assign randomly half of the zones to the calibration phase
+calibration_zones = random.sample(zone_numbers, int(len(zone_numbers)/2))
+validation_zones = zone_numbers
+# Assign the rest of the zones to the validation phase
+for x in calibration_zones:
+    validation_zones.remove(x)
+
+mask_zones = {
+'calibration': calibration_zones,
+'validation': validation_zones
+}
 
 ### remove zones with zero urban in 2000
 ##urb2000 = readmap('observations\urb00')
@@ -598,45 +615,33 @@ zones = readmap(os.path.join(country_dir, 'zones.map'))
 ##zones = ifthen(av > 0, zones)
 ##report(zones, 'input_data\zones.map')
 
-samplePoints = pcreq(areaminimum(unique, zones), unique)
-samplePoints = uniqueid(samplePoints)
+# Create sample points for each zone
+samplePointsCondition = ifthen(samplePoints > 0, boolean(1))
+samplePointsCondition = uniqueid(samplePointsCondition)
+report(samplePointsCondition, os.path.join(country_dir, 'sampPoint.map'))
+command = 'map2col --unitcell ' + os.path.join(country_dir, 'sampPoint.map') + \
+          ' ' + os.path.join(country_dir, 'sampPoint.col')
+os.system(command)
 
-calibration_condition = "pcror("
-for z in range(len(mask_zones['calibration'])):
-    calibration_condition += "samplePoints == mask_zones['calibration']["+str(z)+"],"
-calibration_condition = calibration_condition[:-1]
-calibration_condition+= ")"
-print(calibration_condition)
+# Create sample points for calibration and validation zones:
+for goal in mask_zones.keys():
+    conditions = country_dir + "/" + str(goal) + "_zones.txt"
+    a_file = open(conditions,"w")
 
+    for z in mask_zones[goal]:
+        a_file.write(str(z)+"\t"+str(1)+"\n")
+          
+    a_file.close()
 
-conditions = {
-    'sampPoint': samplePoints > 0,
-    'sampPoint_cal': pcror(pcror(pcror(
-        samplePoints == mask_zones['calibration'][0],
-        samplePoints == mask_zones['calibration'][1]),
-                                 pcror(samplePoints == mask_zones['calibration'][2],
-                                       samplePoints == mask_zones['calibration'][3])),
-                           pcror(pcror(samplePoints == mask_zones['calibration'][4],
-                                       samplePoints == mask_zones['calibration'][5]),
-                                 pcror(samplePoints == mask_zones['calibration'][6],
-                                       samplePoints == mask_zones['calibration'][7]))),
+    calibrationMap = lookupscalar(conditions,samplePoints)
+    calibrationZoneMap = lookupscalar(conditions,scalar(zones))
+    report(calibrationZoneMap, 'zones_'+str(goal)+'.map')
     
-    'sampPoint_val': pcror(pcror(pcror(
-        samplePoints == mask_zones['validation'][0],
-        samplePoints == mask_zones['validation'][1]),
-                                 pcror(samplePoints == mask_zones['validation'][2],
-                                       samplePoints == mask_zones['validation'][3])),
-                           pcror(pcror(samplePoints == mask_zones['validation'][4],
-                                       samplePoints == mask_zones['validation'][5]),
-                                 pcror(samplePoints == mask_zones['validation'][6],
-                                       samplePoints == mask_zones['validation'][7]))),
-    }
-for key in list(conditions.keys()):
-    samplePointsCondition = ifthen(conditions[key], boolean(1))
-    samplePointsCondition = uniqueid(samplePointsCondition)
-    report(samplePointsCondition, os.path.join(country_dir, key+'.map'))
-    command = 'map2col --unitcell ' + os.path.join(country_dir, key+'.map') + \
-              ' ' + os.path.join(country_dir, key+'.col')
+    samplePointsCondition = ifthen(calibrationMap==1, samplePoints)
+    #samplePointsCondition = uniqueid(samplePointsCondition)
+    report(samplePointsCondition, os.path.join(country_dir,'sampPoint_'+str(goal)[0:3]+'.map'))
+    command = 'map2col --unitcell ' + os.path.join(country_dir,'sampPoint_'+str(goal)[0:3]+'.map') + \
+              ' ' + os.path.join(country_dir,'sampPoint_'+str(goal)[0:3]+'.col')
     os.system(command)
     
 # Create sample points for each cell (for Kappa statistic calculation in calibration)
