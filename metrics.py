@@ -103,8 +103,8 @@ def calculateSumStats(systemState, listOfSumStats, zones, validation=False):
   clumps = ifthen(boolean(systemState) == 1, clump(boolean(systemState)))
   #numberMap = areadiversity(clumps, spatial(nominal(1))) # doesnt work for test map
   oneCellPerPatch = pcreq(areamaximum(unique, clumps), unique) # gets the cell in the right bottom corner of a patch
-  scNegative = ifthenelse(boolean(systemState) == 1, boolean(0), boolean(1)) 
-  borders = ifthen(boolean(systemState) == 1, window4total(scalar(scNegative))) 
+  scNegative = ifthenelse(boolean(systemState) == 1, boolean(0), boolean(1))
+  borders = ifthen(boolean(systemState) == 1, window4total(scalar(scNegative)))
   perimeter = areatotal(borders, nominal(clumps))*sqrt(cellarea()) # in [m]
   patchSizes = areaarea(clumps)/cellarea() # in[m2]
   zone_area = areaarea(zones)/cellarea() # in[m2]
@@ -114,7 +114,7 @@ def calculateSumStats(systemState, listOfSumStats, zones, validation=False):
       average_nr = cover(areadiversity(clumps, zones), spatial(scalar(0)))  
       listOfMaps.append(average_nr)
     elif aStat == 'pd': # Patch density in a whole study area
-      zero_mask = spatial(nominal(0))
+      zero_mask = ifthen(defined(systemState),spatial(nominal(0)))
       patches_nr = areadiversity(clumps, zero_mask)
       patch_density = patches_nr/maparea(zero_mask)
       listOfMaps.append(patch_density)
@@ -135,8 +135,10 @@ def calculateSumStats(systemState, listOfSumStats, zones, validation=False):
       # This metric is calculated for one patch only.
       # Saved as a one value for the whole map
       biggestPatchSize = mapmaximum(patchSizes) # largest patch area
+      biggestPatchSize = ifthen(defined(systemState), biggestPatchSize)
       biggestPatchPerimeter = mapmaximum(
         ifthen(patchSizes == biggestPatchSize, perimeter)) # perimeter of the largest patch
+      biggestPatchPerimeter = ifthen(defined(systemState),biggestPatchPerimeter)
       CILP = (2 * numpy.pi * sqrt(biggestPatchSize / numpy.pi)) / biggestPatchPerimeter
       listOfMaps.append(CILP)
     elif aStat == 'wfdi': # Area weighted mean patch fractal dimension index in one zone
@@ -174,6 +176,7 @@ def makeCalibrationMask(rowColFile, zoneMap):
   newTextfile1 = open(inputfolder + '/sampPointAvSelection.col', 'w')
   newTextfile2 = open(inputfolder + '/sampPointNrSelection.col', 'w')
   lookuptable1 = open(inputfolder + '/lookupTable_cal.tbl', 'w')
+  
   newTextfile3 = open(inputfolder + '/sampPointAvValidation.col', 'w')
   newTextfile4 = open(inputfolder + '/sampPointNrValidation.col', 'w')
   lookuptable2 = open(inputfolder + '/lookupTable_val.tbl', 'w')
@@ -208,16 +211,21 @@ def makeCalibrationMask(rowColFile, zoneMap):
   blocksTrue = lookupboolean(inputfolder + '/lookupTable_val.tbl', zoneMap)
   report(blocksTrue, inputfolder + '/zones_validation.map')
 
-'''# TEST
+'''
+# TEST
 """ Testing on the map with one zone: size 30 km x 30 km, with three patches: 700 km2, 200 km2, 100 km2 """
 test_map = os.path.join(os.getcwd(), 'data', 'test_data', 'metric_test_3patches_PL.map')
 systemState = readmap(test_map) == 2 # select urban or predefined pattern
 zones_map = os.path.join(inputfolder, 'zones.map')
+mask = os.path.join(inputfolder, 'zones_calibration.map')
 zones = readmap(zones_map)
+# use a mask
+systemState = ifthen(mask, systemState)
 
 # put HERE the name(s) of the metric(s) you want to test
 # ['np', 'pd', 'mp', 'fdi', 'wfdi', 'cilp']
-metrics = ['pd']
+metrics = ['cilp']
 listofmaps = calculateSumStats(systemState, metrics, zones)
-aguila(test_map,listofmaps)'''
-
+aguila(listofmaps)
+'''
+    
