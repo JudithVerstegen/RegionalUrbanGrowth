@@ -169,7 +169,7 @@ log = [
   ['country: ',parameters.getCountryName()],
   ['observed time steps: ', parameters.getObsTimesteps()],
   ['parameters (min, max, step): ',parameters.getParametersforCalibration()],
-  ['noise: ','uniform()/10000']]
+  ['alpha: ','0.6']]
   
 calibrate.saveResults(p1+log, 1, 'parameters.csv')
 calibrate.saveResults(p2+log, 2, 'parameters.csv')
