@@ -10,7 +10,7 @@ def getNrTimesteps():
   In the model 1990 - 2018 CLC data are used, including starting and ending date, thus 29 time steps.
   Time step nr 1 is 1990"""
 
-  timesteps = 29
+  timesteps = 17#29
   return timesteps
 
 def getObsTimesteps():
@@ -19,11 +19,40 @@ def getObsTimesteps():
   e.g. 2000 in time step nr 11.
   In the model 2000 and 2006 data are used for calibration, and 2012 and 2018 are used for validation."""
   
-  obsTimeSteps = [1,11,17,23,29]
+  obsTimeSteps = [1,11,17]#,23,29]
   return obsTimeSteps
 
 def getObsYears():
   return {1:1990,11:2000,17:2006,23:2012,29:2018}
+
+def getCalibrationPeriod():
+  """Returns the indexes of years for calibration and validation from getObsYears().values():
+  e.g. [1990, 2000, 2006, 2012, 2018]
+  Scenario 1: calibration period 2000 - 2006, validation period 2012 - 2018
+  Scenario 2: calibration period 2012 - 2018, validation period 2000 - 2006
+  Scenario 3: calibration period 2000 - 2018, validation period 2000 - 2018 (calibratio based on area)"""
+
+  period = {
+    1: {
+      'calibration': [1,2],
+      'validation': -2
+      },
+    2: {
+      'calibration': -2,
+      'validation': [1,2]
+      },
+    3: {
+      'calibration': [1,2,3,4],
+      'validation': [1,2,3,4]
+      }}
+  return period
+
+def getCalibrationArea():
+  mask_zones = {
+    'calibration': [1,2,3,4,5,6,7,8],
+    'validation': [9,10,11,12,13,14,15,16]
+    }
+  return mask_zones
 
 def getNumberOfZones():
   """ Returns the number of zones, in which the case study area will be divided.
@@ -45,13 +74,13 @@ def getParametersforCalibration():
      minParameter needs to be >= 0
      maxParameter needs to be <= 1
     [minParameter, maxParameter, stepSize] """
-  return [0.0, 1.0, 0.25]
+  return [0.0, 1.0, 0.5]
 
 def getCountryName():
   """ Returns the case study symbol """
   # case studies: 'IT', 'IE', 'PL'
 
-  name = 'IE'
+  name = 'PL'
   return name
   
   
