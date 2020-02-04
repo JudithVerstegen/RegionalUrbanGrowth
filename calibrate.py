@@ -23,11 +23,12 @@ timeSteps=range(1,nrOfTimesteps+1,1)
 
 # Get the observed time steps. Time steps relate to the year of the CLC data, where 1990 was time step 0.
 obsSampleNumbers = [1] #range(1,20+1,1) <- for stochastic model
-obsTimeSteps = parameters.getObsTimesteps() # [1,11,17]
+obsTimeSteps = parameters.getObsTimesteps() 
 
 # Path to the folder with the metrics npy arrays stored
 country = parameters.getCountryName()
-arrayFolder = os.path.join(os.getcwd(),'results',country,'metrics')
+#arrayFolder = os.path.join(os.getcwd(),'results',country,'metrics')
+arrayFolder = os.path.join('F:/','results',country,'metrics')
 
 
 #################
@@ -49,11 +50,10 @@ def createDiffArray(modelled,observed):
   #print(modelled)
   # Get the number of zones
   numberZones = len(modelled[0][0][1])
-  print(numberZones)
+  
   # Create a 3D array: no of rows = no of observed timesteps, no of columns = no of parameter sets
   # Each cell store: the parameter set and the values of zones
   theArray = np.zeros((len(obsTimeSteps),noParameterConfigurations,numberZones,1))
-  print(theArray)
   
   for row in range(0,len(obsTimeSteps)):
     for col in range(0,noParameterConfigurations):
@@ -61,10 +61,10 @@ def createDiffArray(modelled,observed):
         theArray[row,col][zone][0] = modelled[obsTimeSteps[row]-1,col][1][zone][0] - observed[row,0][1][zone][0]  
   return theArray
 
-  
 def calculateKappa():
-  # Create an array to store the comparison between the observed and modelled urban areas.
-  
+  # Create arrays to store the metrices by Pontius (quantity disagreement and allocation disagreement)
+  quantityArray = np.zeros((len(obsTimeSteps),numberOfIterations))
+  allocationArray = np.zeros((len(obsTimeSteps),numberOfIterations))
   # Create array to store transition states:
   transArray = np.zeros((len(obsTimeSteps),numberOfIterations,3,3))
   # Create array to store Kappa
@@ -73,31 +73,35 @@ def calculateKappa():
   
   # Load data:
   urbObs = getObservedArray('urb')
-  urbMod = getModelledArray('urb_subset')
   cells = len(urbObs[0,0,1])
   nanCells = sum(np.isnan(urbObs[0,0,1]))
   validCells = cells - nanCells
   print('valid:', validCells)
       
-  # Loop years:
-  for row in range(len(obsTimeSteps)):
-    
+  # Loop observed years:
+  for row in enumerate(obsTimeSteps):
+    print(row)
+    # Load modelled urban for the given obs year
+    #urbMod = getModelledArray('urb_subset_'+str(row[1]))
+    urbMod = np.load(os.path.join('F:/results/PL/metrics', 'urb_subset_'+str(row[1]) + '.npy'))
     # Loop parameter sets:
     for col in range(0,numberOfIterations):
-      # Create contingency table, full of zeros
+      # Create contingency table, full of zeros (to calculate Kappa)
       cArray = np.zeros((3,3))
+      # Create population table, full of zeros (to calculate quantity disagreement and allocation disagreement)
+      popMatrix = np.zeros((3,3))
         
-      # For year 1990 (row 0) there is a perfect agreement:
-      if row == 0:
-        kappaArray[row,col] = 1.0
-        transArray[row,col] = cArray
+      # For year 1990 (first observation time step) there is a perfect agreement:
+      if row[0] == 0:
+        kappaArray[row[0],col] = 1.0
+        transArray[row[0],col] = cArray
         
       else:
         # Define conditions
-        obs1 = (urbObs[row,0,1] == 1)
-        obs0 = (urbObs[row,0,1] == 0)
-        mod1 = (urbMod[row,col,1] == 1)
-        mod0 = (urbMod[row,col,1] == 0)
+        obs1 = (urbObs[row[0],0,1] == 1)
+        obs0 = (urbObs[row[0],0,1] == 0)
+        mod1 = (urbMod[0,col,1] == 1)
+        mod0 = (urbMod[0,col,1] == 0)
 
         # Find states. Each cell has only one of four states.
         # Observed -> modelled
@@ -115,39 +119,65 @@ def calculateKappa():
 
         # Fill the contingency table:
         cArray[0,0] = sum(allStates == 1)/validCells
-        cArray[0,1] = sum(allStates == 2)/validCells
-        cArray[1,0] = sum(allStates == 3)/validCells
+        cArray[1,0] = sum(allStates == 2)/validCells
+        cArray[0,1] = sum(allStates == 3)/validCells
         cArray[1,1] = sum(allStates == 4)/validCells
-        cArray[0,2] = (sum(allStates == 1)+sum(allStates == 2))/validCells
-        cArray[1,2] = (sum(allStates == 3)+sum(allStates == 4))/validCells
-        cArray[2,0] = (sum(allStates == 1)+sum(allStates == 3))/validCells
-        cArray[2,1] = (sum(allStates == 2)+sum(allStates == 4))/validCells
+        cArray[2,0] = (sum(allStates == 1)+sum(allStates == 2))/validCells
+        cArray[2,1] = (sum(allStates == 3)+sum(allStates == 4))/validCells
+        cArray[0,2] = (sum(allStates == 1)+sum(allStates == 3))/validCells
+        cArray[1,2] = (sum(allStates == 2)+sum(allStates == 4))/validCells
         cArray[2,2] = 1
 
-        transArray[row,col] = cArray
+        transArray[row[0],col] = cArray
+
+        # Calculate quantity disagreemnt (Pontius and Millones, 2011) (2)
+        q_urban = np.absolute(cArray[0,0]+cArray[1,0]-(cArray[0,0]+cArray[0,1]))
+        q_non_urban = np.absolute(cArray[0,1]+cArray[1,1]-(cArray[1,0]+cArray[1,1]))
+        Q = (q_urban + q_non_urban) / 2 # (3)
+
+        # Calculate allocation disagreement (Pontius and Millones, 2011): (4)
+        a_urban = 2 * np.minimum(cArray[1,0], cArray[0,1])
+        a_non_urban = 2 * np.minimum(cArray[0,1], cArray[1,0])
+        A = (a_urban + a_non_urban) / 2 # (5)
+
+        # Calculate the proportion correct
+        C = cArray[0,0] + cArray[1,1] # (6)
+
+        # Calculate the total disagreement
+        D = 1 - C # = Q + A (7)
 
         # Calculate fractions of agreement:
-        P0 = cArray[0,0] + cArray[1,1]
-        PE = cArray[0,2]*cArray[2,0] + cArray[1,2]*cArray[2,1]
-        PMAX = np.minimum(cArray[0,2],cArray[2,0]) + np.minimum(cArray[1,2],cArray[2,1])
+        E = cArray[0,2]*cArray[2,0] + cArray[1,2]*cArray[2,1] # (8,9)
 
         # Calculate Kappa
-        Kappa = (P0 - PE) / (1 - PE)
+        K_standard = (C - E) / (1 - E) # (11)
         
         # Save Kapa in array
-        kappaArray[row,col] = Kappa
-        #print(cArray)
+        kappaArray[row[0],col] = K_standard
 
-  # Set the name of the file
-  fileName = os.path.join(arrayFolder, 'kappa')
+        # Save errors
+        quantityArray[row[0],col] = Q
+        allocationArray[row[0],col] = A
 
-  # Clear the directory if needed
-  if os.path.exists(fileName + '.npy'):
-      os.remove(fileName + '.npy')
+  # Save all the metrices
+  metrices = {
+    'kappa': kappaArray,
+    'quantity_disagreement': quantityArray,
+    'allocation_disagreement': allocationArray,
+    'transition_matrix': transArray
+    }
+  for name in metrices.keys():
+    # Set the name of the file
+    fileName = os.path.join(arrayFolder, str(name))
 
-  # Save the data  
-  np.save(fileName, kappaArray)
-  print('Kappa calculated and saved as kappa.npy')
+    # Clear the directory if needed
+    if os.path.exists(fileName + '.npy'):
+        os.remove(fileName + '.npy')
+
+    # Save the data  
+    np.save(fileName, metrices[name])
+    
+  print('Kappa and Pontius metrices calculated and saved as npy files')
 
 def calcRMSE(diffArray, aVariable, scenario=None):
   pSets = diffArray.shape[1]
@@ -158,30 +188,22 @@ def calcRMSE(diffArray, aVariable, scenario=None):
   # Calculate RMSE for each timestep and parameter set. Number of observations = number of zones
   for row in range(0,len(obsTimeSteps)):
     for col in range(0,pSets):
-      # Create a list containing values for each zone
+      # Create a list containing values for each zone or selected zones only
       x = diffArray[row,col].flatten()
+      if scenario==3:
+        # Path to the file storing numbers of calibration zones:
+        calibration_zones_file = os.path.join(os.getcwd(),'input_data', country, 'calibration_zones.txt')
+        # Read only first column from the file and get the zones numbers.
+        # The zone numbers start with 1, so substract 1 to get values starting from 0:
+        calibration_zones = [int(x.split("\t")[0])-1 for x in open(calibration_zones_file).readlines()]
+        x = np.array([diffArray[row,col].flatten()[x] for x in calibration_zones])
       # Remove nan values
       x = x[~numpy.isnan(x)]
       # Calculate RMSE for each zones
       rmseArray[row,col] = np.sqrt(np.mean(x**2))
 
   return rmseArray
-
-
-
-#########
-"""
-for m in ['pd']:
-    zonesModelled = getModelledArray(m)
-    zonesObserved = getObservedArray(m)
-    diffArray = createDiffArray(zonesModelled,zonesObserved)
-    rmseArray = calcRMSE(diffArray, m, 3)
-    RMSEindex_selectedArea(rmseArray,3,'calibration')
-    """
-##########
-
-
-    
+  
 def RMSEindex_eachTimeStep(rmseArr):
   fitList = []
   
@@ -197,7 +219,7 @@ def RMSEindex_eachTimeStep(rmseArr):
     fitList.append([obsTimeSteps[year],base[1]])
   return(fitList)
 
-def RMSEindex_selectedPeriod(aRMSE,scenario,aim): #smallestMeanErrorIndex
+def RMSEindex_selectedPeriod(aRMSE,scenario,aim):
   # scenario and aim define the period, for which the RMSE is to be calculated
   # period is a list containing indexes of selected years, it is defined by the calibration scenario
 
@@ -211,24 +233,22 @@ def RMSEindex_selectedPeriod(aRMSE,scenario,aim): #smallestMeanErrorIndex
       mBase[1] = p
   return mBase[1]
 
-#def smallestMeanErrorIndex_2000_2006(theRMSE): # to be removed and included in RMSEindex_selectedPeriod()
+def RMSEindex_selectedArea(metric,aim):
+  if metric in ['cilp','pd']:
+    metric = metric + '_' + aim[:3]
+    
+  modelled = getModelledArray(metric)
+  observed = getObservedArray(metric)
+  dArray = createDiffArray(modelled,observed)
+  # For the metrics calculated for each zone separately (fdi, wfdi) calculate the RMSE only for selected zones
+  if metric in ['fdi', 'wfdi']: 
+    zoneRMSE = calcRMSE(dArray, metric, scenario=3)
+  # For 'pd' and 'cilp' the selected zones are already saved in the files
+  else:
+    zoneRMSE = calcRMSE(dArray, metric)
 
-#def smallestMeanErrorIndex_2012_2018(theRMSE): # to be removed and included in RMSEindex_selectedPeriod()
-
-def RMSEindex_selectedArea(theRMSE, scenario, aim):
-  mask_zones = parameters.getCalibrationArea()[aim]
-  period = parameters.getCalibrationPeriod()[scenario][aim]
-  #mask =
-  mBase = [np.absolute(np.mean(theRMSE[period,0])),0]
+  return RMSEindex_selectedPeriod(zoneRMSE,3,'calibration')
   
-  # Loop parameter configurations to find the one with the smalles abs mean value for zones 0-7
-  for p in range(len(theRMSE[0,:])):
-    mRMSE = np.absolute(np.mean(theRMSE[:,p]))
-    if mRMSE < mBase[0]:
-      mBase[0] = mRMSE
-      mBase[1] = p
-  return mBase[1]
-
 def biggestKappaInObsYear(kappaArr):
   fitList = []
   
@@ -264,30 +284,69 @@ def biggestKappa_2012_2018(kappaArr):
       kBase[1] = p
   return kBase[1]
 
-'''####### Testing for combinaing kappa and single metric:
-def normalized(a, axis=-1, order=2): ## <-- what is this thing doing
-    l2 = np.atleast_1d(np.linalg.norm(a, order, axis))
-    l2[l2==0] = 1
-    return a / np.expand_dims(l2, axis)
+ 
+def RMSEindex_KAPPAindex_selectedPeriod(aRMSE,aKAPPA,w_RMSE,w_Kappa,scenario,aim):
+  # multi - objective goal function
+  # RMSE and kappa metrics are combined (summed)
+  # each metric has a weight (w1,w2)
+  w1 = w_RMSE
+  w2 = w_Kappa
+  # scenario and aim define the period, for which the RMSE is to be calculated
+  # period is a list containing indexes of selected years, it is defined by the scenario
+  period = parameters.getCalibrationPeriod()[scenario][aim]
+  # Normalize the mean RMSE values for the selected period
+  RMSE_mean = [(r1+r2)/2 for r1,r2 in zip(aRMSE[period][0],aRMSE[period][1])]
+  RMSE_max = np.amax(RMSE_mean)
+  RMSE_min = np.amin(RMSE_mean)
+  RMSE_norm = [(RMSE_max - x) / (RMSE_max - RMSE_min) for x in RMSE_mean]
+
+  # Calculate the mean value for Kappa.It has already values 0-1, co there is no need for normalization.
+  Kappa_mean = [(k1+k2)/2 for k1,k2 in zip(aKAPPA[period][0],aKAPPA[period][1])]
+  Kappa_max = np.amax(Kappa_mean)
+  Kappa_min = np.amin(Kappa_mean)
+  Kappa_norm = [(x - Kappa_min) / (Kappa_max - Kappa_min) for x in Kappa_mean]
   
-def testKasi(KAPPAarr, RMSEarr):
-  RMSEarr = normalized(RMSEarr)
-  kBase = [np.mean(KAPPAarr[1:3,0]),0]
-  mBase = [np.absolute(np.mean(RMSEarr[1:3,0])),0]
-  testBase = [np.mean([1-kBase[0], mBase[0]]),0] # the smaller the better
-  # Loop parameter configurations to find the one with the best mean value for years 2000 and 2006
-  for p in range(len(KAPPAarr[0,:])):
-    mKappa = np.mean(KAPPAarr[1:3,p])
-    mRMSE = np.absolute(np.mean(RMSEarr[1:3,p]))
-    mTest = np.mean([1-mKappa, mRMSE])
-    if mTest < testBase[0]:
-      testBase[0] = mTest
-      testBase[1] = p
+  rBase = [RMSE_norm[0],0]
+  kBase = [Kappa_norm[0],0]
+  
+  multiBase = [w1 * rBase[0] + w2 * kBase[0],0] # the bigger the better
+  # Loop parameter configurations to find the one with the best goal function outcome for the selected period
+  for p in range(len(aKAPPA[0,:])): 
+    # select normalized mean RMSE for the given parameter
+    mRMSE = RMSE_norm[p]
+    # calculate mean kappa for the given parameter
+    mKappa = Kappa_norm[p]
     
-  return testBase[1]
+    multiGoal = w1 * mRMSE + w2 * mKappa
+    if multiGoal > multiBase[0]:
+      multiBase[0] = multiGoal
+      multiBase[1] = p
+    
+  return multiBase[1]
+'''
+############33 TESTTT
+country = 'IT'
+arrayFolder = os.path.join(os.getcwd(),'results',country,'metrics')
 
-######## <------- testing!'''
-
+for metric in ['cilp','fdi','wfdi','pd']:
+  modelled = getModelledArray(metric)
+  observed = getObservedArray(metric)  
+  dArray = createDiffArray(modelled,observed)
+  rmse = calcRMSE(dArray, metric)
+  kappa = np.load(os.path.join(arrayFolder,'kappa.npy'))
+  print(metric)
+  rmse_weight = 0.5
+  kappa_weight = 1 - rmse_weight
+  print('rmse ',rmse_weight,'kappa ',
+        kappa_weight,RMSEindex_KAPPAindex_selectedPeriod(rmse,kappa,rmse_weight,kappa_weight,1,'calibration'))
+  #print('rmse 0','kappa 1',RMSEindex_KAPPAindex_selectedPeriod(rmse,kappa,0,1,1,'calibration'))
+  #print('rmse 1','kappa 0',RMSEindex_KAPPAindex_selectedPeriod(rmse,kappa,1,0,1,'calibration'))"""
+kappa = np.load(os.path.join(arrayFolder,'kappa.npy'))
+print(kappa[3:5])
+for k1, k2 in zip(kappa[3:5][0],kappa[3:5][1]):
+  print((k1+k2)/2)
+################
+'''  
 ###############################################################################################################
 ############################ CALBRATE AND VALIDATE
 ###############################################################################################################
@@ -312,7 +371,8 @@ def getCalibratedParameters(calibrationScenario):
     theParameters.insert(0,m)
     indexes.append(theParameters)
   
-  kappaArray = np.load(os.path.join(arrayFolder, 'kappa.npy'))
+  #kappaArray = np.load(os.path.join(arrayFolder, 'kappa.npy'))
+  kappaArray = np.load(os.path.join('F:/results/PL/metrics', 'kappa.npy'))
   kappaIndexes = {
     1: biggestKappa_2000_2006(kappaArray),
     2: biggestKappa_2012_2018(kappaArray)
@@ -354,31 +414,12 @@ def calibrate_validate(scenario):
           v[i,j] = np.mean(rmseArray[aim_period, int(index)])
     c[aim] = v
 
-  x = np.concatenate((c['calibration'],c['validation']), axis=0)
+  #x = np.concatenate(('Calibration:',c['calibration'],'Validation:'],c['validation']), axis=0)
+  x = ['Calibration:']+list(c['calibration'])+['Validation:']+list(c['validation'])
   return x
-   
-'''def validate(calibrationScenario): 
-  indexes = np.array(getCalibratedParameters(calibrationScenario))[:,1]
-  kappaArray = np.load(os.path.join(arrayFolder, 'kappa.npy'))
-  
-  scenarioPeriod = {
-    1: -2,
-    2: [1,2]
-    }
-  
-  # create the array to store the calibration values
-  v = np.zeros((len(metricList)+1,len(metricList)+1))
-  for i, index in enumerate(indexes):
-    for j, metricCol in enumerate(metricList+['kappa']):
-      if metricCol == 'kappa':
-        # Calculate the mean Kappa for the selected senario
-        v[i,j] = np.mean(kappaArray[scenarioPeriod[calibrationScenario], int(index)])
-      else:
-        # Calculate the mean RMSE for the selected senario
-        zonesModelled = getModelledArray(metricCol)
-        zonesObserved = getObservedArray(metricCol)
-        rmseArray = calcRMSE(createDiffArray(zonesModelled,zonesObserved), metricCol)
-        v[i,j] = np.mean(rmseArray[scenarioPeriod[calibrationScenario], int(index)])
-  return v'''
+
+
+
+
 
 

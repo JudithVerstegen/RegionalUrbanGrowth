@@ -13,7 +13,8 @@ import matplotlib.pyplot as plt
 #### Metrics are transformed into an array
 
 # Get metrics
-metricNames = parameters.getSumStats() 
+metricNames = parameters.getSumStats()
+areaMetricNames = ['pd_cal','pd_val','cilp_cal','cilp_val']
 
 # Get the number of parameter iterations and number of time step defined in the parameter.py script
 nrOfTimesteps=parameters.getNrTimesteps()
@@ -29,7 +30,8 @@ obsTimeSteps = parameters.getObsTimesteps()
 
 # Path to the folder with the metrics stored
 country = parameters.getCountryName()
-resultFolder = os.path.join(os.getcwd(),'results',country)
+resultFolder = os.path.join('F:','results',country)
+#resultFolder = os.path.join(os.getcwd(),'results',country)
 output_mainfolder = os.path.join(resultFolder, "metrics")
 
 #################
@@ -40,7 +42,7 @@ output_mainfolder = os.path.join(resultFolder, "metrics")
 def openPickledSamplesAndTimestepsAsNumpyArray(basename,iterations,timesteps, \
                                                obs=False):
   output=[]
-  
+
   for timestep in timesteps:
     allIterations=[]
     
@@ -72,8 +74,9 @@ def openPickledSamplesAndTimestepsAsNumpyArray(basename,iterations,timesteps, \
       else:
         theName = basename + str(timestep) + '.obj'
         fileName = os.path.join(resultFolder, str(i), theName)
-        filehandler = open(fileName, 'rb') 
+        filehandler = open(fileName, 'rb')
         data = pickle.load(filehandler)
+        
         '''# Keep these lines for the later use:
         if it is a dictionary, get the sugar cane parameters (lu type 6)
         if type(data) == dict:
@@ -117,8 +120,9 @@ def setNameClearSave(basename, output, obs=False):
 #################################
 
 ########### Save the observed metrics and urban areas
+ 
 # Metrics:
-for aVariable in metricNames:  
+for aVariable in metricNames + areaMetricNames:  
   output_obs = openPickledSamplesAndTimestepsAsNumpyArray(aVariable, obsSampleNumbers,obsTimeSteps, True)
   setNameClearSave(aVariable, output_obs,obs=True)
 
@@ -127,19 +131,20 @@ output_urb_obs = openPickledSamplesAndTimestepsAsNumpyArray('urb', obsSampleNumb
 setNameClearSave('urb', output_urb_obs,obs=True)
 
 ########### Save the modelled metrics and urban areas
-
 # Metrics:
-for aVariable in metricNames:
+for aVariable in metricNames + areaMetricNames:
   output_mod = openPickledSamplesAndTimestepsAsNumpyArray(aVariable, iterations, timeSteps, False)
   setNameClearSave(aVariable, output_mod,obs=False)
-  
-# Urban areas <- takes a while and lots of RAM (around 16GB)
-output_urb_mod = openPickledSamplesAndTimestepsAsNumpyArray('urb', iterations, timeSteps, False)
-setNameClearSave('urb', output_urb_mod,obs=False)
 
-# Subset the modellled urban areas only for the observation years
-subset_urb_mod = output_urb_mod[np.array(obsTimeSteps)-1,:]
-setNameClearSave('urb_subset', subset_urb_mod,obs=False)
+
+'''# Urban areas <- heavy memory load
+output_urb_mod = openPickledSamplesAndTimestepsAsNumpyArray('urb', iterations, timeSteps, False)
+setNameClearSave('urb', output_urb_mod,obs=False)'''
+
+# Modellled urban areas only for the observation years:
+for a_step in obsTimeSteps:
+  subset_urb_mod = openPickledSamplesAndTimestepsAsNumpyArray('urb', iterations, [a_step], False)
+  setNameClearSave('urb_subset_'+str(a_step), subset_urb_mod,obs=False)
 
 # Parameter sets
 parameter_sets = subset_urb_mod[0,:,0]
@@ -161,7 +166,8 @@ calibrate.calculateKappa()
 print("Kappa statistic calculated and saved as npy file")
 
 
-########### Get parameter values
+########### Calibrate and validate
+# Get parameter values
 p1 = calibrate.getCalibratedParameters(1)
 p2 = calibrate.getCalibratedParameters(2)
 #p3 = calibrate.getCalibratedParameters(3)
@@ -171,22 +177,14 @@ log = [
   ['parameters (min, max, step): ',parameters.getParametersforCalibration()],
   ['alpha: ','0.6']]
   
-calibrate.saveResults(p1+log, 1, 'parameters.csv')
-calibrate.saveResults(p2+log, 2, 'parameters.csv')
+# Find errors
+errors_1 = calibrate.calibrate_validate(1)
+errors_2 = calibrate.calibrate_validate(2)
 
-########### Calibrate model
-calibrate.saveResults(calibrate.calibrate_validate(1),1,'calibration_validation.csv')
-print("Model calibrated for 2000 - 2006")
-calibrate.saveResults(calibrate.calibrate_validate(2),2,'calibration_validation.csv')
-print("Model calibrated for 2012 - 2018")
-
-
-'''
-########### Validate model
-calibrate.saveResults(calibrate.validate(1),1,'validation.csv')
-print("Model validated for 2012 - 2018")
-calibrate.saveResults(calibrate.validate(2),2,'validation.csv')
-print("Model validated for 2000 - 2006")'''
+# Save
+calibrate.saveResults(['Scenario 1']+log+p1+errors_1, 1, 'calibration_validation.csv')
+calibrate.saveResults(['Scenario 2']+log+p2+errors_2, 2, 'calibration_validation.csv')
+print("Model calibrated and validated")
 
 
   

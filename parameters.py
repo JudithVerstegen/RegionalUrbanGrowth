@@ -68,13 +68,13 @@ def getParametersforCalibration():
      minParameter needs to be >= 0
      maxParameter needs to be <= 1
     [minParameter, maxParameter, stepSize] """
-  return [0.0, 1.0, 0.2]
+  return [0.0, 1.0, 0.125]
 
 def getCountryName():
   """ Returns the case study symbol """
   # case studies: 'IT', 'IE', 'PL'
 
-  name = 'PL'
+  name = 'IT'
   return name
   
   

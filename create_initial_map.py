@@ -378,7 +378,6 @@ def reproject_resample_tif(in_raster, out_raster, ref_raster):
 ### main ###
 ############
 
-
 # 0. clean the two directories (input_data and observations)
 # Folders input_data and observations have to exist
 if not os.path.isdir(country_dir):
@@ -572,6 +571,7 @@ null_mask = spatial(scalar(0))
 report(null_mask, os.path.join(country_dir, 'nullmask.map'))
 one_mask = boolean(null_mask + 1)
 report(one_mask, os.path.join(country_dir, 'onemask.map'))
+
 # Blocks (zones) for the calibration
 command = 'resample -r ' + str(zone_size) + ' ' + \
           os.path.join(country_dir, 'onemask.map') + ' resamp.map'
@@ -587,7 +587,6 @@ os.remove('resamp.map')
 os.remove('unique.map')
 
 # 8. blocks and calibration/validation masks
-
 unique = uniqueid(one_mask)
 zones = readmap(os.path.join(country_dir, 'zones.map'))
 samplePoints = pcreq(areaminimum(unique, zones), unique)
@@ -629,8 +628,7 @@ for goal in mask_zones.keys():
     a_file = open(conditions,"w")
 
     for z in mask_zones[goal]:
-        a_file.write(str(z)+"\t"+str(1)+"\n")
-          
+        a_file.write(str(z)+"\t"+str(1)+"\n")   
     a_file.close()
 
     calibrationMap = lookupscalar(conditions,samplePoints)
@@ -638,23 +636,26 @@ for goal in mask_zones.keys():
     report(calibrationZoneMap, 'zones_'+str(goal)+'.map')
     
     samplePointsCondition = ifthen(calibrationMap==1, samplePoints)
-    #samplePointsCondition = uniqueid(samplePointsCondition)
     report(samplePointsCondition, os.path.join(country_dir,'sampPoint_'+str(goal)[0:3]+'.map'))
     command = 'map2col --unitcell ' + os.path.join(country_dir,'sampPoint_'+str(goal)[0:3]+'.map') + \
               ' ' + os.path.join(country_dir,'sampPoint_'+str(goal)[0:3]+'.col')
     os.system(command)
     
-# Create sample points for each cell (for Kappa statistic calculation in calibration)
+# Create sample points for each cell (for Kappa statistic calculation)
 samplePointsNr = unique
 report(samplePointsNr, os.path.join(country_dir, 'sampPointNr.map'))
 command = 'map2col --unitcell ' + os.path.join(country_dir, 'sampPointNr.map') + \
           ' ' + os.path.join(country_dir, 'sampPointNr.col')
 os.system(command)
 
-# Create sample points for one cell in the study area (for one metric for the whole study area)
-samplePoint = pcreq(areaminimum(unique, one_mask), unique)
-samplePoint = ifthen(samplePoint == 1, boolean(1))
-samplePoint = uniqueid(samplePoint)
+# Create a sample point for one cell in the study area (for one metric for the whole study area)
+## Find corrdinates of the middle of the study area
+middle_x = (mapminimum(xcoordinate(one_mask))+mapmaximum(xcoordinate(one_mask)))/2
+middle_y = (mapminimum(ycoordinate(one_mask))+mapmaximum(ycoordinate(one_mask)))/2
+## Select bottom right quarter and assign unique values
+one_quarter = uniqueid(pcrand(xcoordinate(one_mask)<middle_x,ycoordinate(one_mask)>middle_y))
+## Find the point in the middle
+samplePoint = ifthen(pcreq(mapmaximum(one_quarter), one_quarter), scalar(1))
 report(samplePoint, os.path.join(country_dir, 'sampSinglePoint.map'))
 command = 'map2col --unitcell ' + os.path.join(country_dir, 'sampSinglePoint.map') + \
           ' ' + os.path.join(country_dir, 'sampSinglePoint.col')

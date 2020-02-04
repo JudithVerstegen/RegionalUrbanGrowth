@@ -152,7 +152,7 @@ def plotRMSE_calibrationPeriod(rArray, oneMetric, observations, parameterSets):
   plt.xticks(observations)
   plt.xlabel('observed years')
     
-  meanIndex = calibrate.smallestMeanErrorIndex_2000_2006(rArray)
+  meanIndex = calibrate.RMSEindex_selectedPeriod(rArray,1,'calibration')
   for pSet in range(rArray.shape[1]):
     if pSet == meanIndex:
       myLabel = 'parameter set ' + str(pSet) + ': ' + str(parameterSets[pSet])
@@ -399,7 +399,7 @@ def plotParameterValues(kapppaInx):
     zonesObserved = calibrate.getObservedArray(m)
     rmseArray = calibrate.calcRMSE(calibrate.createDiffArray(zonesModelled,zonesObserved), m)
     parameterSets = np.array(calibrate.getParameterConfigurations()) # gives the parameter sets
-    calibratedIndex = calibrate.smallestMeanErrorIndex_2000_2006(rmseArray) # gives the index of the best parameter set
+    calibratedIndex = calibrate.RMSEindex_selectedPeriod(rmseArray, 1, 'calibration') # gives the index of the best parameter set
     for j in range(nParams):
       weights[j].append(parameterSets[calibratedIndex][j])
   # Add Kappa
@@ -452,8 +452,7 @@ def plotUrbMod(m, theIndex, parameterSets):
   # Plot the modelled urban arreas
   ncol = 3
   nrows = int(np.ceil(len(observedYears)/ncol))
-  # Load modelled urb
-  urb_mod = np.load(os.path.join(resultFolder, 'urb_subset.npy'))
+  
   # Create figure
   fig = plt.figure(figsize=(7.14,2.5*nrows)) # Figure size set to give 16 cm of width
   fig.suptitle(
@@ -462,11 +461,13 @@ def plotUrbMod(m, theIndex, parameterSets):
   
   # Create subplots
   for index, oYear in enumerate(observedYears):
+    # Load modelled urb
+    urb_mod = np.load(os.path.join(resultFolder, 'urb_subset_'+str(obsTimeSteps[index])+'.npy'))
     ax1 = plt.subplot(nrows,ncol,index+1)
     ax1.get_xaxis().set_visible(False)
     ax1.get_yaxis().set_visible(False)
     ax1.set_title(oYear)
-    urbMatrix1 = np.reshape(urb_mod[index,theIndex,1], (1600,1600))
+    urbMatrix1 = np.reshape(urb_mod[0,theIndex,1], (1600,1600))
     ax1.xticks = ([])
     cmap = colors.ListedColormap([(0.98,0.98,0.95),'black'])
     ax1.imshow(urbMatrix1, cmap=cmap)
@@ -513,8 +514,8 @@ def plotUrbModelledChanges(m, calibratedIndex, parameterSets):
   # Plot the observed urban arreas
   ncol,nrows = 2,2
 
-  # Load observed urb
-  urb_mod_subset = np.load(os.path.join(resultFolder, 'urb_subset.npy'))
+  
+
   # Create figure
   fig = plt.figure(figsize=(7.14,7.14)) # Figure size set to give 16 cm of width
   fig.suptitle('Change in modelled urban areas for parameter set '
@@ -536,14 +537,17 @@ def plotUrbModelledChanges(m, calibratedIndex, parameterSets):
   # Create subplots
   states = []
   for obsIndex, theObsTimeStep in enumerate(obsTimeSteps[:-1]):
+    # Load observed urb
+    urb_mod_current = np.load(os.path.join(resultFolder, 'urb_subset_'+str(theObsTimeStep)+'.npy'))
+    urb_mod_next = np.load(os.path.join(resultFolder, 'urb_subset_'+str(obsTimeSteps[obsIndex+1])+'.npy'))
     ax1 = plt.subplot(nrows,ncol,obsIndex+1)
     ax1.get_xaxis().set_visible(False)
     ax1.get_yaxis().set_visible(False)
     ax1.set_title(str(observedYears[obsIndex]) + '-' + str(observedYears[obsIndex+1]))
     ax1.xticks = ([])
     
-    changeModMatrix = (urb_mod_subset[obsIndex+1,calibratedIndex,1]
-                    - urb_mod_subset[obsIndex,calibratedIndex,1])  
+    changeModMatrix = (urb_mod_next[0,calibratedIndex,1]
+                    - urb_mod_current[0,calibratedIndex,1])  
     changeModMatrix_reshape = np.reshape(changeModMatrix, (1600,1600))
     u = np.unique(changeModMatrix[~numpy.isnan(changeModMatrix)])
     states.append(u)
@@ -604,7 +608,7 @@ for theMetric in metricNames:
   zonesObserved = calibrate.getObservedArray(theMetric)
   rmseArray = calibrate.calcRMSE(calibrate.createDiffArray(zonesModelled,zonesObserved), theMetric)
   parameterSets = calibrate.getParameterConfigurations() # gives the parameter sets
-  calibratedIndex = calibrate.smallestMeanErrorIndex_2000_2006(rmseArray) # gives the index of the best parameter set
+  calibratedIndex = calibrate.RMSEindex_selectedPeriod(rmseArray,1,'calibration') # gives the index of the best parameter set
     
   ##### Create histograms of metric values for different parameters per zone per timestep
   #histogramsModelledMetrics(theMetric, zonesModelled) 

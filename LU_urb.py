@@ -478,10 +478,12 @@ class LandUseChangeModel(DynamicModel):
     self.weightDict = {1: weights}
     # input and output folders
     country = parameters.getCountryName()
-    output_mainfolder = os.path.join(os.getcwd(), 'results', country)
+    #output_mainfolder = os.path.join(os.getcwd(), 'results', country)
+    output_mainfolder = os.path.join('F:/results', country)
     if not os.path.isdir(output_mainfolder):
       os.mkdir(output_mainfolder)
-    self.outputfolder = os.path.join(os.getcwd(), 'results', country, str(nr))
+    #self.outputfolder = os.path.join(os.getcwd(), 'results', country, str(nr))
+    self.outputfolder = os.path.join('F:/results', country, str(nr))
     if not os.path.isdir(self.outputfolder):
       os.mkdir(self.outputfolder)
     self.inputfolder = os.path.join('input_data', country)
@@ -562,7 +564,6 @@ class LandUseChangeModel(DynamicModel):
     # But for urban we don't use it now (perhaps later with pop), so 1
     maxYield = 1.0
     demand = timeinputscalar(self.inputfolder + '/demand.tss', self.environment)
-
     
     # Suibility maps are calculated
     self.landUse.calculateSuitabilityMaps()
@@ -583,18 +584,32 @@ class LandUseChangeModel(DynamicModel):
     listOfSumStats = metrics.calculateSumStats(scalar(urban), \
                                             self.sumStats, self.zones)               
 
+    # Save the metrics for calibration and validation based on the area
+    # For each meric a value is saved for the preselected cell(s).
+    # The cell coordinates are created in create_initial_maps.py and saved in .col files:
+    col_files = {
+      'fdi': 'sampPoint.col',         # each zone
+      'wfdi': 'sampPoint.col',        # each zone
+      'cilp': 'sampSinglePoint.col',  # single point in the middle of the study area
+      'pd': 'sampSinglePoint.col',    # single point in the middle of the study area
+      'urb': 'sampPointNr.col',       # point for each cell
+      'cilp_cal': 'sampPoint_cal.col',# point for each calibration zones
+      'cilp_val': 'sampPoint_val.col',# point for each validation zones
+      'pd_cal': 'sampPoint_cal.col',  # point for each calibration zones
+      'pd_val': 'sampPoint_val.col'   # point for each validation zones
+      }
+    
     j=0
     part_metrics = []
-    
+
+    # First, calculate the statistics and create the maps:
     for aname in self.sumStats:
       modelledmap = listOfSumStats[j]
       self.report(modelledmap, os.path.join(self.outputfolder, aname))
       j = j + 1
 
-      # Save the metrics for calibration and validation based on the area
-      # For metrics that are calculated for the whole map (pd) of for the biggest patch (cilp)
-      #if aname in ['cilp','fdi']:
-      
+      # Include selected zones for metrics that are calculated for the whole map (pd)
+      # or for the biggest patch only (cilp)
       if aname in ['cilp','pd']:
         stat_cal = metrics.calculateSumStats(scalar(urban_cal), \
                                             self.sumStats, self.zones)
@@ -604,22 +619,8 @@ class LandUseChangeModel(DynamicModel):
         self.report(stat_val[0], os.path.join(self.outputfolder, aname+'_val'))
         part_metrics.append(aname+'_cal')
         part_metrics.append(aname+'_val')
-    
-    # For each meric a value is saved for the preselected cell(s).
-    # The cell coordinates are created in create_initial_maps.py and saved in .col files:
-    col_files = {
-      'fdi': 'sampPoint.col', # single point SHOULD BE ZONE
-      'wfdi': 'sampPoint.col',
-      'cilp': 'sampSinglePoint.col', # single point
-      'pd': 'sampSinglePoint.col',
-      'urb': 'sampPointNr.col', # point for each cell
-      'cilp_cal': 'sampPoint_cal.col',
-      'cilp_val': 'sampPoint_val.col',
-      'pd_cal': 'sampPoint_cal.col',
-      'pd_val': 'sampPoint_val.col'
-      }
-    
-    # Save the metric and urban areas as pickle objects
+      
+    # Then save the metrics and urban areas as pickle objects
     for aStat in self.sumStats + ['urb'] + part_metrics:
       path = generateNameT(self.outputfolder + '/' + aStat, timeStep)
       modelledAverageArray = metrics.map2Array(path, self.inputfolder + '/' + col_files[aStat])    
