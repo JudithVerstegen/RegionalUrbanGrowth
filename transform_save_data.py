@@ -30,8 +30,7 @@ obsTimeSteps = parameters.getObsTimesteps()
 
 # Path to the folder with the metrics stored
 country = parameters.getCountryName()
-resultFolder = os.path.join('F:','results',country)
-#resultFolder = os.path.join(os.getcwd(),'results',country)
+resultFolder = os.path.join(os.getcwd(),'results',country)
 output_mainfolder = os.path.join(resultFolder, "metrics")
 
 #################
@@ -120,7 +119,7 @@ def setNameClearSave(basename, output, obs=False):
 #################################
 
 ########### Save the observed metrics and urban areas
- 
+
 # Metrics:
 for aVariable in metricNames + areaMetricNames:  
   output_obs = openPickledSamplesAndTimestepsAsNumpyArray(aVariable, obsSampleNumbers,obsTimeSteps, True)
@@ -165,6 +164,9 @@ print("All number folders deleted.")
 calibrate.calculateKappa()
 print("Kappa statistic calculated and saved as npy file")
 
+########### Calculate Kappa Simulation
+calibrate.calculateKappaSimulation()
+print("Kappa Simulation calculated and saved as npy file")
 
 ########### Calibrate and validate
 # Get parameter values
