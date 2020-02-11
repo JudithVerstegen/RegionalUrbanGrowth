@@ -755,13 +755,11 @@ for i in range(1, realizations + 1):
             j+=1
 
             # Save the metrics for calibration and validation based on the area
-            # For metrics that are calculated for the whole map (pd) of for the biggest patch (cilp)
-            #if aname in ['cilp','fdi']:
-          
+            # For metrics that are calculated for the whole map (pd) of for the biggest patch (cilp)          
             if aname in ['cilp','pd']:
-                stat_cal = metrics.calculateSumStats(new_map_cal,metric_names,\
+                stat_cal = metrics.calculateSumStats(new_map_cal,[aname],\
                                                         zones)
-                stat_val = metrics.calculateSumStats(new_map_val,metric_names,\
+                stat_val = metrics.calculateSumStats(new_map_val,[aname],\
                                                         zones)
                 report(stat_cal[0], generateNameT(os.path.join(base, str(i), aname+'_cal'),year[1]))
                 report(stat_val[0], generateNameT(os.path.join(base, str(i), aname+'_val'),year[1]))
