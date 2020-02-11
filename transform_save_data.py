@@ -22,6 +22,7 @@ nrOfTimesteps=parameters.getNrTimesteps()
 numberOfIterations = parameters.getNumberofIterations(parameters.getSuitFactorDict(), parameters.getParametersforCalibration())
 
 iterations = range(1, numberOfIterations+1, 1)
+
 timeSteps=range(1,nrOfTimesteps+1,1)
 
 # Get the observed time steps. Time steps relate to the year of the CLC data, where 1990 was time step 0.
@@ -113,13 +114,12 @@ def setNameClearSave(basename, output, obs=False):
 
   # Save the data  
   np.save(fileName, output)
-    
+"""    
 #################################
 ### SAVE OUTPUTS OF THE MODEL ###
 #################################
 
 ########### Save the observed metrics and urban areas
-
 # Metrics:
 for aVariable in metricNames + areaMetricNames:  
   output_obs = openPickledSamplesAndTimestepsAsNumpyArray(aVariable, obsSampleNumbers,obsTimeSteps, True)
@@ -134,11 +134,6 @@ setNameClearSave('urb', output_urb_obs,obs=True)
 for aVariable in metricNames + areaMetricNames:
   output_mod = openPickledSamplesAndTimestepsAsNumpyArray(aVariable, iterations, timeSteps, False)
   setNameClearSave(aVariable, output_mod,obs=False)
-
-
-'''# Urban areas <- heavy memory load
-output_urb_mod = openPickledSamplesAndTimestepsAsNumpyArray('urb', iterations, timeSteps, False)
-setNameClearSave('urb', output_urb_mod,obs=False)'''
 
 # Modellled urban areas only for the observation years:
 for a_step in obsTimeSteps:
@@ -160,34 +155,38 @@ for f in files:
 print("All number folders deleted.")
 '''
 
-########### Calculate Kappa
+##################################
+### CALCULATE KAPPA STATISTICS ###
+##################################
+
+########### Calculate Kappa statistics
+# Calculate Kappa standard and Kappa statistic fot the whole study area
 calibrate.calculateKappa()
-print("Kappa statistic calculated and saved as npy file")
+calibrate.calculateKappaSimulation()"""
 
-########### Calculate Kappa Simulation
-calibrate.calculateKappaSimulation()
-print("Kappa Simulation calculated and saved as npy file")
+# Calculate Kappa standard and Kappa statistic for the calibration and validation based on selected zones
+for aim in ['calibration','validation']:
+  calibrate.calculateKappa(3,aim)
+  calibrate.calculateKappaSimulation(3,aim)
+print("Kappa statistics calculated and saved as npy file")
 
-########### Calibrate and validate
-# Get parameter values
-p1 = calibrate.getCalibratedParameters(1)
-p2 = calibrate.getCalibratedParameters(2)
-#p3 = calibrate.getCalibratedParameters(3)
-log = [
-  ['country: ',parameters.getCountryName()],
-  ['observed time steps: ', parameters.getObsTimesteps()],
-  ['parameters (min, max, step): ',parameters.getParametersforCalibration()],
-  ['alpha: ','0.6']]
-  
-# Find errors
-errors_1 = calibrate.calibrate_validate(1)
-errors_2 = calibrate.calibrate_validate(2)
+##############################
+### CALIBRATE AND VALIDATE ###
+##############################
 
-# Save
-calibrate.saveResults(['Scenario 1']+log+p1+errors_1, 1, 'calibration_validation.csv')
-calibrate.saveResults(['Scenario 2']+log+p2+errors_2, 2, 'calibration_validation.csv')
-print("Model calibrated and validated")
+# Get the calibration and validation results for 3 scenarios:
+# 1: calibrate on year 2000-2006 valdate on 2012-2018
+# 2: calibrate on years 2012-2018 validate on 200-2006
+# 3: calibrate and validate on different aras (zones)
 
+for scenario in [1,2,3]:
+  print('Scenario '+str(scenario))
+  # Calibrate, validate and save the results as csv file
+  calibrate.calibrate_validate(scenario)
+  print("Model calibrated and validated")
+  # Perform validation based on multi-objective calibration
+  calibrate.multiobjective(scenario) 
+  print("Model calibrated using multi-objective goal function and validated")
 
   
 
