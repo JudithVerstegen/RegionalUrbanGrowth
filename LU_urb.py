@@ -137,6 +137,28 @@ class LandUseType:
     report(currentLandUseSuitbaility, 'suit_curLu' + str(self.typeNr))
     return currentLandUseSuitbaility
 
+  def getRandomClumps(self):
+    """Return random map."""
+    # Create map of random clumps
+    randmap = windowaverage(uniform(boolean(self.yieldFrac)), \
+                            10 * celllength())
+    # Add randomness parameter from model by Garcia. Alfa (0,1) reflects the randomness level.
+    # In the noise (uniform) map change the zero values to very small values, to allow logarythmic function.
+    # Total suitability is multiplied by the randomness value v.
+    alpha = parameters.getAlphaValue()
+    # Replace the value of zero to a very small value
+    v = ifthenelse(self.noise==0,1E-300, self.noise)
+    # Apply function by White
+    v = 1 + ((-ln(v))**alpha)
+    '''# Apply function by Garcia
+    v = exp(-alpha*(1-v))
+    # Apply randomness factor to the map with random clumps to make them less dense
+    randomClumps = randmap * v
+    randomClumps = self.normalizeMap(randomClumps)
+    report(randomClumps, 'rand_clumps.map')
+    
+    return randomClumps'''
+    return v
  
   def createInitialSuitabilityMap(self, distmap, yieldFrac, friction):
     """Return the initial suitability map, i.e. for static factors.
@@ -215,14 +237,8 @@ class LandUseType:
       i += 1
     suitabilityMap += self.weightInitialSuitabilityMap * \
                       self.initialSuitabilityMap
-    # Add randomness from model by White. Alfa (0,1) reflects the randomness level.
-    # In the noise (uniform) map change the zero values to very small values, to allow logarythmic function.
-    # Total suitability is multiplied by the randomness value v.
-    alpha = parameters.getAlphaValue()
-    v = ifthenelse(self.noise==0,1E-300, self.noise)
-    v = 1 + ((-ln(v))**alpha)
-    report(v, 'v_alpha'+str(alpha)+'.map')
-    suitabilityMap = v * suitabilityMap
+    # Add randomness
+    suitabilityMap = self.getRandomClumps() * suitabilityMap
     # Normalize the total suitability map and report
     self.totalSuitabilityMap = self.normalizeMap(suitabilityMap)
     report(self.totalSuitabilityMap, 'suit_tot' + str(self.typeNr))
@@ -478,12 +494,10 @@ class LandUseChangeModel(DynamicModel):
     self.weightDict = {1: weights}
     # input and output folders
     country = parameters.getCountryName()
-    #output_mainfolder = os.path.join(os.getcwd(), 'results', country)
-    output_mainfolder = os.path.join('F:/results', country)
+    output_mainfolder = os.path.join(os.getcwd(), 'results', country)
     if not os.path.isdir(output_mainfolder):
       os.mkdir(output_mainfolder)
-    #self.outputfolder = os.path.join(os.getcwd(), 'results', country, str(nr))
-    self.outputfolder = os.path.join('F:/results', country, str(nr))
+    self.outputfolder = os.path.join(os.getcwd(), 'results', country, str(nr))
     if not os.path.isdir(self.outputfolder):
       os.mkdir(self.outputfolder)
     self.inputfolder = os.path.join('input_data', country)
@@ -612,9 +626,9 @@ class LandUseChangeModel(DynamicModel):
       # or for the biggest patch only (cilp)
       if aname in ['cilp','pd']:
         stat_cal = metrics.calculateSumStats(scalar(urban_cal), \
-                                            self.sumStats, self.zones)
+                                            [aname], self.zones)
         stat_val = metrics.calculateSumStats(scalar(urban_val), \
-                                            self.sumStats, self.zones)
+                                            [aname], self.zones)
         self.report(stat_cal[0], os.path.join(self.outputfolder, aname+'_cal'))
         self.report(stat_val[0], os.path.join(self.outputfolder, aname+'_val'))
         part_metrics.append(aname+'_cal')
@@ -674,7 +688,6 @@ preMCLandUse.determineSpeedRoads(roads)
 ### Loop COMES HERE ###
 #######################
 
-sumOfParameters = 0
 loopCount = 0
 
 # Set step size for calibration
@@ -683,10 +696,9 @@ max_p = parameters.getParametersforCalibration()[1]
 stepsize = parameters.getParametersforCalibration()[2]
 
 # Assure that steps in the loop have 3 decimal place only
-param_steps = np.arange(min_p, max_p + 0.100, stepsize)
-for step in range(0,len(param_steps)):
-    param_steps[step] = round(param_steps[step],3)
+param_steps = np.around(np.arange(min_p, max_p + 0.100, stepsize),decimals=3)
 
+# Run the model
 print('\n################################################')
 print('Run LU_urb model')
 print('Number of iterations: ', nrOfIterations)
@@ -694,25 +706,20 @@ print('Number of time steps: ', nrOfTimeSteps)
 print('Min parameter value: ', min_p, '. Max parameter value: ', max_p,'. Parameter steps: ', param_steps)
 
 
-for p1 in param_steps:
-    for p2 in param_steps:
-        for p3 in param_steps:
-            for p4 in param_steps:
-                sumOfParameters = p1+p2+p3+p4
-                if (sumOfParameters > 0.9999 and sumOfParameters < 1.0001):
-                    loopCount = loopCount + 1
-                    print('\n################################################')
-                    print('Model Run: ',loopCount,'. Parameters used: ',p1,p2,p3,p4)
-                    weights = [p1,p2,p3,p4]
-                    myModel = LandUseChangeModel(loopCount, weights)
-                    dynamicModel = DynamicFramework(myModel, nrOfTimeSteps)
-                    dynamicModel.run()
+for p1,p2,p3,p4 in ((a,b,c,d) for a in param_steps for b in param_steps for c in param_steps for d in param_steps):
+  sumOfParameters = p1+p2+p3+p4
+  if (sumOfParameters > 0.9999 and sumOfParameters < 1.0001):
+      loopCount = loopCount + 1
+      print('\n################################################')
+      print('Model Run: ',loopCount,'. Parameters used: ',p1,p2,p3,p4)
+      myModel = LandUseChangeModel(loopCount, [p1,p2,p3,p4])
+      dynamicModel = DynamicFramework(myModel, nrOfTimeSteps)
+      dynamicModel.run()                  
 
 print('\n################################################')
 print("--- Number of iterations of a loop: %s ---" % (nrOfIterations))
 print("--- Number of timesteps: %s ---" % (nrOfTimeSteps))
-time_passed = str(int((time.time() - start_time))/60)
-print("--- Program execution: ", time_passed, " minutes ---")
+print("--- Program execution: ", str(int((time.time() - start_time))/60), " minutes ---")
 
 
 ## USED TO BE THE POSTLOOP; SAVED FOR LATER USE
