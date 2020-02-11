@@ -17,7 +17,6 @@ metricList = parameters.getSumStats()
 # Get the number of parameter iterations and number of time step defined in the parameter.py script
 nrOfTimesteps=parameters.getNrTimesteps()
 numberOfIterations = parameters.getNumberofIterations(parameters.getSuitFactorDict(), parameters.getParametersforCalibration())
-
 iterations = range(1, numberOfIterations+1, 1)
 timeSteps=range(1,nrOfTimesteps+1,1)
 
@@ -34,22 +33,80 @@ arrayFolder = os.path.join(os.getcwd(),'results',country,'metrics')
 ### FUNCTIONS ###
 #################
 
-def getModelledArray(metric):
+def getModelledArray(metric,scenario=None,aim=None):
+  if (scenario==3 and metric in ['cilp','pd']):
+    metric = metric + '_' + aim[:3]
   return np.load(os.path.join(arrayFolder, metric + '.npy'))
 
-def getObservedArray(metric):
+def getObservedArray(metric,scenario=None,aim=None):
+  if (scenario==3 and metric in ['cilp','pd']):
+    metric = metric + '_' + aim[:3]
   return np.load(os.path.join(arrayFolder, metric + '_obs.npy'))
   
 def getParameterConfigurations():
   return np.load(os.path.join(arrayFolder, 'parameter_sets.npy'))
 
-def createDiffArray(modelled,observed):
+def getSelectedZones(aim):
+  # Get a list with the numbers of calibration zones (between 1 and 16)
+  # Path to the file storing numbers of calibration zones:
+  zones_file = os.path.join(os.getcwd(),'input_data', country, str(aim)+'_zones.txt')
+  # Read only first column from the file and get the zones numbers.
+  # The zone numbers start with 1, so substract 1 to get values starting from 0:
+  selected_zones = [int(x.split("\t")[0])-1 for x in open(zones_file).readlines()]
+  return selected_zones
+
+def getKappaArray(scenario=None,aim=None):
+  if scenario == 3:
+    return np.load(os.path.join(arrayFolder, 'kappa_'+str(aim[:3])+'.npy'))
+  else:  
+    return np.load(os.path.join(arrayFolder, 'kappa.npy'))
+
+def subsetUrbanZones(urbfile,aim):
+  # aim in ['calibration','validation']
+  
+  # Get the number of zones in te study area
+  numberOfZones = parameters.getNumberOfZones()
+  # Get the number of zones in one direction
+  numberOfZones_1D = int(np.sqrt(numberOfZones))
+  # Get the lenght of a zone in one direction. Cell size = 100 m.
+  zone_size = numberOfZones_1D * 100 #[m]
+  # Get the width/height of the study area
+  new_size = int(np.sqrt(len(urbfile[0][0,1])))
+  # Get the numbers of the calibration zones
+  calibration_zones = getSelectedZones(aim)
+  # Create a dict to store the coordinates of the starting corner of each zone
+  zone_limits = {}
+  i=0
+  for x,y in ((a,b) for a in range(0,numberOfZones_1D) for b in range(0,numberOfZones_1D)):
+    zone_limits[i] = [x*zone_size,y*zone_size]
+    i = i+1
+  
+  # Loop each year in the urb file:
+  for year in range(0,len(urbfile)):
+    # Loop each parameter set:
+    for p in range(0,len(urbfile[0])):
+      # Reshape the 1D array to get the array with the size of the study area
+      urbfile_r = np.reshape(urbfile[year][p,1],((new_size,new_size)))
+
+      # Subset the values only for the calibration zones as a list of arrays, loaded from a text file:
+      new_urbrow = [urbfile_r[zone_limits[zone_number][0]:zone_limits[zone_number][0]+zone_size,
+                              zone_limits[zone_number][1]:zone_limits[zone_number][1]+zone_size]
+                    for zone_number in calibration_zones]
+      # Combine the arrays and reshape them into 1D array
+      new_urbrow = np.reshape(np.vstack(new_urbrow),((zone_size*zone_size*len(calibration_zones),1)))
+      # Replace the urban cells in the input file with the subset values
+      urbfile[year,p,1] = new_urbrow
+    
+  # Return an array with the same shape as the input array
+  return urbfile
+
+def createDiffArray(metric, scenario, aim):
+  modelled = getModelledArray(metric, scenario, aim)
+  observed = getObservedArray(metric, scenario, aim)
   # Get the number of parameter configurations
   noParameterConfigurations = modelled.shape[1]
-  #print(modelled)
   # Get the number of zones
   numberZones = len(modelled[0][0][1])
-  
   # Create a 3D array: no of rows = no of observed timesteps, no of columns = no of parameter sets
   # Each cell store: the parameter set and the values of zones
   theArray = np.zeros((len(obsTimeSteps),noParameterConfigurations,numberZones,1))
@@ -60,7 +117,7 @@ def createDiffArray(modelled,observed):
         theArray[row,col][zone][0] = modelled[obsTimeSteps[row]-1,col][1][zone][0] - observed[row,0][1][zone][0]  
   return theArray
 
-def calculateKappa():
+def calculateKappa(scenario=None, aim=None):
   # Create arrays to store the metrices by Pontius (quantity disagreement and allocation disagreement)
   quantityArray = np.zeros((len(obsTimeSteps),numberOfIterations))
   allocationArray = np.zeros((len(obsTimeSteps),numberOfIterations))
@@ -73,6 +130,8 @@ def calculateKappa():
     
   # Load data:
   urbObs = getObservedArray('urb')
+  if scenario==3:
+    urbObs = subsetUrbanZones(urbObs,aim)
   cells = len(urbObs[0,0,1])
   nanCells = sum(np.isnan(urbObs[0,0,1]))
   validCells = cells - nanCells
@@ -82,6 +141,8 @@ def calculateKappa():
     print(row)
     # Load modelled urban for the given obs year
     urbMod = np.load(os.path.join(arrayFolder, 'urb_subset_'+str(row[1]) + '.npy'))
+    if scenario==3:
+      urbMod = subsetUrbanZones(urbMod,aim)
 
     # Define conditions to compare simulated and actual (observed) maps
     obs1 = (urbObs[row[0],0,1] == 1)
@@ -170,8 +231,11 @@ def calculateKappa():
     'transition_matrix': transArray
     }
   for name in metrices.keys():
-    # Set the name of the file
     fileName = os.path.join(arrayFolder, str(name))
+    if scenario==3:
+    # Set the name of the file
+      fileName = os.path.join(arrayFolder, str(name)+'_'+str(aim[:3]))
+
 
     # Clear the directory if needed
     if os.path.exists(fileName + '.npy'):
@@ -182,12 +246,14 @@ def calculateKappa():
     
   print('Kappa and Pontius metrices calculated and saved as npy files')
 
-def calculateKappaSimulation():
+def calculateKappaSimulation(scenario=None, aim=None):
   # Create array to store Kappa Simulation (by Van Vliet):
   kappaSimulation = np.zeros((len(obsTimeSteps),numberOfIterations))
     
   # Load data:
   urbObs = getObservedArray('urb')
+  if scenario==3:
+    urbObs = subsetUrbanZones(urbObs,aim)
   
   cells = len(urbObs[0,0,1])
   nanCells = sum(np.isnan(urbObs[0,0,1]))
@@ -205,6 +271,8 @@ def calculateKappaSimulation():
     print(row)
     # Load modelled urban for the given obs year
     urbMod = np.load(os.path.join(arrayFolder, 'urb_subset_'+str(row[1]) + '.npy'))
+    if scenario==3:
+      urbMod = subsetUrbanZones(urbMod,aim)
 
     # Define conditions to compare simulated and actual (observed) maps
     obs1 = (urbObs[row[0],0,1] == 1)
@@ -252,7 +320,9 @@ def calculateKappaSimulation():
       
   # Set the name of the file
   fileName = os.path.join(arrayFolder, str('kappa_simulation'))
-
+  if scenario==3:
+    fileName = os.path.join(arrayFolder, 'kappa_simulation_'+str(aim[:3]))
+      
   # Clear the directory if needed
   if os.path.exists(fileName + '.npy'):
       os.remove(fileName + '.npy')
@@ -260,9 +330,9 @@ def calculateKappaSimulation():
   # Save the data  
   np.save(fileName, kappaSimulation)
 
-calculateKappaSimulation()
-
-def calcRMSE(diffArray, aVariable, scenario=None):
+def calcRMSE(metric, scenario, aim):
+  diffArray = createDiffArray(metric,scenario,aim)
+  # Get the number of parameter sets and number of zones
   pSets = diffArray.shape[1]
   zones = diffArray.shape[2]
   # Create empty array. Rows = nr of observed timesteps, columns = nr of parameter sets
@@ -271,42 +341,26 @@ def calcRMSE(diffArray, aVariable, scenario=None):
   # Calculate RMSE for each timestep and parameter set. Number of observations = number of zones
   for row in range(0,len(obsTimeSteps)):
     for col in range(0,pSets):
-      # Create a list containing values for each zone or selected zones only
+      # Create a list containing difference between the modelled and observed metric for the zones
       x = diffArray[row,col].flatten()
-      if scenario==3:
-        # Path to the file storing numbers of calibration zones:
-        calibration_zones_file = os.path.join(os.getcwd(),'input_data', country, 'calibration_zones.txt')
-        # Read only first column from the file and get the zones numbers.
-        # The zone numbers start with 1, so substract 1 to get values starting from 0:
-        calibration_zones = [int(x.split("\t")[0])-1 for x in open(calibration_zones_file).readlines()]
+      # In case of scenario 3 subset only selected zones for metric fdi and wfdi. Other metrics are already subset.
+      if (scenario==3 and metric in ['fdi', 'wfdi']):
+        # Scenario 3: calibration based on selected zones
+        calibration_zones = getSelectedZones(aim)
+        # Calculate the difference between the modelled and observed metrics
         x = np.array([diffArray[row,col].flatten()[x] for x in calibration_zones])
       # Remove nan values
       x = x[~numpy.isnan(x)]
       # Calculate RMSE for each zones
       rmseArray[row,col] = np.sqrt(np.mean(x**2))
-
   return rmseArray
-  
-def RMSEindex_eachTimeStep(rmseArr):
-  fitList = []
-  
-  for year in range(1,len(obsTimeSteps)):
-    index = 0
-    base = [rmseArr[year,:][0],index]
-    for r in rmseArr[year,:]:
-      if np.absolute(r) < np.absolute(base[0]):
-        base[0] = r
-        base[1] = index
-      index = index+1
-    # Create a list storing a liast of observed timestep and index of parameter set)
-    fitList.append([obsTimeSteps[year],base[1]])
-  return(fitList)
 
-def RMSEindex_selectedPeriod(aRMSE,scenario,aim):
-  # scenario and aim define the period, for which the RMSE is to be calculated
+def getRMSEIndex(metric,scenario,aim): # earlier RMSEindex_selectedArea and RMSEindex_selectedPeriod
   # period is a list containing indexes of selected years, it is defined by the calibration scenario
-
   period = parameters.getCalibrationPeriod()[scenario][aim]
+  # get the array with RMSE
+  aRMSE = calcRMSE(metric, scenario, aim)
+  # get the initial value of the mean RMSE for the given period
   mBase = [np.absolute(np.mean(aRMSE[period,0])),0]
   # Loop parameter configurations to find the one with the smalles abs mean value for all years
   for p in range(len(aRMSE[0,:])):
@@ -314,80 +368,56 @@ def RMSEindex_selectedPeriod(aRMSE,scenario,aim):
     if mRMSE < mBase[0]:
       mBase[0] = mRMSE
       mBase[1] = p
+  # Return the index with the smallest mean RMSE
   return mBase[1]
 
-def RMSEindex_selectedArea(metric,aim):
-  if metric in ['cilp','pd']:
-    metric = metric + '_' + aim[:3]
-    
-  modelled = getModelledArray(metric)
-  observed = getObservedArray(metric)
-  dArray = createDiffArray(modelled,observed)
-  # For the metrics calculated for each zone separately (fdi, wfdi) calculate the RMSE only for selected zones
-  if metric in ['fdi', 'wfdi']: 
-    zoneRMSE = calcRMSE(dArray, metric, scenario=3)
-  # For 'pd' and 'cilp' the selected zones are already saved in the files
+def getKappaIndex(scenario,aim):
+  # period is a list containing indexes of selected years, it is defined by the calibration scenario
+  period = parameters.getCalibrationPeriod()[scenario][aim]
+  # get the array with kappa values for the whole study area or the selected zones only
+  kappaArr = getKappaArray(scenario,aim)
+  # get the initial value of the mean Kappa for the given period   
+  kBase = [np.mean(kappaArr[period,0]),0]
+  # Loop parameter configurations to find the one with the best mean value for years 2000 and 2006
+  for p in range(len(kappaArr[0,:])):
+    mKappa = np.mean(kappaArr[period,p])
+    if mKappa > kBase[0]:
+      kBase[0] = mKappa
+      kBase[1] = p
+  return kBase[1]
+
+def getAveragedArray(array, scenario, aim):
+  # period is a list containing indexes of selected years, it is defined by the scenario
+  period = parameters.getCalibrationPeriod()[scenario][aim]
+  # get average values
+  a_mean = [(a1+a2)/2 for a1,a2 in zip(array[period][0],array[period][1])]
+  return a_mean
+  
+def getNormalizedArray(array, scenario, aim, kappa=None):
+  a_max = np.amax(array)
+  a_min = np.amin(array)
+  if kappa==True:
+    a_norm = [(x - a_min) / (a_max - a_min) for x in array]
   else:
-    zoneRMSE = calcRMSE(dArray, metric)
-
-  return RMSEindex_selectedPeriod(zoneRMSE,3,'calibration')
+    a_norm = [(a_max - x) / (a_max - a_min) for x in array]
+  return a_norm
   
-def biggestKappaInObsYear(kappaArr):
-  fitList = []
-  
-  for year in range(1,len(obsTimeSteps)):
-    index = 0
-    base = [kappaArr[year,:][0],index]
-    for r in kappaArr[year,:]:
-      if r > base[0]:
-        base[0] = r
-        base[1] = index
-      index = index+1
-    # Create a list storing a liast of observed timestep and index of parameter set)
-    fitList.append([obsTimeSteps[year],base[1]])
-  return(fitList)
-
-def biggestKappa_2000_2006(kappaArr):
-  kBase = [np.mean(kappaArr[1:3,0]),0]
-  # Loop parameter configurations to find the one with the best mean value for years 2000 and 2006
-  for p in range(len(kappaArr[0,:])):
-    mKappa = np.mean(kappaArr[1:3,p])
-    if mKappa > kBase[0]:
-      kBase[0] = mKappa
-      kBase[1] = p
-  return kBase[1]
-
-def biggestKappa_2012_2018(kappaArr):
-  kBase = [np.mean(kappaArr[-2,0]),0]
-  # Loop parameter configurations to find the one with the best mean value for years 2000 and 2006
-  for p in range(len(kappaArr[0,:])):
-    mKappa = np.mean(kappaArr[-2,p])
-    if mKappa > kBase[0]:
-      kBase[0] = mKappa
-      kBase[1] = p
-  return kBase[1]
-
- 
-def RMSEindex_KAPPAindex_selectedPeriod(aRMSE,aKAPPA,w_RMSE,w_Kappa,scenario,aim):
-  # multi - objective goal function
+def getMultiObjectiveIndex(metric, w_RMSE,w_Kappa,scenario,aim):
   # RMSE and kappa metrics are combined (summed)
   # each metric has a weight (w1,w2)
   w1 = w_RMSE
   w2 = w_Kappa
-  # scenario and aim define the period, for which the RMSE is to be calculated
-  # period is a list containing indexes of selected years, it is defined by the scenario
-  period = parameters.getCalibrationPeriod()[scenario][aim]
-  # Normalize the mean RMSE values for the selected period
-  RMSE_mean = [(r1+r2)/2 for r1,r2 in zip(aRMSE[period][0],aRMSE[period][1])]
-  RMSE_max = np.amax(RMSE_mean)
-  RMSE_min = np.amin(RMSE_mean)
-  RMSE_norm = [(RMSE_max - x) / (RMSE_max - RMSE_min) for x in RMSE_mean]
-
-  # Calculate the mean value for Kappa.It has already values 0-1, co there is no need for normalization.
-  Kappa_mean = [(k1+k2)/2 for k1,k2 in zip(aKAPPA[period][0],aKAPPA[period][1])]
-  Kappa_max = np.amax(Kappa_mean)
-  Kappa_min = np.amin(Kappa_mean)
-  Kappa_norm = [(x - Kappa_min) / (Kappa_max - Kappa_min) for x in Kappa_mean]
+  
+  # Get the RMSE for the given metric and scenario
+  aRMSE = calcRMSE(metric,scenario,aim)
+  # Calculate the mean value and normalize the mean RMSE values for the selected period
+  RMSE_mean = getAveragedArray(aRMSE, scenario, aim)
+  RMSE_norm = getNormalizedArray(RMSE_mean, scenario,aim)
+  # Get the Kappa array for the given aim and scenario
+  aKAPPA = getKappaArray(scenario,aim)
+  # Calculate the mean value and normalize the mean value for Kappa.
+  Kappa_mean = getAveragedArray(aKAPPA, scenario, aim)
+  Kappa_norm = getNormalizedArray(Kappa_mean, scenario,aim,kappa=True)
   
   rBase = [RMSE_norm[0],0]
   kBase = [Kappa_norm[0],0]
@@ -404,45 +434,8 @@ def RMSEindex_KAPPAindex_selectedPeriod(aRMSE,aKAPPA,w_RMSE,w_Kappa,scenario,aim
     if multiGoal > multiBase[0]:
       multiBase[0] = multiGoal
       multiBase[1] = p
-    
+  # Return the best index
   return multiBase[1]
-
-###############################################################################################################
-############################ CALBRATE AND VALIDATE
-###############################################################################################################
-
-def getCalibratedParameters(calibrationScenario):
-  # create a list of indexes
-  indexes = []
-  for m in metricList:
-    zonesModelled = getModelledArray(m)
-    zonesObserved = getObservedArray(m)
-    rmseArray = calcRMSE(createDiffArray(zonesModelled,zonesObserved), m)
-    if calibrationScenario in [1,2]:
-      calibratedIndex = RMSEindex_selectedPeriod(rmseArray, calibrationScenario,'calibration')
-    elif calibrationScenario == 3:
-      calibratedIndex = RMSEindex_selectedArea(rmseArray, 'calibration')
-    else:
-      print('Invalid calibration scenario. Possible scenarios: 1,2,3')
-    
-    parameterSets = list(getParameterConfigurations())
-    theParameters = list(parameterSets[calibratedIndex])
-    theParameters.insert(0,calibratedIndex)
-    theParameters.insert(0,m)
-    indexes.append(theParameters)
-  
-  kappaArray = np.load(os.path.join(arrayFolder, 'kappa.npy'))
-  kappaIndexes = {
-    1: biggestKappa_2000_2006(kappaArray),
-    2: biggestKappa_2012_2018(kappaArray)
-    }
-  kappaIndex = kappaIndexes[calibrationScenario] 
-  kappaParameters = list(parameterSets[kappaIndex])
-  kappaParameters.insert(0,kappaIndex)
-  kappaParameters.insert(0,'kappa')
-  indexes.append(kappaParameters)
-
-  return indexes
 
 def saveResults(array, scenario, fileName):
   with open(os.path.join(arrayFolder,'Scenario'+'_'+str(scenario)+'_'+fileName),
@@ -451,13 +444,79 @@ def saveResults(array, scenario, fileName):
     for row in array:
       writer.writerow(row)
 
-def calibrate_validate(scenario): 
-  indexes = np.array(getCalibratedParameters(scenario))[:,1]
-  kappaArray = np.load(os.path.join(arrayFolder, 'kappa.npy'))
+def getLog():
+  log = [
+    ['country: ',parameters.getCountryName()],
+    ['observed time steps: ', parameters.getObsTimesteps()],
+    ['parameters (min, max, step): ',parameters.getParametersforCalibration()],
+    ['alpha: ',parameters.getAlphaValue()]]
+  return log
+
+def getCalibratedParameters(calibrationScenario):
+  # create a list of metric names, indexes of the parameters and the parameters' values
+  indexes = []
+  for m in metricList:
+    calibratedIndex = getRMSEIndex(m,calibrationScenario,'calibration')  
+    parameterSets = list(getParameterConfigurations())
+    theParameters = list(parameterSets[calibratedIndex])
+    theParameters.insert(0,calibratedIndex)
+    theParameters.insert(0,m)
+    indexes.append(theParameters)
+  
+  kappaIndex = getKappaIndex(calibrationScenario,'calibration') 
+  kappaParameters = list(parameterSets[kappaIndex])
+  kappaParameters.insert(0,kappaIndex)
+  kappaParameters.insert(0,'kappa')
+  indexes.append(kappaParameters)
+
+  return indexes
+
+'''not that important
+def biggestKappaInObsYear(kappaArr):
+  fitList = []
+  
+  for year in range(1,len(obsTimeSteps)):
+    index = 0
+    base = [kappaArr[year,:][0],index]
+    for r in kappaArr[year,:]:
+      if r > base[0]:
+        base[0] = r
+        base[1] = index
+      index = index+1
+    # Create a list storing a liast of observed timestep and index of parameter set)
+    fitList.append([obsTimeSteps[year],base[1]])
+  return(fitList)
+
+def RMSEindex_eachTimeStep(rmseArr):
+  fitList = []
+  
+  for year in range(1,len(obsTimeSteps)):
+    index = 0
+    base = [rmseArr[year,:][0],index]
+    for r in rmseArr[year,:]:
+      if np.absolute(r) < np.absolute(base[0]):
+        base[0] = r
+        base[1] = index
+      index = index+1
+    # Create a list storing a liast of observed timestep and index of parameter set)
+    fitList.append([obsTimeSteps[year],base[1]])
+  return(fitList)'''
+
+###############################################################################
+############################ CALBRATE AND VALIDATE ############################
+###############################################################################
+
+def calibrate_validate(scenario):
+  # Get parameter values
+  p = getCalibratedParameters(scenario)
+  # Get the parameter sets' indices only
+  indexes = np.array(p)[:,1]
 
   c={}
   for aim in ['calibration', 'validation']:
+    kappaArray = getKappaArray(scenario,aim)
     aim_period = parameters.getCalibrationPeriod()[scenario][aim]
+    
     # create the array to store the calibration values
     v = np.zeros((len(metricList)+1,len(metricList)+1))
     for i, index in enumerate(indexes):
@@ -467,21 +526,107 @@ def calibrate_validate(scenario):
           v[i,j] = np.mean(kappaArray[aim_period, int(index)])
         else:
           # Calculate the mean RMSE for the selected senario
-          zonesModelled = getModelledArray(metricCol)
-          zonesObserved = getObservedArray(metricCol)
-          rmseArray = calcRMSE(createDiffArray(zonesModelled,zonesObserved), metricCol)
+          rmseArray = calcRMSE(metricCol,scenario,aim)
           v[i,j] = np.mean(rmseArray[aim_period, int(index)])
     c[aim] = v
 
-  #x = np.concatenate(('Calibration:',c['calibration'],'Validation:'],c['validation']), axis=0)
-  x = ['Calibration:']+list(c['calibration'])+['Validation:']+list(c['validation'])
-  return x
+  # Create a list containing all errors
+  errors = [['Calibration:']]+list(c['calibration'])+[['Validation:']]+list(c['validation'])
+  # Save the errors
+  saveResults(['Scenario '+str(scenario)]+getLog()+p+errors, scenario, 'calibration_validation.csv')
+
+def multiobjective(scenario):
+  # Define weights for the multi-objective calibration. Weights are assigned to RMSE and kappa values.
+  # function arguents: weight_min,weight_max+1,weight_step
+  weight_min = 0
+  weight_max = 10
+  weight_step = 1
+  weights = range(weight_min,weight_max+weight_step,weight_step)
+  # Create array to store multiobjective validation results. The array stores indices and validation results:
+  # Rows: index / RMSE / Kappa / goal function for each metric
+  # Columns: weight combinations (e.g. 0: [RMSE_weight = weight_min, Kappa_weight = weight_max])
+  nrows = len(metricList) * 4
+  ncols = int((weight_max-weight_min)/weight_step)+1
+  multiobjective = np.zeros((nrows,ncols))
+  # get Kappa for validation before the loop
+  kappa = getKappaArray(scenario, 'validation')
+  # Calculate average kappa values for selected period
+  avKappa = getAveragedArray(kappa, scenario, 'validation')
+  # Normalize kappa array
+  norKappa = getNormalizedArray(avKappa, scenario, 'validation',kappa=True)
+
+  for w in weights:
+    # Assign weights
+    rmse_weight = w/10
+    kappa_weight = 1 - rmse_weight
+
+    # Calibrate goal function for each metric          
+    for row,metric in enumerate(metricList):
+      # Get the index of the calibrated parameter set based on the multi-objective goal function
+      multiIndex = getMultiObjectiveIndex(metric, rmse_weight,kappa_weight,scenario,'calibration')
+      # Validate
+      # Get the RMSE array
+      rmse = calcRMSE(metric, scenario,'validation')
+      # Calculate average RMSE values for selected period
+      avRMSE = getAveragedArray(rmse, scenario, 'validation')
+      # Normalize RMSE array
+      norRMSE = getNormalizedArray(avRMSE, scenario, 'validation')
+      # Save selected index, the average RMSE and the average Kappa
+      multiobjective[row*4, w] = multiIndex
+      multiobjective[row*4+1, w] = avRMSE[multiIndex]
+      multiobjective[row*4+2, w] = avKappa[multiIndex]
+      # Results of the goal function for the validation data
+      multiobjective[row*4+3, w] = rmse_weight * norRMSE[multiIndex] + kappa_weight * norKappa[multiIndex]
+
+  # Save results
+  saveResults(multiobjective, scenario, 'multiobjective.csv')
 
 
-############33 TESTTT
-'''kappa = np.load(os.path.join(arrayFolder,'kappa.npy'))
-print(kappa)
+############ TESTTT
 
+
+
+
+"""country = 'IE_good_results'
+arrayFolder = os.path.join(os.getcwd(),'results',country,'metrics')
+parameters = np.load(os.path.join(arrayFolder,'parameter_sets.npy'))
+print(parameters[146])
+
+arrayFolder = os.path.join(os.getcwd(),'results','PL','metrics')
+kappa_simulation = np.load(os.path.join(arrayFolder,'kappa_simulation.npy'))
+allocation = np.load(os.path.join(arrayFolder,'allocation_disagreement.npy'))
+scenario = 1
+period_validation = parameters.getCalibrationPeriod()[scenario]['validation']
+
+print(country, 'scenario', scenario, 'period', period_validation)
+indexes = np.array(getCalibratedParameters(scenario))[:,1]
+print(indexes)
+print('allocation')
+for i in indexes:
+  allocation_av = (allocation[period_validation[0]]+allocation[period_validation[1]])/2
+  print(allocation_av[int(i)])
+print('kappa simulation')
+for i in indexes:
+  kappa_av = (kappa_simulation[period_validation[0]]+kappa_simulation[period_validation[1]])/2
+  print(kappa_av[int(i)])"""
+  
+  
+  
+'''
+  
+print(country, 'mean kappa simulation for validation (scenario 1)')
+period=[3,4]
+kappa = np.load(os.path.join(arrayFolder,'kappa_simulation.npy'))
+for i in [108,164,130,163,145]:
+  av = sum(kappa[period])/2
+  print(i, av[i])
+#print(155,np.mean(kappa[period,155]))
+#print(156,np.mean(kappa[period,156]))
+#print(158,np.mean(kappa[period,158]))
+'''
+
+
+'''
 timestep=29
 theName = 'urb' + str(timestep) + '.obj'
 fileName = os.path.join('F:/results/IE', str(158), theName)
@@ -500,33 +645,11 @@ for row in enumerate(obsTimeSteps):
     urbMod159year2018 = urbMod[0,158,1].reshape((1600,1600))
     n2p = numpy2pcr(Nominal,urbMod159year2018,0)
     aguila(n2p)
+'''
 
 
-'''
-'''
-ALMOST DONE
-multiobjective = np.zeros((12,11))
-kappa = np.load(os.path.join(arrayFolder,'kappa.npy'))
-k=[]
-for k1, k2 in zip(kappa[3:5][0],kappa[3:5][1]):
-  k.append((k1+k2)/2)
-for w in range(0,11,1):
-  rmse_weight = w/10
-  kappa_weight = 1 - rmse_weight
-  #print('rmse ',rmse_weight,'kappa ',kappa_weight)
-        
-  for row,metric in enumerate(['cilp','fdi','wfdi','pd']):
-    modelled = getModelledArray(metric)
-    observed = getObservedArray(metric)  
-    dArray = createDiffArray(modelled,observed)
-    rmse = calcRMSE(dArray, metric)
-    theR = (rmse[3:5][0]+rmse[3:5][1])/2
-    
 
-    hereIndex = RMSEindex_KAPPAindex_selectedPeriod(rmse,kappa,rmse_weight,kappa_weight,1,'calibration')
-    multiobjective[row*3, w] = hereIndex
-    multiobjective[row*3+1, w] = theR[hereIndex]
-    multiobjective[row*3+2, w] = k[hereIndex]
-print('done')
-saveResults(multiobjective, 1, 'multiobjective.csv')
-'''
+
+
+  
+
