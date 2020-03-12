@@ -19,7 +19,7 @@ areaMetricNames = ['pd_cal','pd_val','cilp_cal','cilp_val']
 # Get the number of parameter iterations and number of time step defined in the parameter.py script
 nrOfTimesteps=parameters.getNrTimesteps()
 
-numberOfIterations = parameters.getNumberofIterations(parameters.getSuitFactorDict(), parameters.getParametersforCalibration())
+numberOfIterations = parameters.getNumberofIterations()
 
 iterations = range(1, numberOfIterations+1, 1)
 
@@ -162,7 +162,7 @@ print("All number folders deleted.")
 ########### Calculate Kappa statistics
 # Calculate Kappa standard and Kappa statistic fot the whole study area
 calibrate.calculateKappa()
-calibrate.calculateKappaSimulation()"""
+calibrate.calculateKappaSimulation()
 
 # Calculate Kappa standard and Kappa statistic for the calibration and validation based on selected zones
 for aim in ['calibration','validation']:
@@ -178,8 +178,8 @@ print("Kappa statistics calculated and saved as npy file")
 # 1: calibrate on year 2000-2006 valdate on 2012-2018
 # 2: calibrate on years 2012-2018 validate on 200-2006
 # 3: calibrate and validate on different aras (zones)
-
-for scenario in [1,2,3]:
+"""
+for scenario in [1,2]:
   print('Scenario '+str(scenario))
   # Calibrate, validate and save the results as csv file
   calibrate.calibrate_validate(scenario)
