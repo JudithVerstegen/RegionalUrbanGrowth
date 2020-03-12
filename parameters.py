@@ -74,7 +74,7 @@ def getCountryName():
   """ Returns the case study symbol """
   # case studies: 'IT', 'IE', 'PL'
 
-  name = 'PL'
+  name = 'IE'
   return name
   
   
@@ -145,14 +145,14 @@ def getSuitFactorDict():
   suitFactorDict[1] = [1, 2, 3, 4]
   return suitFactorDict
 
-def getNumberofIterations(getSuitFactorDict, getParametersforCalibration):
+def getNumberofIterations():
   """ Returns number of iterations depnded on the number, min, max and step of the parameters"""
   import numpy as np
   suma = 0
   count = 0
-  min_p = getParametersforCalibration[0]
-  max_p = getParametersforCalibration[1]
-  stepsize = getParametersforCalibration[2]
+  min_p = getParametersforCalibration()[0]
+  max_p = getParametersforCalibration()[1]
+  stepsize = getParametersforCalibration()[2]
   param_steps = np.arange(min_p, max_p + 0.1, stepsize)
   for step in range(0,len(param_steps)):
     # Round parameters to avoid issues with the precision
