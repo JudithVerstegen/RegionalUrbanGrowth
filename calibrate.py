@@ -16,7 +16,7 @@ metricList = parameters.getSumStats()
 
 # Get the number of parameter iterations and number of time step defined in the parameter.py script
 nrOfTimesteps=parameters.getNrTimesteps()
-numberOfIterations = parameters.getNumberofIterations(parameters.getSuitFactorDict(), parameters.getParametersforCalibration())
+numberOfIterations = parameters.getNumberofIterations()
 iterations = range(1, numberOfIterations+1, 1)
 timeSteps=range(1,nrOfTimesteps+1,1)
 
@@ -355,36 +355,45 @@ def calcRMSE(metric, scenario, aim):
       rmseArray[row,col] = np.sqrt(np.mean(x**2))
   return rmseArray
 
-def getRMSEIndex(metric,scenario,aim): # earlier RMSEindex_selectedArea and RMSEindex_selectedPeriod
+def getRankedRMSE(metric,scenario,aim):
   # period is a list containing indexes of selected years, it is defined by the calibration scenario
   period = parameters.getCalibrationPeriod()[scenario][aim]
   # get the array with RMSE
   aRMSE = calcRMSE(metric, scenario, aim)
-  # get the initial value of the mean RMSE for the given period
-  mBase = [np.absolute(np.mean(aRMSE[period,0])),0]
-  # Loop parameter configurations to find the one with the smalles abs mean value for all years
-  for p in range(len(aRMSE[0,:])):
-    mRMSE = np.absolute(np.mean(aRMSE[period,p]))
-    if mRMSE < mBase[0]:
-      mBase[0] = mRMSE
-      mBase[1] = p
-  # Return the index with the smallest mean RMSE
-  return mBase[1]
+  # get the average RMSE for the selected years
+  avRMSE = np.mean(aRMSE[period],axis=0)
+  # order the parameter sets
+  RMSEorder = avRMSE.argsort()
+  # rank the parameter sets. rank == 0 indifies the best parameter set
+  RMSEranks = RMSEorder.argsort()
+  
+  return RMSEranks
+
+def getCalibratedIndeks(metric,scenario): 
+  if metric == 'kappa':
+    # Get the ranked parameter sets based on Kappa
+    ranked = getKappaIndex(scenario,'calibration')
+  else:
+    # Get the ranked parameter sets based on RMSE
+    ranked = getRankedRMSE(metric,scenario,'calibration')    
+  calibratedIndex, = np.where(ranked == 0)
+  return int(calibratedIndex)
 
 def getKappaIndex(scenario,aim):
   # period is a list containing indexes of selected years, it is defined by the calibration scenario
   period = parameters.getCalibrationPeriod()[scenario][aim]
   # get the array with kappa values for the whole study area or the selected zones only
   kappaArr = getKappaArray(scenario,aim)
-  # get the initial value of the mean Kappa for the given period   
-  kBase = [np.mean(kappaArr[period,0]),0]
-  # Loop parameter configurations to find the one with the best mean value for years 2000 and 2006
-  for p in range(len(kappaArr[0,:])):
-    mKappa = np.mean(kappaArr[period,p])
-    if mKappa > kBase[0]:
-      kBase[0] = mKappa
-      kBase[1] = p
-  return kBase[1]
+  # get the average kappa for the selected years
+  avKAPPA = np.mean(kappaArr[period],axis=0)
+  # order the parameter sets
+  KAPPAorder = avKAPPA.argsort()
+  # rank the parameter sets. 
+  KAPPAranks = KAPPAorder.argsort()
+  # reverse the ranking of the parameter sets. rank == 0 indifies the best parameter set
+  KAPPAranks = np.subtract(np.amax(KAPPAranks),KAPPAranks)
+
+  return KAPPAranks
 
 def getAveragedArray(array, scenario, aim):
   # period is a list containing indexes of selected years, it is defined by the scenario
@@ -453,23 +462,47 @@ def getLog():
   return log
 
 def getCalibratedParameters(calibrationScenario):
-  # create a list of metric names, indexes of the parameters and the parameters' values
-  indexes = []
-  for m in metricList:
-    calibratedIndex = getRMSEIndex(m,calibrationScenario,'calibration')  
-    parameterSets = list(getParameterConfigurations())
-    theParameters = list(parameterSets[calibratedIndex])
-    theParameters.insert(0,calibratedIndex)
-    theParameters.insert(0,m)
-    indexes.append(theParameters)
+  # create an array of metric names, indexes of the parameters and the parameters' values
+  pArray = np.zeros((len(metricList+['kappa']),6), dtype='object')
+  parameterSets = getParameterConfigurations()
+  for row,m in enumerate(metricList):
+    # Get the calibrated parameter index
+    calibratedIndex = getCalibratedIndeks(m,calibrationScenario)
+    p = parameterSets[calibratedIndex]
+    pArray[row,:] = m, calibratedIndex, p[0],p[1],p[2],p[3]
   
-  kappaIndex = getKappaIndex(calibrationScenario,'calibration') 
-  kappaParameters = list(parameterSets[kappaIndex])
-  kappaParameters.insert(0,kappaIndex)
-  kappaParameters.insert(0,'kappa')
-  indexes.append(kappaParameters)
+  # Get the parameter index with the highest Kappa 
+  kappaIndex = getCalibratedIndeks('kappa',calibrationScenario)
+  # Get the best parameter set
+  k = parameterSets[kappaIndex]
+  # Fill the array
+  pArray[row+1,:] = 'kappa',kappaIndex, k[0],k[1],k[2],k[3]
 
-  return indexes
+  return pArray
+
+def getTopCalibratedParameters(metric, scenario, numberOfTopPerformers):
+  topArray = np.zeros((numberOfTopPerformers,7), dtype='object')
+  parameterSets = getParameterConfigurations()
+  if metric == 'kappa':
+    # Get the ranked parameter sets based on Kappa
+    ranked = getKappaIndex(scenario,'calibration')
+    # Get the validation error
+    error = getKappaArray(scenario,'validation')
+  else:
+    # Get the ranked parameter sets based on RMSE
+    ranked = getRankedRMSE(metric,scenario,'calibration')
+    # Get the validation error
+    error = calcRMSE(metric,scenario,'validation')
+  
+  for i in range(0,numberOfTopPerformers):
+    # Get the parameter index depending on the rank i
+    calibratedIndex, = np.where(ranked == i)
+    avError = getAveragedArray(error, scenario, 'validation')
+    p = parameterSets[calibratedIndex]
+    topArray[i,[0,1,2]] = metric, calibratedIndex[0], avError[int(calibratedIndex)]
+    for j in [3,4,5,6]:
+      topArray[i, j] = p[0][j-3]
+  return topArray
 
 '''not that important
 def biggestKappaInObsYear(kappaArr):
@@ -533,7 +566,7 @@ def calibrate_validate(scenario):
   # Create a list containing all errors
   errors = [['Calibration:']]+list(c['calibration'])+[['Validation:']]+list(c['validation'])
   # Save the errors
-  saveResults(['Scenario '+str(scenario)]+getLog()+p+errors, scenario, 'calibration_validation.csv')
+  saveResults(['Scenario '+str(scenario)]+getLog()+list(p)+errors, scenario, 'calibration_validation.csv')
 
 def multiobjective(scenario):
   # Define weights for the multi-objective calibration. Weights are assigned to RMSE and kappa values.
@@ -543,27 +576,26 @@ def multiobjective(scenario):
   weight_step = 1
   weights = range(weight_min,weight_max+weight_step,weight_step)
   # Create array to store multiobjective validation results. The array stores indices and validation results:
-  # Rows: index / RMSE / Kappa / goal function for each metric
+  result = np.empty((len(metricList),1),dtype='object')
+  # 4 rows: index / RMSE / Kappa / goal function for each metric
   # Columns: weight combinations (e.g. 0: [RMSE_weight = weight_min, Kappa_weight = weight_max])
-  nrows = len(metricList) * 4
   ncols = int((weight_max-weight_min)/weight_step)+1
-  multiobjective = np.zeros((nrows,ncols))
   # get Kappa for validation before the loop
   kappa = getKappaArray(scenario, 'validation')
   # Calculate average kappa values for selected period
   avKappa = getAveragedArray(kappa, scenario, 'validation')
   # Normalize kappa array
   norKappa = getNormalizedArray(avKappa, scenario, 'validation',kappa=True)
-
-  for w in weights:
-    # Assign weights
-    rmse_weight = w/10
-    kappa_weight = 1 - rmse_weight
-
-    # Calibrate goal function for each metric          
-    for row,metric in enumerate(metricList):
+ 
+  # Calibrate goal function for each metric          
+  for row,metric in enumerate(metricList):
+    multiobjective = np.zeros((4,ncols))
+    for w in weights:
+      # Assign weights
+      rmse_weight = w/10
+      kappa_weight = 1 - rmse_weight    
       # Get the index of the calibrated parameter set based on the multi-objective goal function
-      multiIndex = getMultiObjectiveIndex(metric, rmse_weight,kappa_weight,scenario,'calibration')
+      multiIndex = getMultiObjectiveIndex(metric,rmse_weight,kappa_weight,scenario,'calibration')
       # Validate
       # Get the RMSE array
       rmse = calcRMSE(metric, scenario,'validation')
@@ -572,19 +604,28 @@ def multiobjective(scenario):
       # Normalize RMSE array
       norRMSE = getNormalizedArray(avRMSE, scenario, 'validation')
       # Save selected index, the average RMSE and the average Kappa
-      multiobjective[row*4, w] = multiIndex
-      multiobjective[row*4+1, w] = avRMSE[multiIndex]
-      multiobjective[row*4+2, w] = avKappa[multiIndex]
+      multiobjective[0, w] = multiIndex
+      multiobjective[1, w] = avRMSE[multiIndex]
+      multiobjective[2, w] = avKappa[multiIndex]
       # Results of the goal function for the validation data
-      multiobjective[row*4+3, w] = rmse_weight * norRMSE[multiIndex] + kappa_weight * norKappa[multiIndex]
+      multiobjective[3, w] = rmse_weight * norRMSE[multiIndex] + kappa_weight * norKappa[multiIndex]
+    result[row,0] = multiobjective
 
   # Save results
-  saveResults(multiobjective, scenario, 'multiobjective.csv')
+  saveResults(result, scenario, 'multiobjective.csv')
+  
+  # Set the name of the file
+  fileName = os.path.join(arrayFolder, 'scenario_'+str(scenario)+'_multiobjective')
+  # Clear the directory if needed
+  if os.path.exists(fileName + '.npy'):
+      os.remove(fileName + '.npy')
+  # Save the data  
+  np.save(fileName, result)
+    
+  return result
 
-
+  
 ############ TESTTT
-
-
 
 
 """country = 'IE_good_results'
