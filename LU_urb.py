@@ -601,6 +601,8 @@ class LandUseChangeModel(DynamicModel):
     # Save the metrics for calibration and validation based on the area
     # For each meric a value is saved for the preselected cell(s).
     # The cell coordinates are created in create_initial_maps.py and saved in .col files:
+    # to be checked: each landscape metrics can be saved in sampPoint.col, probably also the _cal and _val.
+    # RMSE get the mean value for all zones. RMSE for 16 same zones == RMSE for 8 same zones
     col_files = {
       'fdi': 'sampPoint.col',         # each zone
       'wfdi': 'sampPoint.col',        # each zone
