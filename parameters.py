@@ -84,7 +84,7 @@ def getCovarOn():
   return on
 
 def getSumStats():
-  # 'np': Number of patches <- equal to patch density 'pd'
+  # 'np': Number of patches
   # 'mp': Mean patch size
   # 'cilp': Compactness index of the largest patch
   # 'fdi': Fractal dimension index

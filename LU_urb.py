@@ -235,7 +235,7 @@ class LandUseType:
       else:
         print('ERROR: unknown suitability factor for landuse', self.typeNr)
       i += 1
-    suitabilityMap += self.weightInitialSuitabilityMap * \
+    suitabilityMap += self.weightInitialSuitabilityMap * \ # WHY MULTIPLY AGAIN BY WEIGHT
                       self.initialSuitabilityMap
     # Add randomness
     suitabilityMap = self.getRandomClumps() * suitabilityMap
@@ -659,7 +659,7 @@ nrOfTimeSteps = parameters.getNrTimesteps()
 #nrOfSamples = parameters.getNrSamples() # This variable is not being used as MC was eliminated from the model
 # Find the number of parameters to calibrate
 nrOfParameters = len(parameters.getSuitFactorDict()[1])
-nrOfIterations = parameters.getNumberofIterations(parameters.getSuitFactorDict(), parameters.getParametersforCalibration())
+nrOfIterations = parameters.getNumberofIterations()
 
 # Before loop to save computation time
 inputfolder = os.path.join('input_data', parameters.getCountryName())
@@ -672,19 +672,6 @@ preMCLandUse.determineDistanceToStations(stations)
 roads = readmap(inputfolder + '/roads')
 preMCLandUse.determineSpeedRoads(roads)
 
-# Find the number of parameters to calibrate
-nrOfParameters = len(parameters.getSuitFactorDict()[1])
-
-# Before loop to save computation time
-inputfolder = os.path.join('input_data', parameters.getCountryName())
-nullMask = readmap(inputfolder + '/nullmask')
-
-landUseList = parameters.getLandUseList()
-preMCLandUse = LandUse(landUseList, nullMask)
-stations = readmap(inputfolder + '/train_stations')
-preMCLandUse.determineDistanceToStations(stations)
-roads = readmap(inputfolder + '/roads')
-preMCLandUse.determineSpeedRoads(roads)
 
 #######################
 ### Loop COMES HERE ###
