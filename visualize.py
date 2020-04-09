@@ -59,9 +59,13 @@ tickDict = {
 ### FUNCTIONS ###
 #################
 
-def setNameClearSave(scenario, figName):
+def setNameClearSave(figName, scenario=None):
   # Set the name and clear the directory if needed
-  wPath = os.path.join(resultFolder, 'Scenario_'+str(scenario)+'_'+ figName)
+  if scenario is None:
+    name = ''
+  else:
+    name = 'Scenario_'+str(scenario)+'_'
+  wPath = os.path.join(resultFolder, name + figName)
   if os.path.exists(wPath):
       os.remove(wPath)
 
@@ -167,7 +171,7 @@ def plotRMSE(oneMetric, scenario):#(rArray, oneMetric, observations, parameterSe
     plt.ylabel('root mean square error')
 
   # Set the name and clear the directory if needed
-  setNameClearSave(scenario,'RMSE_' + oneMetric + '.png')
+  setNameClearSave('RMSE_' + oneMetric + '.png',scenario)
   
 def plotObservedAndCalibratedMetrics(aMetric, scenario):#, observedYearArray, zonesObserved, zonesModelled, indexCalibratedSet):
   # Plot the observed values of metrics in one subplot
@@ -232,7 +236,7 @@ def plotObservedAndCalibratedMetrics(aMetric, scenario):#, observedYearArray, zo
       ncol=8)
   
   # Set the name and clear the directory if needed
-  setNameClearSave(scenario, 'obs_and_mod_'+aMetric+'.png')
+  setNameClearSave('obs_and_mod_'+aMetric+'.png',scenario)
 
 def plotKappa(scenario): #plotKappa_calibrationPeriod
   # Plot the kappa statistic for all parameter sets
@@ -240,7 +244,7 @@ def plotKappa(scenario): #plotKappa_calibrationPeriod
   # Load data
   kappaArray = calibrate.getKappaArray(scenario,aim='validation')
   kappaIndex = calibrate.getCalibratedIndeks('kappa',scenario)
-  parameterSets = getParameterConfigurations()
+  parameterSets = calibrate.getParameterConfigurations()
   
   # Create the figure
   fig = plt.figure(figsize=(3.2,3.2)) # Figure size set to give 8 cm of width
@@ -270,194 +274,12 @@ def plotKappa(scenario): #plotKappa_calibrationPeriod
   plt.legend()
   
   # Set the name and clear the directory if needed
-  setNameClearSave(scenario,'kappa.png')
-  
-def plotParameterValues(scenario):
-  # Number of metrics:
-  nParams = len(parameters.getSuitFactorDict()[1])
-  N = len(metricNames)+1 # = plus Kappa!
-  # Get the all possible parameter sets
-  parameterSets = calibrate.getParameterConfigurations()
-  
-  # Create figure
-  fig = plt.figure(figsize=(4,3.2))
-  # Create list to store the lists of parameters
-  weights = [[] for i in range(nParams)]
-  # Loop metrics
-  for m in metricNames:
-    # get the index of the best parameter set
-    calibratedIndex = calibrate.getCalibratedIndeks(m,scenario)
-    for j in range(nParams):
-      weights[j].append(parameterSets[calibratedIndex][j])
-  # Add Kappa
-  kapppaInx = calibrate.getCalibratedIndeks('kappa',scenario)
-  for j in range(nParams):
-    weights[j].append(parameterSets[kapppaInx][j])
+  setNameClearSave('kappa.png',scenario)
 
 
-  ind = np.arange(N)    # the x locations for the groups
-  alpha = 0.5
-  bottom = 0
-  c = ['green','red','purple','orange']
-  labels = ['NeighborSuitability', 'DistanceSuitability', 'TravelTimeCityBorder', 'CurrentLandUseSuitability']
-  for bar in range(len(weights)):
-    plt.bar(ind, weights[bar],label=labels[bar], bottom = bottom, alpha=alpha, color=c[bar])
-    bottom = bottom + np.array(weights[bar])
-
-  plt.title("Calibrated parameters", fontweight='bold')
-  plt.ylabel('parameters')
-  plt.xlabel('metrics')
-  plt.xticks(ind, metricNames + ['kappa'])
-  plt.yticks(np.arange(0, 1.5, 0.25),np.arange(0,1.1,0.25))
-  plt.legend(ncol=2)
-
-  setNameClearSave(scenario,'parameters.png')
-
-def plotUrbObs():
-  # Plot the observed urban arreas
-  ncol = 3
-  nrows = int(np.ceil(len(observedYears)/ncol))
-  # Load observed urb
-  urb_obs = calibrate.getObservedArray('urb')
-  # Create figure
-  fig = plt.figure(figsize=(7.14,2.5*nrows)) # Figure size set to give 16 cm of width
-  fig.suptitle('Observed urban areas',fontweight='bold', y=0.95)
-  # Create subplots
-  for index, oYear in enumerate(observedYears):
-    ax1 = plt.subplot(nrows,ncol,index+1)
-    ax1.get_xaxis().set_visible(False)
-    ax1.get_yaxis().set_visible(False)
-    ax1.set_title(oYear)
-    urbMatrix1 = np.reshape(urb_obs[index,0,1], (1600,1600))
-    ax1.xticks = ([])
-    cmap = colors.ListedColormap(['black','yellow'])
-    ax1.imshow(urbMatrix1)#, cmap=cmap)
-  
-  setNameClearSave('observed','urb.png')
-
-def plotUrbMod(metric,scenario):# theIndex, parameterSets):
-  theIndex = calibrate.getCalibratedIndeks(metric,scenario)
-  parameterSets = calibrate.getParameterConfigurations()
-  # Plot the modelled urban arreas
-  ncol = 3
-  nrows = int(np.ceil(len(observedYears)/ncol))
-  
-  # Create figure
-  fig = plt.figure(figsize=(7.14,2.5*nrows)) # Figure size set to give 16 cm of width
-  fig.suptitle(
-    'Modelled urban areas for parameter set '+str(theIndex)+': '+str(parameterSets[theIndex]),
-    fontweight='bold', y=0.95)
-  
-  # Create subplots
-  for index, oYear in enumerate(observedYears):
-    # Load modelled urban areas. Each year is saved in the seperate npy file.
-    urb_mod = calibrate.getModelledArray('urb_subset_'+str(obsTimeSteps[index]))
-    ax1 = plt.subplot(nrows,ncol,index+1)
-    ax1.get_xaxis().set_visible(False)
-    ax1.get_yaxis().set_visible(False)
-    ax1.set_title(oYear)
-    urbMatrix1 = np.reshape(urb_mod[0,theIndex,1], (1600,1600))
-    ax1.xticks = ([])
-    cmap = colors.ListedColormap([(0.98,0.98,0.95),'black'])
-    ax1.imshow(urbMatrix1, cmap=cmap)
-  
-  setNameClearSave(scenario,'urb_modelled_'+str(theIndex)+'_'+metric+'.png')
-
-def plotUrbChanges():
-  from matplotlib import colors
-  # Plot the observed urban arreas
-  ncol = 2
-  nrows = 2
-  # Load observed urb
-  urb_obs = calibrate.getObservedArray('urb')
-  # Create figure
-  fig = plt.figure(figsize=(7.14,7.14)) # Figure size set to give 16 cm of width
-  fig.suptitle('Change in observed urban areas',fontweight='bold', y=0.95)
-  # Create subplots
-
-  for index, oYear in enumerate(observedYears[:-1]):
-    ax1 = plt.subplot(nrows,ncol,index+1)
-    ax1.get_xaxis().set_visible(False)
-    ax1.get_yaxis().set_visible(False)
-    ax1.set_title(str(oYear) + '-' + str(observedYears[index+1]))
-    changeMatrix = urb_obs[index+1,0,1] - urb_obs[index,0,1] 
-    changeMatrix_reshape = np.reshape(changeMatrix, (1600,1600))
-    ax1.xticks = ([])
-    # Set colors for 'urban -> non-urban', 'no change', 'non-urban -> urban'
-    cmap = colors.ListedColormap(['magenta', 'black','yellow'])
-    bounds=[-1.5,-0.5,0.5,1.5]
-    norm = colors.BoundaryNorm(bounds, cmap.N)
-    im = ax1.imshow(changeMatrix_reshape, cmap=cmap)
-
-  values = [-1,0,1]#np.unique(changeMatrix_reshape.ravel())
-  labels = ['urban -> non-urban', 'no change', 'non-urban -> urban']#, 'missing value']
-  colors = [ im.cmap(im.norm(value)) for value in values]
-  patches = [ mpatches.Patch(color=colors[i], label="{l}".format(l=labels[i]) ) for i in range(len(values)) ]
-  # put those patched as legend-handles into the legend
-  fig.legend(handles=patches,
-             bbox_to_anchor=(0.069,0.03,0.78,0.2), loc="lower left", mode="expand", borderaxespad=0, ncol=3)
-
-  setNameClearSave('observed','urb_changes.png')
-
-def plotUrbModelledChanges(metric,scenario):
-  calibratedIndex = calibrate.getCalibratedIndeks(metric,scenario)
-  parameterSets = calibrate.getParameterConfigurations()
-  
-  # Plot the observed urban arreas
-  ncol,nrows = 2,2
-
-  # Create figure
-  fig = plt.figure(figsize=(7.14,7.14)) # Figure size set to give 16 cm of width
-  fig.suptitle('Change in modelled urban areas for parameter set '
-               +str(calibratedIndex)+': '+str(parameterSets[calibratedIndex])+'\nmetric '+metric,
-               fontweight='bold', y=0.95)
-
-  # Set colors
-  colorsModelledChange = {
-    -1: 'red',            # 'urban -> non-urban'
-    0: (0.98,0.98,0.95),  # 'no change'
-    1: 'black'}           # 'non-urban -> urban'
 
 
-  labelsChange = {
-    -1: 'urban -> non-urban',
-    0: 'no change',
-    1: 'non-urban -> urban'}
-  
-  # Create subplots
-  states = []
-  for obsIndex, theObsTimeStep in enumerate(obsTimeSteps[:-1]):
-    # Load observed urb
-    urb_mod_current = calibrate.getModelledArray('urb_subset_'+str(theObsTimeStep))
-    urb_mod_next = calibrate.getModelledArray('urb_subset_'+str(obsTimeSteps[obsIndex+1]))
-    ax1 = plt.subplot(nrows,ncol,obsIndex+1)
-    ax1.get_xaxis().set_visible(False)
-    ax1.get_yaxis().set_visible(False)
-    ax1.set_title(str(observedYears[obsIndex]) + '-' + str(observedYears[obsIndex+1]))
-    ax1.xticks = ([])
-    
-    changeModMatrix = (urb_mod_next[0,calibratedIndex,1]
-                    - urb_mod_current[0,calibratedIndex,1])  
-    changeModMatrix_reshape = np.reshape(changeModMatrix, (1600,1600))
-    u = np.unique(changeModMatrix[~numpy.isnan(changeModMatrix)])
-    states.append(u)
-    cmapL = [colorsModelledChange[v] for v in u]
-    cmap = colors.ListedColormap(cmapL) 
-    im = ax1.imshow(changeModMatrix_reshape, cmap=cmap)
-  
-  # Create legend
-
-  values = np.unique(np.array([item for sublist in states for item in sublist]))
-  cmap = colors.ListedColormap([colorsModelledChange[v] for v in values])
-  labels = [labelsChange[v] for v in values]
-  patchColors = [ colorsModelledChange[v] for v in values]
-  patches = [ mpatches.Patch(color=patchColors[i], label="{l}".format(l=labels[i]) ) for i in range(len(values)) ]
-  
-  # put those patched as legend-handles into the legend
-  fig.legend(handles=patches,
-            bbox_to_anchor=(0.069,0.03,0.78,0.2), loc="lower left", mode="expand", borderaxespad=0, ncol=3)
-  
-  setNameClearSave(scenario,'urb_changes_modelled_'+str(calibratedIndex)+'_'+metric+'.png') 
+ 
   
 def plotBestPerformers(metric, scenario, nrOfBestPerformers):  
   nParams = len(parameters.getSuitFactorDict()[1])
@@ -471,7 +293,7 @@ def plotBestPerformers(metric, scenario, nrOfBestPerformers):
   plt.xlabel('suitability factors')
   plt.xticks([1,2,3,4],['NeighborSuitability', 'DistanceSuitability', 'TravelTimeCityBorder', 'CurrentLandUseSuitability'])
   plt.boxplot(y,whis=[5,95]) # whis: set the whiskers at specific percentiles of the data [p1,p2] <- percentiles
-  setNameClearSave(scenario, metric+'_top_performers.png') 
+  setNameClearSave(metric+'_top_performers.png',scenario) 
 
 
 def plotMultiobjective(scenario):
@@ -519,10 +341,7 @@ def plotMultiobjective(scenario):
         plt.scatter(imprDict[country][m,0][1,:-1],multiDict[country][m,0][2,:-1],c=plotC[m+1])
 
   plt.legend()
-  setNameClearSave(scenario, 'multiobjective') 
-
-plotMultiobjective(1)
-plotMultiobjective(2)
+  setNameClearSave('multiobjective',scenario) 
 
 # This goes to visualize.py :
 def plotTransition():
@@ -544,10 +363,14 @@ def plotTransition():
 ######################################
 ### VISUALIZE OUTPUTS OF THE MODEL ###
 ######################################
-
-###
 '''
-for scenario in [1,2,3]:
+###
+### Print observed values
+print('Visualize the outputs of modelling the urban areas')
+#plotUrbObs()
+#plotUrbChanges()
+
+for scenario in [1,2]:
   print('Scenario',scenario)
   print('1. Visualize the outputs of calculating the metrics')
 
@@ -556,23 +379,20 @@ for scenario in [1,2,3]:
 
   #### Print results for each metric
   for metric in metricNames:
-    #plotRMSE(metric,scenario)
-    #plotObservedAndCalibratedMetrics(metric, scenario)
-    #plotUrbMod(metric,scenario)
-    #plotUrbModelledChanges(metric, scenario)
+    plotRMSE(metric,scenario)
+    plotObservedAndCalibratedMetrics(metric, scenario)
+    plotUrbMod(metric,scenario)
+    plotUrbModelledChanges(metric, scenario)
     plotBestPerformers(metric, scenario, 20)
 
   ###
   print('2. Visualize the outputs of calculating Kapppa standard')
-  #plotKappa(scenario)
+  plotKappa(scenario)
   plotBestPerformers('kappa', scenario, 20)
-  
-  ###
-  print('3. Visualize the outputs of modelling the urban areas')
 
-### Print observed values
-#plotUrbObs()
-#plotUrbChanges()
+  ###
+  print('3. Plot multiobjective function results')
+  plotMultiobjective(scenario)
 '''
   
 ''' Maybe for later
