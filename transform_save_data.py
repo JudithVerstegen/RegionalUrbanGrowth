@@ -160,14 +160,15 @@ print("All number folders deleted.")
 ##################################
 
 ########### Calculate Kappa statistics
-# Calculate Kappa standard and Kappa statistic fot the whole study area
+# Calculate Kappa standard and Kappa statistic for the whole study area
 calibrate.calculateKappa()
-calibrate.calculateKappaSimulation()
+calibrate.calculateKappaSimulation()"""
 
 # Calculate Kappa standard and Kappa statistic for the calibration and validation based on selected zones
-for aim in ['calibration','validation']:
-  calibrate.calculateKappa(3,aim)
-  calibrate.calculateKappaSimulation(3,aim)
+for scenario in [1,2]:
+  for aim in ['calibration','validation']:
+    #calibrate.calculateKappa(3,aim)
+    calibrate.calculateKappaSimulation(scenario,aim)
 print("Kappa statistics calculated and saved as npy file")
 
 ##############################
@@ -179,14 +180,14 @@ print("Kappa statistics calculated and saved as npy file")
 # 2: calibrate on years 2012-2018 validate on 200-2006
 # 3: calibrate and validate on different aras (zones)
 """
-for scenario in [1,2]:
+for scenario in [1,2,3]:
   print('Scenario '+str(scenario))
   # Calibrate, validate and save the results as csv file
   calibrate.calibrate_validate(scenario)
   print("Model calibrated and validated")
   # Perform validation based on multi-objective calibration
   calibrate.multiobjective(scenario) 
-  print("Model calibrated using multi-objective goal function and validated")
+  print("Model calibrated using multi-objective goal function and validated")"""
 
   
 

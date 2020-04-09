@@ -74,7 +74,7 @@ def getCountryName():
   """ Returns the case study symbol """
   # case studies: 'IT', 'IE', 'PL'
 
-  name = 'IE'
+  name = 'IT'
   return name
   
   
