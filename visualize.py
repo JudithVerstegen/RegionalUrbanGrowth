@@ -173,7 +173,7 @@ def plotRMSE(oneMetric, scenario):#(rArray, oneMetric, observations, parameterSe
   # Set the name and clear the directory if needed
   setNameClearSave('RMSE_' + oneMetric + '.png',scenario)
   
-def plotObservedAndCalibratedMetrics(aMetric, scenario):#, observedYearArray, zonesObserved, zonesModelled, indexCalibratedSet):
+def plotObservedAndCalibratedMetrics(aMetric, scenario):
   # Plot the observed values of metrics in one subplot
   # and the metric values for the calibrated parameters on the other subplot
 
@@ -394,8 +394,158 @@ for scenario in [1,2]:
   print('3. Plot multiobjective function results')
   plotMultiobjective(scenario)
 '''
+
+
+
+
+
+#####################
+### FOR LATER USE ###
+#####################
   
 ''' Maybe for later
+def plotNonDominatedSolutions(metrics,aim):
+  # Plot all the validation metrics for all parameter sets, for a case study, both scenarios
+  # Plot will be used for multi-objective calibration WITHOUT CILP
+  results = {
+    'calibration':createNormalizedResultDict(metrics,'calibration'),
+    'validation':createNormalizedResultDict(metrics,'validation')}
+
+  fmt = {1:'-o',2:'--o'}
+  # Create the figure
+  fig = plt.figure(figsize=(6.4,3.2)) # Figure size set to give 16 cm of width
+  plt.ylabel('normalized metric value')       
+  plt.xlabel('metric')
+  
+  for country in case_studies:
+    for scenario in [1,2]:
+      #non_dominated = is_pareto_efficient_simple(results[scenario])
+      asum = np.reshape(np.sum(results['calibration'][country][scenario],axis=1),(165,1))
+      #non_dominated = is_pareto_efficient_simple(asum)
+      non_dominated = is_pareto_efficient_simple(results['calibration'][country][scenario])
+      aLabel = country+str(scenario)
+      for n in range(165):
+        if non_dominated[n] == True:        
+          #c = 'black'
+          lw=0.5
+          m=1
+        else:
+          #c = country_colors[country]
+          lw=0.01
+          m=0
+        if n>0:
+          aLabel=None         
+        plt.plot(metrics,results[aim][country][scenario][n,:],
+           fmt[scenario],label=aLabel,
+           linewidth = lw,
+           c = country_colors[country],
+           markersize=m,
+           markerfacecolor=country_colors[country])
+    
+  leg = plt.legend(loc='lower right')
+  for line in leg.get_lines():
+    line.set_linewidth(1.0)
+  #plt.show()
+
+  wPath = os.path.join(os.getcwd(),'results', 'non_dominated_solutions_'+aim)
+  if os.path.exists(wPath):
+      os.remove(wPath)
+
+  # Save plot and clear    
+  plt.savefig(wPath, bbox_inches = "tight",dpi=300)
+  plt.clf()
+  
+def plotNonDominatedSolutionsSmall(metrics):
+  # Now create small plots for each country seperate
+  results = createNormalizedResultDict(metrics,'calibration') #visualization.py
+  fmt = {1:'-o',2:'--o'}
+  for country in case_studies:
+    fig = plt.figure(figsize=(2.1,2.1))   
+    for scenario in [1,2]:
+      non_dominated = is_pareto_efficient_simple(results[country][scenario])
+      for n in range(165):
+        if non_dominated[n] == True:        
+          lw=0.5
+          m=1
+        else:
+          lw=0
+          m=0
+        plt.plot(metrics,results[country][scenario][n,:],
+           fmt[scenario],
+           linewidth = lw,
+           c = country_colors[country],
+           markersize=m,
+           markerfacecolor=country_colors[country])
+    wPath = os.path.join(os.getcwd(),'results', 'non_dominated_solutions_'+country)
+    if os.path.exists(wPath):
+        os.remove(wPath)
+
+    # Save plot and clear    
+    plt.savefig(wPath, bbox_inches = "tight",dpi=300)
+    plt.clf()
+    plt.close()
+
+
+def plotManyParetoSolutions(metrics):
+  # Plot will be used for multi-objective function based on 1-4 functions
+  # Get the normalized results of metrics (RMSE or Kappa), for every parameter set
+  results = {
+    'calibration':createNormalizedResultDict(metrics,'calibration'), #visualization.py
+    'validation':createNormalizedResultDict(metrics,'validation')}
+
+  fmt = {1:'-o',2:'-o'}
+  # Get all the posible function combinations (manually):
+  function_combinations = [
+    [0],[1],[2],[3],[0,1],[0,2],[0,3],[1,2],[1,3],[2,3],[0,1,2],[0,1,3],[0,2,3],[1,2,3],[0,1,2,3]]
+  labels = [0,4,10,14]
+  ending={0:''}
+  # Create the figure
+  fig,axs = plt.subplots(1,1, squeeze=False,figsize=(6.4,3.2)) # Figure size set to give 16 cm of width
+  plt.ylabel('normalized metric value')       
+  plt.xlabel('metric')
+  old_len=0
+  plots=[]
+  i=0
+  for country in case_studies:
+    for scenario in [1,2]:
+      for f_i, f in enumerate(function_combinations):
+        if f_i in labels and i<len(labels):
+          aLabel = str(len(f)) + ' objective'+ending.get(i,'s')
+          i+=1
+        else:
+          aLabel=None
+        results_f = results['calibration'][country][scenario][:,f] # f (columns) = normalized values for selected metrics
+        asum = np.reshape(np.sum(results_f,axis=1),(165,1))
+        non_dominated = is_pareto_efficient_simple(asum)
+        #non_dominated = is_pareto_efficient_simple(results['calibration'][country][scenario])
+        for n in range(165):
+          if non_dominated[n] == True:
+            axs[0,0].plot(
+              np.array(metrics)[f],
+              results['validation'][country][scenario][n,f], # n(rows) contain results for given parameters
+              fmt[scenario],
+              label=aLabel,
+              
+              linewidth =0.2,
+              c = functionColors[len(f)-1],
+              markersize=3,
+              markerfacecolor=functionColors[len(f)-1])
+            
+            axs[0,0].plot(
+              np.array(metrics)[f],
+              results[aim][country][scenario][n,f],
+              'ro-')
+            
+
+  #leg.get_frame().set_edgecolor('darkviolet')
+  #leg.get_frame().set_linewidth(0.50)
+
+
+  leg= axs[0,0].legend(loc='lower right')
+  # Set the name and clear the directory if needed
+  plt.show()
+  #setNameClearSave('non_dominated_number_of_objectives', scenario=None)
+  
 def histogramsModelledMetrics(aVariable, zonesModelled):
   #('number of time steps: ',len(zonesModelled))
   #('number of parameter configurations: ',len(zonesModelled[0]))                     
