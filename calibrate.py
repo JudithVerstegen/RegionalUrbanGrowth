@@ -77,6 +77,26 @@ def getKappaArray(scenario=None,aim=None,case=None):
   else:  
     return np.load(os.path.join(folder, 'kappa.npy'))
 
+def getKappaSimulationArray(aim=None,scenario=None, case=None):
+  if case is None:
+    folder = arrayFolder
+  else:
+    folder = os.path.join(os.getcwd(),'results',case,'metrics')
+  if scenario == 3:
+    return np.load(os.path.join(folder, 'kappa_simulation'+str(aim[:3])+'.npy'))
+  else:  
+    return np.load(os.path.join(folder, 'kappa_simulation.npy'))
+
+def getAllocationArray(aim=None,scenario=None,case=None):
+  if case is None:
+    folder = arrayFolder
+  else:
+    folder = os.path.join(os.getcwd(),'results',case,'metrics')
+  if scenario == 3:
+    return np.load(os.path.join(folder, 'allocation_disagreement_'+str(aim[:3])+'.npy'))
+  else:  
+    return np.load(os.path.join(folder, 'allocation_disagreement.npy'))
+  
 def subsetUrbanZones(urbfile,aim):
   # aim in ['calibration','validation']
   
@@ -416,7 +436,7 @@ def getAveragedArray(array, scenario, aim):
   a_mean = np.mean(array[period],axis=0)#[(a1+a2)/2 for a1,a2 in zip(array[period][0],array[period][1])]
   return a_mean
   
-def getNormalizedArray(array, scenario, aim, kappa=None):
+def getNormalizedArray(array, kappa=None):
   a_max = np.amax(array)
   a_min = np.amin(array)
   if kappa==True:
