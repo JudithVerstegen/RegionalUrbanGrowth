@@ -416,21 +416,17 @@ def plotNonDominatedSolutions(metrics,aim):
   fig = plt.figure(figsize=(6.4,3.2)) # Figure size set to give 16 cm of width
   plt.ylabel('normalized metric value')       
   plt.xlabel('metric')
-  
+  count=0
   for country in case_studies:
     for scenario in [1,2]:
-      #non_dominated = is_pareto_efficient_simple(results[scenario])
       asum = np.reshape(np.sum(results['calibration'][country][scenario],axis=1),(165,1))
-      #non_dominated = is_pareto_efficient_simple(asum)
       non_dominated = is_pareto_efficient_simple(results['calibration'][country][scenario])
       aLabel = country+str(scenario)
       for n in range(165):
         if non_dominated[n] == True:        
-          #c = 'black'
           lw=0.5
           m=1
         else:
-          #c = country_colors[country]
           lw=0.01
           m=0
         if n>0:
@@ -438,22 +434,16 @@ def plotNonDominatedSolutions(metrics,aim):
         plt.plot(metrics,results[aim][country][scenario][n,:],
            fmt[scenario],label=aLabel,
            linewidth = lw,
-           c = country_colors[country],
+           c = countryColors[country],
            markersize=m,
-           markerfacecolor=country_colors[country])
+           markerfacecolor=countryColors[country])
     
   leg = plt.legend(loc='lower right')
   for line in leg.get_lines():
     line.set_linewidth(1.0)
-  #plt.show()
-
-  wPath = os.path.join(os.getcwd(),'results', 'non_dominated_solutions_'+aim)
-  if os.path.exists(wPath):
-      os.remove(wPath)
 
   # Save plot and clear    
   plt.savefig(wPath, bbox_inches = "tight",dpi=300)
-  plt.clf()
   
 def plotNonDominatedSolutionsSmall(metrics):
   # Now create small plots for each country seperate
@@ -506,7 +496,7 @@ def plotManyParetoSolutions(metrics):
   old_len=0
   plots=[]
   i=0
-  for country in case_studies:
+  for country in [case_studies:
     for scenario in [1,2]:
       for f_i, f in enumerate(function_combinations):
         if f_i in labels and i<len(labels):
@@ -515,8 +505,9 @@ def plotManyParetoSolutions(metrics):
         else:
           aLabel=None
         results_f = results['calibration'][country][scenario][:,f] # f (columns) = normalized values for selected metrics
-        asum = np.reshape(np.sum(results_f,axis=1),(165,1))
-        non_dominated = is_pareto_efficient_simple(asum)
+        #asum = np.reshape(np.sum(results_f,axis=1),(165,1))
+        non_dominated = is_pareto_efficient_simple(results_f)
+
         #non_dominated = is_pareto_efficient_simple(results['calibration'][country][scenario])
         for n in range(165):
           if non_dominated[n] == True:
@@ -531,10 +522,10 @@ def plotManyParetoSolutions(metrics):
               markersize=3,
               markerfacecolor=functionColors[len(f)-1])
             
-            axs[0,0].plot(
+            """axs[0,0].plot(
               np.array(metrics)[f],
-              results[aim][country][scenario][n,f],
-              'ro-')
+              results['validation'][country][scenario][n,f],
+              'ro-')"""
             
 
   #leg.get_frame().set_edgecolor('darkviolet')
