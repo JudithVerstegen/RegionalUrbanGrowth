@@ -10,6 +10,7 @@ from pcraster.framework import *
 import matplotlib.pyplot as plt
 from matplotlib import colors
 import matplotlib.patches as mpatches
+import matplotlib.lines as mlines
 
 #### Script to read in the metrics saved as the result of the LU_urb.py script.
 #### Metrics are transformed into an array
@@ -568,7 +569,6 @@ def plotParameters(): #DONE
       plt.annotate(country,xy=(p,1.01), rotation=0, color="darkviolet",ha='center',weight='bold')
 
   #Create a legend
-  #leg11 = plt.legend([axs[1][0],axs[2][0]], ['scenario 1','scenario 2'], loc=1)
   handles, labels = ax[0].get_legend_handles_labels()
   patch = handles[0][0]
   # plot the driver in the right top corner. Reverse the order to adjust tp the plot:
@@ -947,6 +947,8 @@ def plotMultiobjectiveImprovementToLocationalMetric(weights,loc_metric):
   fig.text(0.04, 0.5, loc_metric+' improvement [%]', va='center', rotation='vertical')
   # Add x label
   fig.text(0.4, 0.04, 'RMSE improvement [%]', va='center')
+  # Arrange subplots:
+  plt.subplots_adjust(wspace=0.2, hspace=0.2)
   # Assign markers
   marker = {
     'cilp':'s', # square
@@ -960,7 +962,6 @@ def plotMultiobjectiveImprovementToLocationalMetric(weights,loc_metric):
     for s in [1,2]:
       a_color = colors.to_rgba(countryColors[case])[:-1]+(alpha[s],)
       c_color.append(a_color)
-  #c_color=['b','g','r','c','m','y']
   # Make a mask for plotting for each case (scenario):
   n = 3*2
   mask = [i for i in range(n)]
@@ -970,7 +971,7 @@ def plotMultiobjectiveImprovementToLocationalMetric(weights,loc_metric):
   for m_v,metric_v in enumerate(metricNames):
     axs[i,j].axvline(x=0, alpha=0.2)
     axs[i,j].axhline(y=0, alpha=0.2)
-    axs[i,j].set_title(all_validation_metrices[m_v])
+    axs[i,j].set_title(metric_v.upper())
     # plot seperately values for each goal function
     cols = [np.array(mask)+i*6 for i in range(len(metricNames))]
     for gf,col in enumerate(cols):
@@ -981,26 +982,55 @@ def plotMultiobjectiveImprovementToLocationalMetric(weights,loc_metric):
         facecolor='none',
         edgecolor=c_color,
         marker = marker[metricNames[gf]])
-
     j=+1
     if m_v==1:
       i=1
       j=0
-                               
-  '''
-  for i in [0,1]:
-    # Set a legend's anchor
-    leg = axs[0,i].legend(
-      handles=patches[i],
-      bbox_to_anchor=(0., 1.2, 1, .102),
-      loc='lower center',
-      ncol=len(patches[i]),
-      mode="expand",
-      borderaxespad=0.,
-      bbox_transform=axs[0,i].transAxes,
-      fontsize=6)
+  ## 4. Create the legends from scratch
+  # First, for patches representing the meaning of colors:
+  # Make labels patches:
+  labels = [x+str(y) for x in case_studies for y in [1,2]]
+  patches = [ mpatches.Patch(color=c_color[j], label="{l}".format(l=labels[j]) ) for j in range(len(labels)) ]
+  # Make the first legend:
+  leg1 = axs[0,0].legend(
+    patches,
+    labels,
+    bbox_to_anchor=(0., 1.25, 2+0.2, .102),
+    loc='lower center',
+    ncol=len(patches),
+    mode="expand",
+    borderaxespad=0.,
+    bbox_transform=axs[0,0].transAxes,
+    fontsize=6)
+  axs[0,0].add_artist(leg1)
+  
+  # Second, for markers used in plot
+  # Make marker objects:
+  markers = []
+  for m, metric in enumerate(metricNames):
+    markers.append(mlines.Line2D([], [],
+                                 marker=marker[metric],
+                                 linestyle='none',
+                                 mec = c_color[0],
+                                 mfc = 'none',
+                                 markersize=6,
+                                 label='Goal function '+all_validation_metrices[m]))
+
+  # Add second legend
+  leg2 = axs[0,0].legend(
+    handles = markers,
+    bbox_to_anchor=(0., 1.15, 2+0.2, .102),
+    loc='lower center',
+    ncol=len(metricNames),
+    mode="expand",
+    borderaxespad=0.,
+    bbox_transform=axs[0,0].transAxes,
+    fontsize=6)
+
+  # Adjust borders of both legends:
+  for leg in [leg1,leg2]:
     leg.get_frame().set_edgecolor('darkviolet')
-    leg.get_frame().set_linewidth(0.50)'''
+    leg.get_frame().set_linewidth(0.50)
     
   # Set the name and clear the directory if needed
   setNameClearSave('multiobjective_compared_to_'+loc_metric)
