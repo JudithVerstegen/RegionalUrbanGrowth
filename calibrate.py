@@ -77,7 +77,7 @@ def getKappaArray(scenario=None,aim=None,case=None):
   if scenario == 3:
     return np.load(os.path.join(folder, 'kappa_'+str(aim[:3])+'.npy'))
   else:  
-    return np.load(os.path.join(folder, 'kappa.npy')) # TESTING
+    return np.load(os.path.join(folder, 'kappa.npy'))
 
 def getKappaSimulationArray(aim=None,scenario=None, case=None):
   if case is None:
