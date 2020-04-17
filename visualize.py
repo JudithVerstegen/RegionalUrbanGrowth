@@ -404,6 +404,145 @@ for scenario in [1,2]:
 #####################
   
 ''' Maybe for later
+
+def plotValidation_multiobjective(errors_or_kappas, weights):
+  # cant's see the difference between this and single-objective, useless
+  """  
+  Plot bars presenting validation results (y axis) for 4 multiobjective goal functions (x axis)
+  There are 4 goal functions, 3 case studies, 2 scenarios --> 24 bars
+  There are 5 validation metrics showing errors or disagreement
+  There are 2 validation metrics showing Kappa statistics
+
+  errors_or_kappas in ['errors','kappas']
+  weights = [w_RMSE, w_Kappa] <- importance of each goal function in multiobjective optimisation
+  """
+  rows = {
+    'errors':[0,1,2,3,6],
+    'kappas': [4,5]
+    }
+  # Get the array with validation results for landscape metrics ([0:3]) and allocation disagreement ([6]):
+  results = calibrate.getValidationResults_multiobjective(weights)[rows[errors_or_kappas],:]
+
+  # Create figure
+  height = len(rows[errors_or_kappas])*1.1
+  fig, axs = plt.subplots(len(rows[errors_or_kappas]),1,figsize=(7.14,height),sharex=True)
+  validation_metrices = [ validation_functions[i] for i in rows[errors_or_kappas]]
+  ind = np.arange(len(metricNames))    # the x locations for the groups
+  n = 3*2 # 3 countries, two scenarios
+  width = 0.1 # width of a bar
+  space = 0.02 # space between case studies
+  alpha = {1:0.9,2:0.6}
+  plt.xlabel('multiobjective goal function')
+  plt.xticks(ind, [goal_functions[i]+' and h1(K)' for i in range(len(metricNames))])
+  fig.align_ylabels()
+  plt.subplots_adjust(wspace=0.1, hspace=0.25)
+  
+  #Assign positions of bars for each of case studies and scenarios:
+  positions = np.array(
+    [[i - (2.5*width+space),
+      i - (1.5*width+space),
+      i - 0.5*width,
+      i + 0.5*width,
+      i + (1.5*width+space),
+      i + (2.5*width+space)] for i in ind ]).flatten()
+  # Assign y labels:
+  ylabel=['RMSE','RMSE','RMSE','RMSE','K','Ks','A']
+  ylabel = [ ylabel[i] for i in rows[errors_or_kappas]]
+  # Prepare colors:
+  bar_c=[]
+  for case in case_studies:
+    for s in [1,2]:
+      a_color = colors.to_rgba(countryColors[case])[:-1]+(alpha[s],)
+      bar_c.append(a_color)
+  # Prepare list for bars and labels
+  bars = []
+  labels = [x+str(y) for x in case_studies for y in [1,2]]
+  # Now plot the bars. For each metric, the bars are plotted as a different ax
+  for v_m,v_metric in enumerate(validation_metrices):
+    axs[v_m].set_title(validation_metrices[v_m], pad=2)
+    axs[v_m].set_ylabel(ylabel[v_m])
+    axs[v_m].ticklabel_format(style='sci', axis='y', scilimits=(-2,2))
+    bar=axs[v_m].bar(
+        positions,
+        results[v_m],
+        color = bar_c,
+        width=width)
+    if v_m == 0:
+      bars.append(bar)
+    # Draw lines dividing scenario bars and add annotation with the country symbol
+    for xtick in ind:
+      for c,country in enumerate(case_studies):
+        p = xtick-2*width-space+c*(2*width+space)
+        axs[v_m].axvline(p, alpha=0.5,c='white',linestyle='--', linewidth=0.5)
+        
+  # Create a legend:
+  leg = axs[0].legend(
+    [ bar for bar in bars[0]] ,
+    labels,
+    bbox_to_anchor=(0., 1.3, 1, .102),
+    loc='lower center',
+    ncol=6,
+    mode="expand",
+    bbox_transform=axs[0].transAxes,
+    borderaxespad=0.)
+  leg.get_frame().set_edgecolor('darkviolet')
+  leg.get_frame().set_linewidth(0.50)  
+ 
+  # Set the name and clear the directory if needed
+  setNameClearSave('plotValidation_multiobjective_'+errors_or_kappas, scenario=None)
+
+def plotFindingWeights(): # works, but no point
+  """
+  Creates 4 subplots, gor each metric based goal function
+  Each subplot presents the validation results for a multiobjective goal function combining metric based
+  and locational based goal functions
+  """
+
+  ## 1, Crete a dict to store the multiobjective results for each country
+  multiDict = {}
+  for scenario in [1,2]:
+    multiDict[scenario]={}
+    for country in case_studies:
+      fileName = 'scenario_'+str(scenario)+'_multiobjective.npy'
+      multiobjectiveArray = os.path.join(os.getcwd(),'results',country, 'metrics',fileName)
+      # The file contains validation results. Rows: index, RMSE, kappa, goal function
+      multiDict[scenario][country] = np.load(multiobjectiveArray)
+
+  ## 2. Create a dict to store the normalized values
+  normDict = {}
+  for scenario in [1,2]:
+    normDict[scenario]={}
+    for country in case_studies:
+      normArray = multiDict[scenario][country]
+      for metric in range(0,len(metricNames)):
+        ## Find the normalized value of RMSE for each weight combination 
+        normArray[metric,0][1,:] = calibrate.getNormalizedArray(normArray[metric,0][1,:],kappa=False)
+        ## Find the normalized value of Kappa for each weight combination 
+        normArray[metric,0][2,:] = calibrate.getNormalizedArray(normArray[metric,0][2,:],kappa=True)
+      normDict[scenario][country] = normArray
+
+  ## 3. Prepare the plot!
+  fig, axs = plt.subplots(2,2, figsize=(7.14,4)) # 16 cm of width
+  linestyle = {1:'solid',2:'dashed'}
+  for scenario in [1]:
+    i=0
+    j=0
+    
+    for m,metric in enumerate(metricNames):
+      for country in case_studies:
+        axs[i,j].plot(
+          normDict[scenario][country][m,0][1,1:-1],
+          c = countryColors[country])
+        axs[i,j].plot(
+          normDict[scenario][country][m,0][2,:-1],
+          '--o',
+          c = countryColors[country])
+      j=+1
+      if m==1:
+        i=1
+        j=0
+  plt.show()
+
 def plotNonDominatedSolutions(metrics,aim):
   # Plot all the validation metrics for all parameter sets, for a case study, both scenarios
   # Plot will be used for multi-objective calibration WITHOUT CILP
@@ -445,37 +584,6 @@ def plotNonDominatedSolutions(metrics,aim):
   # Save plot and clear    
   plt.savefig(wPath, bbox_inches = "tight",dpi=300)
   
-def plotNonDominatedSolutionsSmall(metrics):
-  # Now create small plots for each country seperate
-  results = createNormalizedResultDict(metrics,'calibration') #visualization.py
-  fmt = {1:'-o',2:'--o'}
-  for country in case_studies:
-    fig = plt.figure(figsize=(2.1,2.1))   
-    for scenario in [1,2]:
-      non_dominated = is_pareto_efficient_simple(results[country][scenario])
-      for n in range(165):
-        if non_dominated[n] == True:        
-          lw=0.5
-          m=1
-        else:
-          lw=0
-          m=0
-        plt.plot(metrics,results[country][scenario][n,:],
-           fmt[scenario],
-           linewidth = lw,
-           c = country_colors[country],
-           markersize=m,
-           markerfacecolor=country_colors[country])
-    wPath = os.path.join(os.getcwd(),'results', 'non_dominated_solutions_'+country)
-    if os.path.exists(wPath):
-        os.remove(wPath)
-
-    # Save plot and clear    
-    plt.savefig(wPath, bbox_inches = "tight",dpi=300)
-    plt.clf()
-    plt.close()
-
-
 def plotManyParetoSolutions(metrics):
   # Plot will be used for multi-objective function based on 1-4 functions
   # Get the normalized results of metrics (RMSE or Kappa), for every parameter set
@@ -537,34 +645,6 @@ def plotManyParetoSolutions(metrics):
   plt.show()
   #setNameClearSave('non_dominated_number_of_objectives', scenario=None)
   
-def histogramsModelledMetrics(aVariable, zonesModelled):
-  #('number of time steps: ',len(zonesModelled))
-  #('number of parameter configurations: ',len(zonesModelled[0]))                     
-  #('number of zones: ',len(zonesModelled[0][0][1]))
-  
-  for timeStep in timeSteps: # Loop data for each time step
-    # Prepare the main plot for each timeStep
-    fig, axes = plt.subplots(nrows=4, ncols=4, sharex=True, sharey = True) # Depending on number of zones!
-    hTitle = "Histogram of modelled metric "+aVariable+" for each zone in timestep: " + str(timeStep)
-    fig.suptitle(hTitle, fontweight='bold')
-    fig.subplots_adjust(hspace=1)
-    
-    for zone in range(numberOfZones): # Loop array to extraxt data for each zone
-      # Prepare data for each zone to be plotted in each subplot
-      metrics_for_histogram = []
-
-      for i in range(0,len(zonesModelled[timeStep-1])): # Loop array to get metrics for each parameter configuration
-        metrics_for_histogram.append(zonesModelled[timeStep-1][i][1][zone][0]) # [0] gives the raw number
-        
-      # Plot subplots
-      axes.flatten()[zone].hist(metrics_for_histogram, bins = 'auto', )
-      axes.flatten()[zone].set(title=zone+1)
-      axes.flatten()[zone].ticklabel_format(axis='x', style='sci', scilimits=(-4,4))
-
-    # Set the name and clear the directory if needed
-    setNameClearSave('Histogram_' + aVariable + "_modelled_timestep_"+ str(timeStep) + ".png")
-    
-
 def transformArray(theArray):
   # Create an array storing absolute difference values in the shape of the zones
   rowNo = len(obsTimeSteps) # Number of rows is equal to number of observed years
@@ -581,59 +661,6 @@ def transformArray(theArray):
         j = np.remainder(zone,n)
         newArray[row][pSet][i][j] = theArray[row][pSet][zone] 
   return newArray
-
-def plotAbsoluteDifference(metricNames, obsTimeStep):
-  for aMetric in metricNames:
-    differenceArray = np.load(os.path.join(resultFolder, aMetric + '_diff.npy'))
-    array = transformArray(differenceArray)[1] # here [1] for year '2000' to be changed
-    parameterSets = len(differenceArray[0])
-    NoRows = int(np.ceil(parameterSets/4))
-        
-    fig = plt.figure(figsize=(12, 40))
-    
-    for pSet in range(0,parameterSets):
-      plt.subplot(NoRows,4,pSet+1)
-      plt.imshow(array[pSet], cmap='Purples')
-      plt.xlabel('Parameter set: '+ str(pSet+1))
-      plt.axis('off')
-      plt.title('Parameter set: '+ str(pSet+1))
-
-    plt.subplots_adjust(bottom=0.2, right=0.8, top=0.9, wspace=0.2)
-    cax = plt.axes([0.125, 0.10, 0.675, 0.025])
-    plt.colorbar(cax = cax,orientation='horizontal')
-    
-    # Set the name and clear the directory if needed
-    setNameClearSave('Difference_' + aMetric + "_timestep_"+ str(obsTimeStep) + ".png")
-
-def plotRMSE_eachTimeStep(arrayR, oneMetric,observations):
-  # Find and plot parameter sets with the smallest RMSE
-  fig = plt.figure(figsize=(3.2,3.2)) # Figure size set to give 8 cm of width
-  plt.title('Smallest RMSE for the parameter sets\nfor metric '+oneMetric,fontweight='bold')
-  plt.ylabel('root mean square error')
-      
-  fitList = calibrate.RMSEindex_eachTimeStep(arrayR)
-  fitIndices = []
-  for y in fitList:
-    if y[1] not in fitIndices:
-      fitIndices.append(y[1])
-  labels = []
-  theLabels =[]
-  for i in range(len(fitIndices)):
-    for y in fitList:
-      if y[1] == fitIndices[i]:
-        labels.append(parameters.getObsYears()[y[0]])  
-    theLabels.append(labels)
-    labels=[]
-
-  for year in range(len(fitIndices)):
-    itsLabel = 'set %s: min RMSE in %s'%(fitIndices[year],theLabels[year])
-    plt.plot(observations,arrayR[:,fitIndices[year]],'--o', label = itsLabel, linewidth = 1, markersize = 3)
-    plt.xticks(observations)
-    plt.xlabel('observed years')
-    plt.legend()
-   
-  # Set the name and clear the directory if needed
-  setNameClearSave('RMSE_each_time_step_' + oneMetric + '.png')
 
 def plotKappa_eachTimeStep():
   # Plot the kappa statistic for the best parameter sets for each year
@@ -667,7 +694,9 @@ def plotKappa_eachTimeStep():
     plt.legend()
    
   # Set the name and clear the directory if needed
-  setNameClearSave('KAPPA_each_time_step.png')'''
+  setNameClearSave('KAPPA_each_time_step.png')
+
+'''
   
   
   
