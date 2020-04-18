@@ -341,11 +341,6 @@ def normalityTest(no_top_solutions, weights, alpha=0.05):
       else:
         a[mo,v_m] = False
 
-  '''## Convert the array to pd and save as csv file.
-  table_name = 'Shapiro_Wilk_normality_test.csv'
-  saveArrayAsCSV(a, table_name, row_names=['Statistic','p-value','normal_distribution'], col_names = validation_metrices)
-  '''
-
 def saveTopSolutionsReshaped(no_top_solutions, weights):
   # Save single objective results
   results = reshapeSingleObjectiveResults(no_top_solutions)
@@ -360,49 +355,124 @@ def saveTopSolutionsReshaped(no_top_solutions, weights):
     table_name = mo_goal_functions[g]+'_'+str(no_top_solutions)+'_top_solutions_all_cases.csv'
     saveArrayAsCSV(mResults[g], table_name, row_names=range(mResults[g].shape[0]), col_names = validation_metrices)
 
-def WilcoxonTest(results, mResults):
+def statisticalTest(results, mResults, test):
   # Prepare empty array to store results: multiobjective functions x validation metrics x test results
   w_test = np.empty((len(metricNames),len(validation_metrices),2))
   # Loop multi objective goal functions:
   for mo,mo_goal in enumerate(mo_goal_functions):
     # Loop validation metrices:
     for v_m in range(len(validation_metrices)):
-      w_test[mo,v_m] = np.array(
-        stats.wilcoxon(
-          results[:,v_m],
-          mResults[mo,:,v_m])) # median of differences above zero
+      w_test[mo,v_m] = sTest(results[:,v_m],mResults[mo,:,v_m],test)
+      #w_test[mo,v_m] = np.array(stats.ttest_ind(results[:,v_m],mResults[mo,:,v_m]))
   return w_test
-  
 
+def sTest(array0, array1, test):
+  if test == 'Wilcoxon':
+    s = np.array(stats.wilcoxon(array0,array1))
+  elif test == 'MannWhitneyU':
+    s = np.array(stats.mannwhitneyu(array0,array1))
+  elif test == 'TTest_ind':
+    s = np.array(stats.ttest_ind(array0,array1))
+  else:
+    print('Choose another test')
+    s= None
+  return s
+
+def zonalMetricsStatistics(weights, alpha = 0.05):
+  # Create array to store results
+  #singleResults = np.empty((len(case_studies)*len([1,2]),len(['fdi','wfdi']),1,16,1))
+  #multiResults = np.empty((len(case_studies)*len([1,2]),len(['fdi','wfdi']),1,16,1))
+  
+  # Metrics calculated for 16 zones
+  for m,metric in enumerate(['fdi','wfdi']):
+    j=0
+    for country in case_studies:
+      i=0
+      for scenario in [1,2]:
+        rSingleResults = []
+        rMultiResults = []
+        
+        singleIndex = calibrate.getCalibratedIndeks('kappa', scenario,case=country)
+        multioIndex = calibrate.getMultiObjectiveIndex(metric, weights[0],weights[1],scenario, case=country)
+        diffArray = calibrate.createDiffArray(metric, scenario, 'validation', case=country)
+        singleDiffArray = diffArray[:,singleIndex]
+        multioDiffArray = diffArray[:,multioIndex]
+        avSingleDiffArray = calibrate.getAveragedArray(singleDiffArray, scenario, 'validation')
+        avMultioDiffArray = calibrate.getAveragedArray(multioDiffArray, scenario, 'validation')
+
+        rSingleResults.append(avSingleDiffArray)
+        rMultiResults.append(avMultioDiffArray)
+        
+        # Reshape (combine all case studies)
+        rSingleResults = [ rSingleResults[i].flatten() for i in range(len(rSingleResults)) ]
+        rSingleResults = np.reshape(np.array(rSingleResults),(1*16,1))
+        rMultiResults = [ rMultiResults[i].flatten() for i in range(len(rMultiResults)) ]
+        rMultiResults = np.reshape(np.array(rMultiResults),(1*16,1))
+        rSingleResults = rSingleResults[~np.isnan(rSingleResults)]
+        rMultiResults = rMultiResults[~np.isnan(rMultiResults)]
+        # Get the absolute value of difference between modelled and observed
+        rSingleResults = np.absolute(rSingleResults)
+        rMultiResults = np.absolute(rMultiResults)
+
+        # Test normality
+        print('########')
+        print(metric, country, scenario)
+        
+        # Create array containing differences
+        d = rSingleResults-rMultiResults
+        # normality test
+        stat, p = stats.shapiro(d)
+        # fill the array
+        if p > alpha:
+          print('Normal distribution, TTest_ind')
+          test = 'TTest_ind'
+        else:
+          print('Not normal distribution, MannWhitneyU test')
+          test = 'MannWhitneyU'
+
+        # Run statistics
+        sTestResults = sTest(rSingleResults, rMultiResults, test)
+        print(sTestResults)
+        if sTestResults[1] < alpha:
+          print('significant')
+        else:
+          print('not significant')
+        print(np.mean(rSingleResults))
+        print(np.mean(rMultiResults))
+  
+                          
+#zonalMetricsStatistics([0.5,0.5])      
 #############################
 ########### PLOTS ###########
 #############################
 
-def plotWilcoxonTest(no_top_solutions, weights, alpha=0.05):
+def plotStatisticalTest(no_top_solutions, weights, test, alpha=0.05):
   """
   Generates two boxplots for a validation metric (all case studies aggregated)
   first for the goal function Kappa, second for the mutliobjective goal function
   Plots statistics and Wilcoxon test results on the side
+
+  test in ['MannWhitneyU','TTest_ind','Wilcoxon']
   """
   # Create the figure
   fig, axs = plt.subplots(4,7, figsize=(30,15))
   # Get results for Kappa goal function
-  results = reshapeSingleObjectiveResults(no_top_solutions)
+  results = reshapeSingleObjectiveResults(no_top_solutions)[0:+no_top_solutions,:]
   # Get results for multiobjective goal functons
-  mResults = reshapeMultiObjectiveResults(no_top_solutions, weights)
+  mResults = reshapeMultiObjectiveResults(no_top_solutions, weights)[:,0:no_top_solutions,:]
   # Get Wilcoxon test results
-  w_test = WilcoxonTest(results, mResults)
+  s_test = statisticalTest(results, mResults, test)
   # Loop multi objective goal functions:
   for mo,mo_goal in enumerate(mo_goal_functions):
     # Loop validation metrices:
     for v_m in range(len(validation_metrices)):
       # check if the test was significant:
-      p_value = w_test[mo,v_m,1]
+      p_value = s_test[mo,v_m,1]
       # get the median of both arrays
-      median_singlo = np.median(results[:,v_m])
-      median_multio = np.median(mResults[mo,:,v_m])
+      mean_singlo = np.mean(results[:,v_m])
+      mean_multio = np.mean(mResults[mo,:,v_m])
       # test the improvement of errors
-      impr = np.sign(median_singlo - median_multio)
+      impr = np.sign(mean_singlo - mean_multio)
       # assign colors to improvement:
       impr_c = {1: 'mediumseagreen', -1: 'indianred', 0:'none', -0:'none'}
       # reverse for metrics showing accuracy:
@@ -413,15 +483,17 @@ def plotWilcoxonTest(no_top_solutions, weights, alpha=0.05):
         ("h1(K):",
          "min: = {0:.2E}".format(np.amin(results[:,v_m])),
          "max: = {0:.2E}".format(np.amax(results[:,v_m])),
-         "median: = {0:.2E}".format(median_singlo),
+         "mean: = {0:.2E}".format(mean_singlo),
+         "median: = {0:.2E}".format(np.median(results[:,v_m])),
          "var: = {0:.2E}".format(np.var(results[:,v_m])),
          '\n'+mo_goal+':',
          "min: = {0:.2E}".format(np.amin(mResults[mo,:,v_m])),
          "max: = {0:.2E}".format(np.amax(mResults[mo,:,v_m])),
-         "median: = {0:.2E}".format(median_multio),
+         "mean: = {0:.2E}".format(mean_multio),
+         "median: = {0:.2E}".format(np.median(mResults[mo,:,v_m])),
          "var: = {0:.2E}".format(np.var(mResults[mo,:,v_m])),
-         '\nWilcoxon Test:',
-         "statistic: {0:.2E}".format(w_test[mo,v_m,0]),
+         '\n'+test+' Test:',
+         "statistic: {0:.2E}".format(s_test[mo,v_m,0]),
          "p_value: {0:.2E}".format(p_value)))
       # Create two boxplots:
       axs[mo,v_m].boxplot(
@@ -448,9 +520,9 @@ def plotWilcoxonTest(no_top_solutions, weights, alpha=0.05):
     axs[mo,0].text(-0.16,0.5,mo_f, transform=axs[mo,0].transAxes,
                      fontsize=10, verticalalignment='center', weight='bold', rotation = 'vertical')
       
-  setNameClearSave('WilcoxonTest')
+  setNameClearSave('stats_'+test+'_'+str(no_top_solutions)+'_IE1')
 
-#plotWilcoxonTest(17, [0.5,0.5], alpha=0.05)  #[0.8,0.2] for alpha 0.1 gives good ones       
+plotStatisticalTest(17, [0.5,0.5], 'MannWhitneyU', alpha=0.05)      
 
 def plotUrbObs(): # Done
   """
