@@ -179,8 +179,6 @@ def calculateKappa(scenario=None, aim=None):
   transArray = np.zeros((len(obsTimeSteps),numberOfIterations,3,3))
   # Create array to store Kappa
   kappaArray = np.zeros((len(obsTimeSteps),numberOfIterations))
-  # Create array to store Kappa Simulation (by Van Vliet):
-  kappaSimulation = np.zeros((len(obsTimeSteps),numberOfIterations))
     
   # Load data:
   urbObs = getObservedArray('urb')
@@ -190,7 +188,7 @@ def calculateKappa(scenario=None, aim=None):
   nanCells = sum(np.isnan(urbObs[0,0,1]))
   validCells = cells - nanCells
       
-  # Loop observed years:
+  # Loop observed years. For each year, calculate Kappa between observed map and modelled map:
   for row in enumerate(obsTimeSteps):
     print(row)
     # Load modelled urban for the given obs year
@@ -212,7 +210,6 @@ def calculateKappa(scenario=None, aim=None):
       # For year 1990 (first observation time step) there is a perfect agreement:
       if row[0] == 0:
         kappaArray[row[0],col] = 1.0
-        kappaSimulation[row[0],col] = 1.0
         transArray[row[0],col] = cArray
         
       else:
@@ -332,10 +329,14 @@ def calculateKappaSimulation(scenario=None, aim=None):
     obs1 = (urbObs[row[0],0,1] == 1)
     obs0 = (urbObs[row[0],0,1] == 0)
     # Define conditions and calculate the transitions:
+    act_0_0 = np.where(obs0 & original_0,1,0)
     act_0_1 = np.where(obs1 & original_0,1,0)
     act_1_0 = np.where(obs0 & original_1,1,0)
+    act_1_1 = np.where(obs1 & original_1,1,0)
+    p_act_0_0 = sum(act_0_0)/validCells
     p_act_0_1 = sum(act_0_1)/validCells
     p_act_1_0 = sum(act_1_0)/validCells
+    p_act_1_1 = sum(act_1_1)/validCells
     
     # Loop parameter sets:
     for col in range(0,len(urbMod[0])):
@@ -355,14 +356,19 @@ def calculateKappaSimulation(scenario=None, aim=None):
         PO = PO_urban + PO_non_urban
 
         # Define conditions to compare transitions in original and simulated maps
+        sim_0_0 = np.where(mod0 & original_0,1,0)
         sim_0_1 = np.where(mod1 & original_0,1,0)
         sim_1_0 = np.where(mod0 & original_1,1,0)
+        sim_1_1 = np.where(mod1 & original_1,1,0)
         
         # Calculate PE Transition (Van Vliet, 2013, Eq. 2.7):
+        p_sim_0_0 = sum(sim_0_0)/validCells
         p_sim_0_1 = sum(sim_0_1)/validCells
         p_sim_1_0 = sum(sim_1_0)/validCells
+        p_sim_1_1 = sum(sim_1_1)/validCells
         
-        PE_transition = p_org0 * (p_act_0_1 * p_sim_0_1) + p_org1 * (p_act_1_0 * p_sim_1_0)
+        PE_transition = p_org0 * (p_act_0_0 * p_sim_0_0 + p_act_0_1 * p_sim_0_1) +\
+                        p_org1 * (p_act_1_0 * p_sim_1_0 + p_act_1_1 * p_sim_1_1)
 
         # Calculate Kappa Simulation (Van Vliet, 2013, Eq. 2.9):
         K_simulation = (PO - PE_transition) / (1 - PE_transition)
@@ -579,14 +585,14 @@ def getTopCalibratedParameters(metric, scenario, numberOfTopPerformers,case=None
 
 def getTopCalibratedParameters_multiobjective(metric, weights, scenario, numberOfTopPerformers,case=None):
   """
-  Returns an array of size numberOfTopPerformers x 7
-  Each rown contains [metric name, index, validation result, p1, p2, p3, p4]
+  Returns an array of size numberOfTopPerformers x 8
+  Each rown contains [metric name, index, validation result RMSE, validation result Kappa, p1, p2, p3, p4]
   weights = [w_RMSE, w_Kappa] # sum=1
   """
-  topArray = np.zeros((numberOfTopPerformers,7), dtype='object')
+  topArray = np.zeros((numberOfTopPerformers,8), dtype='object')
   parameterSets = getParameterConfigurations()
   # Get the ranked parameter sets based on RMSE
-  multi_ranked = getRankedMultiobjective(metric,weights,scenario,aim='calibration',case=None)
+  multi_ranked = getRankedMultiobjective(metric,weights,scenario,aim='calibration',case=case)
   # Get the validation RMSE error
   RMSE = calcRMSE(metric,scenario,'validation',case)
   # Get the validation kappa metric
@@ -599,7 +605,7 @@ def getTopCalibratedParameters_multiobjective(metric, weights, scenario, numberO
     avKappa = getAveragedArray(RMSE, scenario, 'validation')
     p = parameterSets[calibratedIndex]
     topArray[i,[0,1,2,3]] = metric,calibratedIndex[0],avRMSE[int(calibratedIndex)],avKappa[int(calibratedIndex)]
-                                                               
+                                                         
     for j in [4,5,6,7]:
       topArray[i, j] = p[0][j-4]
   return topArray
@@ -608,7 +614,7 @@ def getValidationResults():
   """
   Create an array matrix:
   ## shape 7x30 (7 validation metrics x 5 goal functions (metrics determining parameter set) * 3 cases * 2 scenarios)
-  ## each cell containes RMSEs, Kappa Standard, Kappa Simulation or Allocation Disagreement value
+  ## each cell containes RMSE or Kappa Standard, Kappa Simulation or Allocation Disagreement value
   ## this value represent the value of the validation metric (row), obtained using the given goal function,
   ## in a given case study, for a given scenario (column).
   """
