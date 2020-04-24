@@ -165,10 +165,9 @@ calibrate.calculateKappa()
 calibrate.calculateKappaSimulation()"""
 
 # Calculate Kappa standard and Kappa statistic for the calibration and validation based on selected zones
-for scenario in [1,2]:
-  for aim in ['calibration','validation']:
-    #calibrate.calculateKappa(3,aim)
-    calibrate.calculateKappaSimulation(scenario,aim)
+#calibrate.calculateKappa()
+calibrate.calculateKappaSimulation()
+print(country)
 print("Kappa statistics calculated and saved as npy file")
 
 ##############################
