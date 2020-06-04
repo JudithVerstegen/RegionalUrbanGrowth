@@ -137,27 +137,31 @@ class LandUseType:
     report(currentLandUseSuitbaility, 'suit_curLu' + str(self.typeNr))
     return currentLandUseSuitbaility
 
-  def getRandomClumps(self):
+  def getRandom(self):
     """Return random map."""
-    # Create map of random clumps
-    randmap = windowaverage(uniform(boolean(self.yieldFrac)), \
-                            10 * celllength())
-    # Add randomness parameter from model by Garcia. Alfa (0,1) reflects the randomness level.
-    # In the noise (uniform) map change the zero values to very small values, to allow logarythmic function.
-    # Total suitability is multiplied by the randomness value v.
+    """Randomness can be applied as in model by White, as in model by Garcia or as clumps"""
+    # Randomness parameter alfa (0,1) reflects the randomness level.
     alpha = parameters.getAlphaValue()
-    # Replace the value of zero to a very small value
+    # In the noise (uniform) map change the zero values to very small values, to allow logarythmic function.
     v = ifthenelse(self.noise==0,1E-300, self.noise)
     # Apply function by White
     v = 1 + ((-ln(v))**alpha)
-    '''# Apply function by Garcia
+    '''
+    # Apply function by Garcia
     v = exp(-alpha*(1-v))
+    '''
+    '''
+    # Create map of random clumps
+    randmap = windowaverage(uniform(boolean(self.yieldFrac)), \
+                            10 * celllength())
     # Apply randomness factor to the map with random clumps to make them less dense
     randomClumps = randmap * v
     randomClumps = self.normalizeMap(randomClumps)
     report(randomClumps, 'rand_clumps.map')
     
-    return randomClumps'''
+    return randomClumps
+    '''
+    # Total suitability is multiplied by the randomness value v.
     return v
  
   def createInitialSuitabilityMap(self, distmap, yieldFrac, friction):
@@ -235,8 +239,8 @@ class LandUseType:
       else:
         print('ERROR: unknown suitability factor for landuse', self.typeNr)
       i += 1
-    suitabilityMap += self.weightInitialSuitabilityMap * \ # WHY MULTIPLY AGAIN BY WEIGHT
-                      self.initialSuitabilityMap
+    # Add the initial (static) suitability maps to the dynamic suitability map
+    suitabilityMap += self.initialSuitabilityMap
     # Add randomness
     suitabilityMap = self.getRandomClumps() * suitabilityMap
     # Normalize the total suitability map and report
@@ -579,11 +583,13 @@ class LandUseChangeModel(DynamicModel):
     maxYield = 1.0
     demand = timeinputscalar(self.inputfolder + '/demand.tss', self.environment)
     
-    # Suibility maps are calculated
+    # Suitability maps are calculated
     self.landUse.calculateSuitabilityMaps()
 
     # Allocate urban land use using demands of current time step
     self.landUse.allocate(maxYield, demand)
+
+    # Update land use map
     self.environment = self.landUse.getEnvironment()
 
     # save the map of urban / non-urban
@@ -648,6 +654,10 @@ class LandUseChangeModel(DynamicModel):
       file_object1.close()
       # the map with the metric or urban area is removed to save disk space
       os.remove(path)
+
+    # If the time step starts the validation period, read in the land use map
+    if timeStep == 17: # year 2006
+      self.environment = self.readmap(self.inputfolder + '/init_lu_06')
     
 
 ############
