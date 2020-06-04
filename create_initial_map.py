@@ -436,6 +436,11 @@ for a_name in os.listdir(corine_dir):
             simple_lu = simplify_lu_map(lu)
             report(simple_lu, os.path.join(country_dir, 'init_lu.map'))
 
+        # 4. make simpler initial land use map only for 2006
+        if a_name[13:15] == '06':
+            simple_lu = simplify_lu_map(lu)
+            report(simple_lu, os.path.join(country_dir, 'init_lu_06.map'))
+
 # Select the dir for the temporal working files
 temp_dir = os.path.join(data_dir, 'temporal_data')
 
