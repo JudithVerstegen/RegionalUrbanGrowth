@@ -97,26 +97,26 @@ def calculateSumStats(systemState, listOfSumStats, zones, validation=False):
   ##  if validation == True: mask = readmap(inputfolder + '/zones_validation')
   ##  systemState = ifthen(mask, systemState)
 
-  # Create maps common for more than one metric
-
+  # Get values common for more than one metric
   unique = uniqueid(boolean(spatial(scalar(1))))
   clumps = ifthen(boolean(systemState) == 1, clump(boolean(systemState)))
+  zero_mask = ifthen(defined(systemState),spatial(nominal(0)))
   #numberMap = areadiversity(clumps, spatial(nominal(1))) # doesnt work for test map
   oneCellPerPatch = pcreq(areamaximum(unique, clumps), unique) # gets the cell in the right bottom corner of a patch
   scNegative = ifthenelse(boolean(systemState) == 1, boolean(0), boolean(1))
   borders = ifthen(boolean(systemState) == 1, window4total(scalar(scNegative)))
-  perimeter = areatotal(borders, nominal(clumps))*sqrt(cellarea()) # in [m]
-  patchSizes = areaarea(clumps)/cellarea() # in[m2]
-  zone_area = areaarea(zones)/cellarea() # in[m2]
+  perimeter = areatotal(borders, nominal(clumps))# in cell units (100m)
+  patchSizes = areaarea(clumps)/cellarea() # size of the clumps in cell units (10 000m2)
+  zone_area = areaarea(zones)/cellarea() # size of the zones in cell units (10 000m2)
+  map_area = areaarea(zero_mask)/cellarea() # size of the whole study area in cell units (10 000m2)
 
   for aStat in listOfSumStats:
     if aStat == 'np': # Number of patches in one zone
       average_nr = cover(areadiversity(clumps, zones), spatial(scalar(0)))  
       listOfMaps.append(average_nr)
     elif aStat == 'pd': # Patch density in a whole study area
-      zero_mask = ifthen(defined(systemState),spatial(nominal(0)))
       patches_nr = areadiversity(clumps, zero_mask)
-      patch_density = patches_nr/maparea(zero_mask)
+      patch_density = patches_nr/map_area
       listOfMaps.append(patch_density)
     elif aStat == 'mp': # Mean patch size in a zone.
       # If patch is in more than one zone it is assigned to one zone only...
@@ -134,7 +134,7 @@ def calculateSumStats(systemState, listOfSumStats, zones, validation=False):
     elif aStat == 'cilp': # Compactness index of the largest patch (CILP)
       # This metric is calculated for one patch only.
       # Saved as a one value for the whole map
-      biggestPatchSize = mapmaximum(patchSizes) # largest patch area
+      biggestPatchSize = mapmaximum(patchSizes)/cellarea() # largest patch area in the cell unit
       biggestPatchSize = ifthen(defined(systemState), biggestPatchSize)
       biggestPatchPerimeter = mapmaximum(
         ifthen(patchSizes == biggestPatchSize, perimeter)) # perimeter of the largest patch
@@ -146,6 +146,41 @@ def calculateSumStats(systemState, listOfSumStats, zones, validation=False):
       wFractalDimensionIndexOneCell = ifthen(oneCellPerPatch, wFractalDimensionIndex)
       WFDI = areaaverage(wFractalDimensionIndexOneCell, zones)
       listOfMaps.append(WFDI)
+    elif aStat == 'cohesion': # Patch Cohesion Index in a zone
+      ### measures the physical connectedness of the corresponding patch type
+      summedPerimeter = areatotal(perimeter, zones) # in cell units
+      summedPerimeterArea = areatotal(perimeter * sqrt(patchSizes),zones)
+      cohesion = (1 - (summedPerimeter/summedPerimeterArea))*(1-1/sqrt(zone_area))
+      listOfMaps.append(cohesion)
+    elif aStat == 'ed': # Edge Density in a zone
+      clumps_edges = perimeter/patchSizes
+      ed = maptotal(clumps_edges)/map_area
+      listOfMaps.append(ed)
+    elif aStat == 'lpi': # Largest Patch Index in a whole study area
+      # This metric is calculated for one patch only.
+      # Saved as a one value for the whole map
+      biggestPatchSize = mapmaximum(patchSizes) # largest patch area in the cell unit
+      LPI = biggestPatchSize/map_area # largest patch area in the cell unit
+      listOfMaps.append(LPI)
+    elif aStat == 'contagion': # Contagion Index in a zone
+      # ratio of the the observed contagion to the maximum possible contagion for the given number of LU types
+      P_urb = areatotal(ifthen(boolean(clumps),scalar(1))/zone_area,zones)# proportion of the selected land use type in a zone
+      P_nonurb = 1-P_urb
+      urb_map = ifthen(boolean(systemState) == 1, scalar(1))
+      nonurb_map = ifthen(boolean(systemState) == 0, scalar(1))
+      # Calculate number of joints between cells for a zone, depending on the land use types
+      g_urb_urb = areatotal(ifthen(boolean(urb_map),window4total(urb_map)),zones)
+      g_urb_nonurb = areatotal(ifthen(boolean(urb_map),window4total(nonurb_map)),zones)
+      g_nonurb_urb = areatotal(ifthen(boolean(nonurb_map),window4total(urb_map)),zones)
+      g_nonurb_nonurb = areatotal(ifthen(boolean(nonurb_map),window4total(nonurb_map)),zones)
+      # Calculate components of CONTAG metric, depending on the land use types
+      c_urb_urb = P_urb * g_urb_urb / (g_urb_urb + g_urb_nonurb)
+      c_urb_nonurb = P_urb * g_urb_nonurb / (g_urb_urb + g_urb_nonurb)
+      c_nonurb_urb = P_nonurb * g_nonurb_urb / (g_nonurb_urb + g_nonurb_nonurb)
+      c_nonurb_nonurb = P_nonurb * g_nonurb_nonurb / (g_nonurb_urb + g_nonurb_nonurb)
+      CONTAG = 1 + (c_urb_urb*ln(c_urb_urb) + c_urb_nonurb*ln(c_urb_nonurb) + c_nonurb_urb*ln(c_nonurb_urb)\
+                    +c_nonurb_nonurb*ln(c_nonurb_nonurb)) / (2 * ln(2))
+      listOfMaps.append(CONTAG)
     else:
       print('ERRRRRRRRRRRROR, unknown sum stat')
   return listOfMaps
@@ -211,21 +246,21 @@ def makeCalibrationMask(rowColFile, zoneMap):
   blocksTrue = lookupboolean(inputfolder + '/lookupTable_val.tbl', zoneMap)
   report(blocksTrue, inputfolder + '/zones_validation.map')
 
-'''
+
 # TEST
 """ Testing on the map with one zone: size 30 km x 30 km, with three patches: 700 km2, 200 km2, 100 km2 """
-test_map = os.path.join(os.getcwd(), 'data', 'test_data', 'metric_test_3patches_PL.map')
-systemState = readmap(test_map) == 2 # select urban or predefined pattern
+test_map = os.path.join(os.getcwd(), 'data', 'test_data', 'metric_test_3patches_IE.map')
+systemState = readmap(test_map) == 1 # select urban or predefined pattern
 zones_map = os.path.join(inputfolder, 'zones.map')
-mask = os.path.join(inputfolder, 'zones_calibration.map')
+#mask = os.path.join(inputfolder, 'zones_calibration.map')
 zones = readmap(zones_map)
 # use a mask
-systemState = ifthen(mask, systemState)
+#systemState = ifthen(mask, systemState)
 
 # put HERE the name(s) of the metric(s) you want to test
-# ['np', 'pd', 'mp', 'fdi', 'wfdi', 'cilp']
-metrics = ['cilp']
+# ['np', 'pd', 'mp', 'fdi', 'wfdi', 'cilp','cohesion','ed']
+metrics = ['contagion']
 listofmaps = calculateSumStats(systemState, metrics, zones)
 aguila(listofmaps)
-'''
+
     
