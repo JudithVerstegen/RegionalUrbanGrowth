@@ -612,7 +612,7 @@ def getTopCalibratedParameters_multiobjective(metric, weights, scenario, numberO
 
 def getValidationResults():
   """
-  Create an array matrix:
+  Create a 2D array matrix:
   ## shape 7x30 (7 validation metrics x 5 goal functions (metrics determining parameter set) * 3 cases * 2 scenarios)
   ## each cell containes RMSE or Kappa Standard, Kappa Simulation or Allocation Disagreement value
   ## this value represent the value of the validation metric (row), obtained using the given goal function,
@@ -778,65 +778,22 @@ def multiobjective(scenario):
 ############ TESTTT
 
 
-"""country = 'IE_good_results'
-arrayFolder = os.path.join(os.getcwd(),'results',country,'metrics')
-parameters = np.load(os.path.join(arrayFolder,'parameter_sets.npy'))
-print(parameters[146])
-
-arrayFolder = os.path.join(os.getcwd(),'results','PL','metrics')
-kappa_simulation = np.load(os.path.join(arrayFolder,'kappa_simulation.npy'))
-allocation = np.load(os.path.join(arrayFolder,'allocation_disagreement.npy'))
-scenario = 1
-period_validation = parameters.getCalibrationPeriod()[scenario]['validation']
-
-print(country, 'scenario', scenario, 'period', period_validation)
-indexes = np.array(getCalibratedParameters(scenario))[:,1]
-print(indexes)
-print('allocation')
-for i in indexes:
-  allocation_av = (allocation[period_validation[0]]+allocation[period_validation[1]])/2
-  print(allocation_av[int(i)])
-print('kappa simulation')
-for i in indexes:
-  kappa_av = (kappa_simulation[period_validation[0]]+kappa_simulation[period_validation[1]])/2
-  print(kappa_av[int(i)])"""
-  
-  
-  
-'''
-  
-print(country, 'mean kappa simulation for validation (scenario 1)')
-period=[3,4]
-kappa = np.load(os.path.join(arrayFolder,'kappa_simulation.npy'))
-for i in [108,164,130,163,145]:
-  av = sum(kappa[period])/2
-  print(i, av[i])
-#print(155,np.mean(kappa[period,155]))
-#print(156,np.mean(kappa[period,156]))
-#print(158,np.mean(kappa[period,158]))
 '''
 
+c = 'PL'
+theName = 'train_stations'
+fileName = os.path.join('input_data',c, theName)
+clone = os.path.join('input_data',c, 'nullmask')
+setclone(clone)
+train = readmap(fileName)
+onemask = spatial(nominal(1))
+train = ifthen(train==onemask,nominal(1))
+train = areaarea(train)
+aguila(train)'''
 
-'''
-timestep=29
-theName = 'urb' + str(timestep) + '.obj'
-fileName = os.path.join('F:/results/IE', str(158), theName)
-filehandler = open(fileName, 'rb')
 
-data = pickle.load(filehandler)
-urbObs = getObservedArray('urb')
-#print('observed',sum(urbObs[4,0,1]==1))
-#print('modelled from pickle:', sum(data==1))
-setclone('F:/input_data/IE/nullmask.map')
-for row in enumerate(obsTimeSteps):
-  print(row)
-  if(row[1]==29):
-    urbMod = np.load(os.path.join(arrayFolder, 'urb_subset_'+str(row[1]) + '.npy'))
-    np.set_printoptions(threshold=np.inf)
-    urbMod159year2018 = urbMod[0,158,1].reshape((1600,1600))
-    n2p = numpy2pcr(Nominal,urbMod159year2018,0)
-    aguila(n2p)
-'''
+
+
 
 
 
