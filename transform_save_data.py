@@ -14,20 +14,18 @@ import matplotlib.pyplot as plt
 
 # Get metrics
 metricNames = parameters.getSumStats()
-areaMetricNames = ['pd_cal','pd_val','cilp_cal','cilp_val']
 
 # Get the number of parameter iterations and number of time step defined in the parameter.py script
 nrOfTimesteps=parameters.getNrTimesteps()
-
 numberOfIterations = parameters.getNumberofIterations()
-
 iterations = range(1, numberOfIterations+1, 1)
-
 timeSteps=range(1,nrOfTimesteps+1,1)
 
 # Get the observed time steps. Time steps relate to the year of the CLC data, where 1990 was time step 0.
 obsSampleNumbers = [1] #range(1,20+1,1) <- for stochastic model
 obsTimeSteps = parameters.getObsTimesteps()
+# Read the reference files
+refArray = parameters.getColFiles()
 
 # Path to the folder with the metrics stored
 country = parameters.getCountryName()
@@ -53,22 +51,12 @@ def openPickledSamplesAndTimestepsAsNumpyArray(basename,iterations,timesteps, \
       filehandler = open(pFileName, 'rb') 
       pData = pickle.load(filehandler)
       pArray = np.array(pData, ndmin=1)
-
-      # If we are working with urban data, then we are using an array for each cell.
-      # Metrics cilp and pd are calculate for the whole area.
-      # Other metrics are calculated for each zone:
-      if basename == 'urb':
-        refArray = 'sampPointNr.col' # Array with an unique ID for each cell
-      elif basename in ['cilp','pd']:
-        refArray = 'sampSinglePoint.col' # Array with an unique ID for the whole study area
-      else:
-        refArray = 'sampPoint.col' # Array with an unique ID for each zone
           
       # If we are working with the observed data (CLC data):
       if obs:
         name = generateNameT(basename, timestep)
-        fileName = os.path.join('observations', country, 'realizations', str(1), name) # for now only realization == 1
-        data = metrics.map2Array(fileName, os.path.join('input_data', country, refArray))
+        fileName = os.path.join('observations', country, 'realizations', str(i), name)
+        data = metrics.map2Array(fileName, os.path.join('input_data', country, refArray[basename]))
         
       # If we are working with the modelled values:  
       else:
@@ -114,14 +102,14 @@ def setNameClearSave(basename, output, obs=False):
 
   # Save the data  
   np.save(fileName, output)
-"""    
+   
 #################################
 ### SAVE OUTPUTS OF THE MODEL ###
 #################################
 
 ########### Save the observed metrics and urban areas
 # Metrics:
-for aVariable in metricNames + areaMetricNames:  
+for aVariable in metricNames:  
   output_obs = openPickledSamplesAndTimestepsAsNumpyArray(aVariable, obsSampleNumbers,obsTimeSteps, True)
   setNameClearSave(aVariable, output_obs,obs=True)
 
@@ -131,7 +119,7 @@ setNameClearSave('urb', output_urb_obs,obs=True)
 
 ########### Save the modelled metrics and urban areas
 # Metrics:
-for aVariable in metricNames + areaMetricNames:
+for aVariable in metricNames:
   output_mod = openPickledSamplesAndTimestepsAsNumpyArray(aVariable, iterations, timeSteps, False)
   setNameClearSave(aVariable, output_mod,obs=False)
 
@@ -160,15 +148,9 @@ print("All number folders deleted.")
 ##################################
 
 ########### Calculate Kappa statistics
-# Calculate Kappa standard and Kappa statistic for the whole study area
 calibrate.calculateKappa()
-calibrate.calculateKappaSimulation()"""
-
-# Calculate Kappa standard and Kappa statistic for the calibration and validation based on selected zones
-#calibrate.calculateKappa()
 calibrate.calculateKappaSimulation()
-print(country)
-print("Kappa statistics calculated and saved as npy file")
+
 
 ##############################
 ### CALIBRATE AND VALIDATE ###
@@ -177,9 +159,8 @@ print("Kappa statistics calculated and saved as npy file")
 # Get the calibration and validation results for 3 scenarios:
 # 1: calibrate on year 2000-2006 valdate on 2012-2018
 # 2: calibrate on years 2012-2018 validate on 200-2006
-# 3: calibrate and validate on different aras (zones)
 """
-for scenario in [1,2,3]:
+for scenario in [1,2]:
   print('Scenario '+str(scenario))
   # Calibrate, validate and save the results as csv file
   calibrate.calibrate_validate(scenario)
