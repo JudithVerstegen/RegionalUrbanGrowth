@@ -30,21 +30,16 @@ def getCalibrationPeriod():
   """Returns the indexes of years for calibration and validation from getObsYears().values():
   e.g. [1990, 2000, 2006, 2012, 2018]
   Scenario 1: calibration period 2000 - 2006, validation period 2012 - 2018
-  Scenario 2: calibration period 2012 - 2018, validation period 2000 - 2006
-  Scenario 3: calibration period 2000 - 2018, validation period 2000 - 2018 (calibratio based on area)"""
+  Scenario 2: calibration period 2012 - 2018, validation period 2000 - 2006"""
 
   period = {
     1: {
-      'calibration': [1,2],
-      'validation': [3,4]
+      'calibration': [2],
+      'validation': [4]
       },
     2: {
-      'calibration': [3,4],
-      'validation': [1,2]
-      },
-    3: {
-      'calibration': [1,2,3,4],
-      'validation': [1,2,3,4]
+      'calibration': [4],
+      'validation': [2]
       }}
   return period
 
@@ -68,7 +63,7 @@ def getParametersforCalibration():
      minParameter needs to be >= 0
      maxParameter needs to be <= 1
     [minParameter, maxParameter, stepSize] """
-  return [0.0, 1.0, 0.125]
+  return [0.0, 1.0, 0.1]
 
 def getCountryName():
   """ Returns the case study symbol """
@@ -91,7 +86,7 @@ def getSumStats():
   # 'wfdi': Area weighted mean patch fractal dimension index
   # 'pd': Patch density
   
-  sumStats = ['cilp', 'fdi', 'wfdi', 'pd']
+  sumStats = ['cilp', 'fdi', 'wfdi', 'pd', 'ed']
   return sumStats
 
 def getCovarName():
@@ -226,5 +221,25 @@ def getYieldMapName(typeNr):
 
   needed = yieldMapNameDict.get(typeNr)
   return needed
+
+def getColFiles():
+  """Return a dictionairy of metrics and corresponding col files
+
+  For each meric a value is saved for one or more cells.
+  The cell coordinates are created in create_initial_maps.py and saved in .col files"""
+  
+  colFiles = {
+    'fdi': 'sampPoint.col',         # each zone
+    'wfdi': 'sampPoint.col',        # each zone
+    'cilp': 'sampSinglePoint.col',  # single point in the middle of the study area
+    'pd': 'sampSinglePoint.col',    # single point in the middle of the study area
+    'urb': 'sampPointNr.col',       # point for each cell
+    'cohesion': 'sampPoint.col',    # each zone
+    'ed': 'sampPoint.col',          # each zone
+    'lpi': 'sampSinglePoint.col',   # single point in the middle of the study area
+    'contagion': 'sampPoint.col'    # each zone
+    }
+  return colFiles
+  
   
   
