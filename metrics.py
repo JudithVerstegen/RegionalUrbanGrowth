@@ -246,7 +246,7 @@ def makeCalibrationMask(rowColFile, zoneMap):
   blocksTrue = lookupboolean(inputfolder + '/lookupTable_val.tbl', zoneMap)
   report(blocksTrue, inputfolder + '/zones_validation.map')
 
-
+'''
 # TEST
 """ Testing on the map with one zone: size 30 km x 30 km, with three patches: 700 km2, 200 km2, 100 km2 """
 test_map = os.path.join(os.getcwd(), 'data', 'test_data', 'metric_test_3patches_IE.map')
@@ -262,5 +262,5 @@ zones = readmap(zones_map)
 metrics = ['contagion']
 listofmaps = calculateSumStats(systemState, metrics, zones)
 aguila(listofmaps)
-
+'''
     
