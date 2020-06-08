@@ -524,6 +524,7 @@ class LandUseChangeModel(DynamicModel):
     # AT SOME POINT WITH STOCHASTIC INPUT
     # in that case land use should not include urban
     self.landuse = self.readmap(self.inputfolder + '/init_lu')
+    self.landuse06 = self.readmap(self.inputfolder + '/init_lu_06')
     self.initialUrb = self.landuse == 1
     self.roads = self.readmap(self.inputfolder + '/roads')
     self.noGoMap = cover(self.readmap(self.inputfolder + '/nogo'), \
@@ -595,55 +596,21 @@ class LandUseChangeModel(DynamicModel):
     # save the map of urban / non-urban
     urban = pcreq(self.environment, 1)
     self.report(urban, os.path.join(self.outputfolder,'urb'))
-
-    # Select the urban areas only for the calibration and validation area
-    urban_cal = ifthen(self.calibrationMask, urban)
-    urban_val = ifthen(self.validationMask, urban)
     
     # save the metrics
     listOfSumStats = metrics.calculateSumStats(scalar(urban), \
                                             self.sumStats, self.zones)               
-
-    # Save the metrics for calibration and validation based on the area
-    # For each meric a value is saved for the preselected cell(s).
-    # The cell coordinates are created in create_initial_maps.py and saved in .col files:
-    # to be checked: each landscape metrics can be saved in sampPoint.col, probably also the _cal and _val.
-    # RMSE get the mean value for all zones. RMSE for 16 same zones == RMSE for 8 same zones
-    col_files = {
-      'fdi': 'sampPoint.col',         # each zone
-      'wfdi': 'sampPoint.col',        # each zone
-      'cilp': 'sampSinglePoint.col',  # single point in the middle of the study area
-      'pd': 'sampSinglePoint.col',    # single point in the middle of the study area
-      'urb': 'sampPointNr.col',       # point for each cell
-      'cilp_cal': 'sampPoint_cal.col',# point for each calibration zones
-      'cilp_val': 'sampPoint_val.col',# point for each validation zones
-      'pd_cal': 'sampPoint_cal.col',  # point for each calibration zones
-      'pd_val': 'sampPoint_val.col'   # point for each validation zones
-      }
+    col_files = parameters.getColFiles()
     
     j=0
-    part_metrics = []
-
     # First, calculate the statistics and create the maps:
     for aname in self.sumStats:
       modelledmap = listOfSumStats[j]
       self.report(modelledmap, os.path.join(self.outputfolder, aname))
       j = j + 1
-
-      # Include selected zones for metrics that are calculated for the whole map (pd)
-      # or for the biggest patch only (cilp)
-      if aname in ['cilp','pd']:
-        stat_cal = metrics.calculateSumStats(scalar(urban_cal), \
-                                            [aname], self.zones)
-        stat_val = metrics.calculateSumStats(scalar(urban_val), \
-                                            [aname], self.zones)
-        self.report(stat_cal[0], os.path.join(self.outputfolder, aname+'_cal'))
-        self.report(stat_val[0], os.path.join(self.outputfolder, aname+'_val'))
-        part_metrics.append(aname+'_cal')
-        part_metrics.append(aname+'_val')
       
     # Then save the metrics and urban areas as pickle objects
-    for aStat in self.sumStats + ['urb'] + part_metrics:
+    for aStat in self.sumStats + ['urb']:
       path = generateNameT(self.outputfolder + '/' + aStat, timeStep)
       modelledAverageArray = metrics.map2Array(path, self.inputfolder + '/' + col_files[aStat])    
       # metric and urban areas are saved as a list
@@ -655,9 +622,9 @@ class LandUseChangeModel(DynamicModel):
       # the map with the metric or urban area is removed to save disk space
       os.remove(path)
 
-    # If the time step starts the validation period, read in the land use map
+    # If in the time step the validation period starts, read in the land use map
     if timeStep == 17: # year 2006
-      self.environment = self.readmap(self.inputfolder + '/init_lu_06')
+      self.environment = self.landuse06
     
 
 ############
