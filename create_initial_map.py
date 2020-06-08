@@ -379,7 +379,10 @@ def reproject_resample_tif(in_raster, out_raster, ref_raster):
 ############
 
 # 0. clean the two directories (input_data and observations)
-# Folders input_data and observations have to exist
+if not os.path.isdir(os.path.join(os.getcwd(), 'input_data')):
+    os.mkdir(os.path.join(os.getcwd(), 'input_data'))
+if not os.path.isdir(os.path.join(os.getcwd(), 'observations')):
+    os.mkdir(os.path.join(os.getcwd(), 'observations'))
 if not os.path.isdir(country_dir):
     os.mkdir(country_dir)
 if not os.path.isdir(os.path.join(os.getcwd(), 'observations', str(country))):
@@ -645,13 +648,6 @@ for goal in mask_zones.keys():
     command = 'map2col --unitcell ' + os.path.join(country_dir,'sampPoint_'+str(goal)[0:3]+'.map') + \
               ' ' + os.path.join(country_dir,'sampPoint_'+str(goal)[0:3]+'.col')
     os.system(command)
-    
-# Create sample points for each cell (for Kappa statistic calculation)
-samplePointsNr = unique
-report(samplePointsNr, os.path.join(country_dir, 'sampPointNr.map'))
-command = 'map2col --unitcell ' + os.path.join(country_dir, 'sampPointNr.map') + \
-          ' ' + os.path.join(country_dir, 'sampPointNr.col')
-os.system(command)
 
 # Create a sample point for one cell in the study area (for one metric for the whole study area)
 ## Find corrdinates of the middle of the study area
@@ -664,6 +660,13 @@ samplePoint = ifthen(pcreq(mapmaximum(one_quarter), one_quarter), scalar(1))
 report(samplePoint, os.path.join(country_dir, 'sampSinglePoint.map'))
 command = 'map2col --unitcell ' + os.path.join(country_dir, 'sampSinglePoint.map') + \
           ' ' + os.path.join(country_dir, 'sampSinglePoint.col')
+os.system(command)
+
+# Create sample points for each cell (for Kappa statistic calculation)
+samplePointsNr = unique
+report(samplePointsNr, os.path.join(country_dir, 'sampPointNr.map'))
+command = 'map2col --unitcell ' + os.path.join(country_dir, 'sampPointNr.map') + \
+          ' ' + os.path.join(country_dir, 'sampPointNr.col')
 os.system(command)
 
 # 9. create calibration and validation masks
