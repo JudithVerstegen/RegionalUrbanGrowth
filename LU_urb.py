@@ -639,7 +639,8 @@ def brute_force():
   stepsize = parameters.getParametersforCalibration()[2]
 
   # Assure that steps in the loop have 3 decimal place only
-  param_steps = np.around(np.arange(min_p, max_p + 0.100, stepsize),decimals=3)
+  p_steps = np.around(np.arange(min_p, max_p+stepsize, stepsize),decimals=3)
+  print(p_steps)
 
   # Print calibration properties
   print('\n################################################')
@@ -651,7 +652,7 @@ def brute_force():
   print('Parameter step: ', stepsize)
 
   # Get the possible combination of parameters:
-  for p1,p2,p3,p4 in ((a,b,c,d) for a in param_steps for b in param_steps for c in param_steps for d in param_steps):
+  for p1,p2,p3,p4 in ((a,b,c,d) for a in p_steps for b in p_steps for c in p_steps for d in p_steps):
     sumOfParameters = p1+p2+p3+p4
     if (sumOfParameters > 0.9999 and sumOfParameters < 1.0001):
       parameters_list.append([p1,p2,p3,p4])
