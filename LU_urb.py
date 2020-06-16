@@ -242,7 +242,7 @@ class LandUseType:
     # Add the initial (static) suitability maps to the dynamic suitability map
     suitabilityMap += self.initialSuitabilityMap
     # Add randomness
-    suitabilityMap = self.getRandomClumps() * suitabilityMap
+    suitabilityMap = self.getRandom() * suitabilityMap
     # Normalize the total suitability map and report
     self.totalSuitabilityMap = self.normalizeMap(suitabilityMap)
     report(self.totalSuitabilityMap, 'suit_tot' + str(self.typeNr))
@@ -498,10 +498,13 @@ class LandUseChangeModel(DynamicModel):
     self.weightDict = {1: weights}
     # input and output folders
     country = parameters.getCountryName()
-    output_mainfolder = os.path.join(os.getcwd(), 'results', country)
+    results_mainfolder = os.path.join(os.getcwd(), 'results')
+    if not os.path.isdir(results_mainfolder):
+      os.mkdir(results_mainfolder)
+    output_mainfolder = os.path.join(results_mainfolder, country)
     if not os.path.isdir(output_mainfolder):
       os.mkdir(output_mainfolder)
-    self.outputfolder = os.path.join(os.getcwd(), 'results', country, str(nr))
+    self.outputfolder = os.path.join(results_mainfolder, country, str(nr))
     if not os.path.isdir(self.outputfolder):
       os.mkdir(self.outputfolder)
     self.inputfolder = os.path.join('input_data', country)
@@ -626,17 +629,45 @@ class LandUseChangeModel(DynamicModel):
     if timeStep == 17: # year 2006
       self.environment = self.landuse06
     
+# Define brute force calibration
+def brute_force():
+  # Prepeare empty list for the calibration parameters:
+  parameters_list = []
+  # Set step size for calibration
+  min_p = parameters.getParametersforCalibration()[0]
+  max_p = parameters.getParametersforCalibration()[1]
+  stepsize = parameters.getParametersforCalibration()[2]
 
+  # Assure that steps in the loop have 3 decimal place only
+  param_steps = np.around(np.arange(min_p, max_p + 0.100, stepsize),decimals=3)
+
+  # Print calibration properties
+  print('\n################################################')
+  print('Run LU_urb model')
+  print('Case study: ', parameters.getCountryName())
+  print('Number of iterations: ', parameters.getNumberofIterations())
+  print('Min parameter value: ', min_p)
+  print('Max parameter value: ', max_p)
+  print('Parameter step: ', stepsize)
+
+  # Get the possible combination of parameters:
+  for p1,p2,p3,p4 in ((a,b,c,d) for a in param_steps for b in param_steps for c in param_steps for d in param_steps):
+    sumOfParameters = p1+p2+p3+p4
+    if (sumOfParameters > 0.9999 and sumOfParameters < 1.0001):
+      parameters_list.append([p1,p2,p3,p4])
+
+  # Return a list with parameters combinations
+  return parameters_list
+  
 ############
 ### MAIN ###
 ############
 
 start_time = time.time()
+parameters_list = brute_force()
 nrOfTimeSteps = parameters.getNrTimesteps()
+print('Number of time steps: ', nrOfTimeSteps)
 #nrOfSamples = parameters.getNrSamples() # This variable is not being used as MC was eliminated from the model
-# Find the number of parameters to calibrate
-nrOfParameters = len(parameters.getSuitFactorDict()[1])
-nrOfIterations = parameters.getNumberofIterations()
 
 # Before loop to save computation time
 inputfolder = os.path.join('input_data', parameters.getCountryName())
@@ -649,42 +680,22 @@ preMCLandUse.determineDistanceToStations(stations)
 roads = readmap(inputfolder + '/roads')
 preMCLandUse.determineSpeedRoads(roads)
 
-
 #######################
 ### Loop COMES HERE ###
 #######################
 
 loopCount = 0
 
-# Set step size for calibration
-min_p = parameters.getParametersforCalibration()[0]
-max_p = parameters.getParametersforCalibration()[1]
-stepsize = parameters.getParametersforCalibration()[2]
-
-# Assure that steps in the loop have 3 decimal place only
-param_steps = np.around(np.arange(min_p, max_p + 0.100, stepsize),decimals=3)
-
 # Run the model
-print('\n################################################')
-print('Run LU_urb model')
-print('Number of iterations: ', nrOfIterations)
-print('Number of time steps: ', nrOfTimeSteps)
-print('Min parameter value: ', min_p, '. Max parameter value: ', max_p,'. Parameter steps: ', param_steps)
-
-
-for p1,p2,p3,p4 in ((a,b,c,d) for a in param_steps for b in param_steps for c in param_steps for d in param_steps):
-  sumOfParameters = p1+p2+p3+p4
-  if (sumOfParameters > 0.9999 and sumOfParameters < 1.0001):
-      loopCount = loopCount + 1
-      print('\n################################################')
-      print('Model Run: ',loopCount,'. Parameters used: ',p1,p2,p3,p4)
-      myModel = LandUseChangeModel(loopCount, [p1,p2,p3,p4])
-      dynamicModel = DynamicFramework(myModel, nrOfTimeSteps)
-      dynamicModel.run()                  
+for p_combination in parameters_list:
+  loopCount = loopCount + 1
+  print('\n################################################')
+  print('Model Run: ',loopCount,'. Parameters used: ',p_combination)
+  myModel = LandUseChangeModel(loopCount, p_combination)
+  dynamicModel = DynamicFramework(myModel, nrOfTimeSteps)
+  dynamicModel.run()               
 
 print('\n################################################')
-print("--- Number of iterations of a loop: %s ---" % (nrOfIterations))
-print("--- Number of timesteps: %s ---" % (nrOfTimeSteps))
 print("--- Program execution: ", str(int((time.time() - start_time))/60), " minutes ---")
 
 
