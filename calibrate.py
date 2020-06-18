@@ -80,11 +80,12 @@ def getAllocationArray(aim=None,scenario=None,case=None):
   else:  
     return np.load(os.path.join(folder, 'allocation_disagreement.npy'))
 
-def getSelectedArray(array, scenario, aim):
-  # end_year is a list containing index of the year, which is the end of calibration/validation period,
-  # defined by the scenario
-  end_year = parameters.getCalibrationPeriod()[scenario][aim]
-  return array[end_year]
+def getAveragedArray(array, scenario, aim):
+  # period is a list containing indexes of selected years, it is defined by the scenario
+  period = parameters.getCalibrationPeriod()[scenario][aim]
+  # get average values
+  a_mean = np.mean(array[period],axis=0)
+  return a_mean
 
 def getNormalizedArray(array, kappa=None):
   a_max = np.amax(array)
@@ -342,7 +343,7 @@ def getRankedRMSE(metric,scenario,aim,case=None):
   # get the array with RMSE
   aRMSE = calcRMSE(metric, scenario, aim,case)
   # get the RMSE for the selected year
-  sRMSE = getSelectedArray(aRMSE, scenario,aim)
+  sRMSE = getAveragedArray(aRMSE, scenario,aim)
   # order the parameter sets
   RMSEorder = sRMSE.argsort()
   # rank the parameter sets. rank == 0 indifies the best parameter set
@@ -354,7 +355,7 @@ def getKappaIndex(scenario,aim,case=None):
   # get the array with kappa values for the whole study area or the selected zones only
   kappaArr = getKappaArray(scenario, aim, case)
   # get the kappa for the selected year
-  aKAPPA = getSelectedArray(kappaArr,scenario,aim)
+  aKAPPA = getAveragedArray(kappaArr,scenario,aim)
   # order the parameter sets
   KAPPAorder = aKAPPA.argsort()
   # rank the parameter sets
@@ -379,13 +380,13 @@ def getRankedMultiobjective(metric,weights,scenario,aim='calibration',case=None)
   # get the array with RMSE
   aRMSE = calcRMSE(metric, scenario, aim,case)
   # get the RMSE for the selected year
-  sRMSE = getSelectedArray(aRMSE, scenario,aim)
+  sRMSE = getAveragedArray(aRMSE, scenario,aim)
   # get the normalized RMSE
   n_RMSE = getNormalizedArray(sRMSE)
   # Get the Kappa array for the given aim and scenario
   aKAPPA = getKappaArray(scenario,aim, case)
   # Get the calibration value
-  sKappa = getSelectedArray(aKAPPA, scenario,aim)
+  sKappa = getAveragedArray(aKAPPA, scenario,aim)
   # Get the normalized Kappa
   n_Kappa = getNormalizedArray(sKappa, kappa=True)
   # Join two goal function
@@ -462,7 +463,7 @@ def getTopCalibratedParameters(metric, scenario, numberOfTopPerformers,case=None
   for i in range(0,numberOfTopPerformers):
     # Get the parameter index depending on the rank i
     calibratedIndex, = np.where(ranked == i)
-    sError = getSelectedArray(error, scenario, 'validation')
+    sError = getAveragedArray(error, scenario, 'validation')
     p = parameterSets[calibratedIndex]
     topArray[i,[0,1,2]] = metric, calibratedIndex[0], sError[int(calibratedIndex)]
     for j in [3,4,5,6]:
@@ -487,8 +488,8 @@ def getTopCalibratedParameters_multiobjective(metric, weights, scenario, numberO
   for i in range(0,numberOfTopPerformers):
     # Get the parameter index depending on the rank i
     calibratedIndex, = np.where(multi_ranked == i)
-    avRMSE = getSelectedArray(RMSE, scenario, 'validation')
-    avKappa = getSelectedArray(RMSE, scenario, 'validation')
+    avRMSE = getAveragedArray(RMSE, scenario, 'validation')
+    avKappa = getAveragedArray(RMSE, scenario, 'validation')
     p = parameterSets[calibratedIndex]
     topArray[i,[0,1,2,3]] = metric,calibratedIndex[0],avRMSE[int(calibratedIndex)],avKappa[int(calibratedIndex)]
                                                          
@@ -528,7 +529,7 @@ def getValidationResults():
             # Get the error for the validation metric
             an_array = calcRMSE(v_m,scenario,'validation',case=country)
           # Get the values for the validation period
-          av_results = getSelectedArray(an_array,scenario,'validation')
+          av_results = getAveragedArray(an_array,scenario,'validation')
           validationResults[i,j] = av_results[index]
           j+=1
   return validationResults
@@ -566,7 +567,7 @@ def getValidationResults_multiobjective(weights):
             # Get the error for the validation metric
             an_array = calcRMSE(v_m,scenario,'validation',case=country)
           # Get the values for the validation period
-          av_results = getSelectedArray(an_array,scenario,'validation')
+          av_results = getAveragedArray(an_array,scenario,'validation')
           validationResults[i,j] = av_results[index]
           j+=1
   return validationResults 
@@ -619,7 +620,7 @@ def multiobjective(scenario):
   # get Kappa for validation before the loop
   kappa = getKappaArray(scenario, 'validation')
   # Get kappa values for selected period
-  avKappa = getSelectedArray(kappa, scenario, 'validation')
+  avKappa = getAveragedArray(kappa, scenario, 'validation')
   # Normalize kappa array
   norKappa = getNormalizedArray(avKappa, kappa=True)
  
@@ -636,7 +637,7 @@ def multiobjective(scenario):
       # Get the RMSE array
       rmse = calcRMSE(metric, scenario,'validation')
       # Get RMSE values for selected period
-      avRMSE = getSelectedArray(rmse, scenario, 'validation')
+      avRMSE = getAveragedArray(rmse, scenario, 'validation')
       # Normalize RMSE array
       norRMSE = getNormalizedArray(avRMSE)
       # Save selected index, the average RMSE and the average Kappa
