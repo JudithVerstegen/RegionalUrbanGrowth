@@ -1,12 +1,12 @@
 import string
-import os, shutil, numpy
-#import generalfunctions
-import matplotlib.pyplot as plt
+import os, numpy
+import parameters
 from pcraster import *
 from pcraster.framework import *
-import parameters
 
-inputfolder = os.path.join(os.getcwd(), 'input_data', parameters.getCountryName())
+# Get work directory
+work_dir = parameters.getWorkDir()
+inputfolder = os.path.join(work_dir, 'input_data', parameters.getCountryName())
 
 def map2Array(filename, rowColFile):
   """Selects values at row, col from raster name in Monte Carlo samples.
@@ -134,7 +134,7 @@ def calculateSumStats(systemState, listOfSumStats, zones, validation=False):
     elif aStat == 'cilp': # Compactness index of the largest patch (CILP)
       # This metric is calculated for one patch only.
       # Saved as a one value for the whole map
-      biggestPatchSize = mapmaximum(patchSizes)/cellarea() # largest patch area in the cell unit
+      biggestPatchSize = mapmaximum(patchSizes) # largest patch area in the cell unit
       biggestPatchSize = ifthen(defined(systemState), biggestPatchSize)
       biggestPatchPerimeter = mapmaximum(
         ifthen(patchSizes == biggestPatchSize, perimeter)) # perimeter of the largest patch
@@ -146,7 +146,7 @@ def calculateSumStats(systemState, listOfSumStats, zones, validation=False):
       wFractalDimensionIndexOneCell = ifthen(oneCellPerPatch, wFractalDimensionIndex)
       WFDI = areaaverage(wFractalDimensionIndexOneCell, zones)
       listOfMaps.append(WFDI)
-    elif aStat == 'cohesion': # Patch Cohesion Index in a zone
+    elif aStat == 'cohes': # Patch Cohesion Index in a zone
       ### measures the physical connectedness of the corresponding patch type
       summedPerimeter = areatotal(perimeter, zones) # in cell units
       summedPerimeterArea = areatotal(perimeter * sqrt(patchSizes),zones)
@@ -162,7 +162,7 @@ def calculateSumStats(systemState, listOfSumStats, zones, validation=False):
       biggestPatchSize = mapmaximum(patchSizes) # largest patch area in the cell unit
       LPI = biggestPatchSize/map_area # largest patch area in the cell unit
       listOfMaps.append(LPI)
-    elif aStat == 'contagion': # Contagion Index in a zone
+    elif aStat == 'contag': # Contagion Index in a zone
       # ratio of the the observed contagion to the maximum possible contagion for the given number of LU types
       P_urb = areatotal(ifthen(boolean(clumps),scalar(1))/zone_area,zones)# proportion of the selected land use type in a zone
       P_nonurb = 1-P_urb
@@ -246,21 +246,4 @@ def makeCalibrationMask(rowColFile, zoneMap):
   blocksTrue = lookupboolean(inputfolder + '/lookupTable_val.tbl', zoneMap)
   report(blocksTrue, inputfolder + '/zones_validation.map')
 
-'''
-# TEST
-""" Testing on the map with one zone: size 30 km x 30 km, with three patches: 700 km2, 200 km2, 100 km2 """
-test_map = os.path.join(os.getcwd(), 'data', 'test_data', 'metric_test_3patches_IE.map')
-systemState = readmap(test_map) == 1 # select urban or predefined pattern
-zones_map = os.path.join(inputfolder, 'zones.map')
-#mask = os.path.join(inputfolder, 'zones_calibration.map')
-zones = readmap(zones_map)
-# use a mask
-#systemState = ifthen(mask, systemState)
-
-# put HERE the name(s) of the metric(s) you want to test
-# ['np', 'pd', 'mp', 'fdi', 'wfdi', 'cilp','cohesion','ed']
-metrics = ['contagion']
-listofmaps = calculateSumStats(systemState, metrics, zones)
-aguila(listofmaps)
-'''
     

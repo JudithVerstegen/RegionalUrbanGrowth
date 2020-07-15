@@ -17,16 +17,14 @@ import parameters
 import random
 from pcraster import *
 from pcraster.framework import *
-from matplotlib import pyplot as plt
-
-
 
 ##############
 ### inputs ###
 ##############
 
 # Directory of Corine land use maps and other input
-data_dir = os.path.join(os.getcwd(), 'data')
+work_dir = parameters.getWorkDir()
+data_dir = os.path.join(work_dir, 'data')
 
 # Coordinates of case study region
 # in ERST 1989 (Corine projection) as [x0, y0, x1, y1]
@@ -36,7 +34,7 @@ coords_dict = {
     'IT':[4172280,2403670,4332280,2563670],
     'PL':[5002510,3212710,5162510,3372710]
 }
-country_dir = os.path.join(os.getcwd(), 'input_data', str(country))
+country_dir = os.path.join(work_dir, 'input_data', str(country))
 
 # Set the country bounding box
 coords = coords_dict[country] 
@@ -50,7 +48,6 @@ realizations = 1 #20
 corr_window_size = 50
 omission = 10#52
 metric_names = parameters.getSumStats()
-
 
 #################
 ### functions ###
@@ -379,24 +376,24 @@ def reproject_resample_tif(in_raster, out_raster, ref_raster):
 ############
 
 # 0. clean the two directories (input_data and observations)
-if not os.path.isdir(os.path.join(os.getcwd(), 'input_data')):
-    os.mkdir(os.path.join(os.getcwd(), 'input_data'))
-if not os.path.isdir(os.path.join(os.getcwd(), 'observations')):
-    os.mkdir(os.path.join(os.getcwd(), 'observations'))
+if not os.path.isdir(os.path.join(work_dir, 'input_data')):
+    os.mkdir(os.path.join(work_dir, 'input_data'))
+if not os.path.isdir(os.path.join(work_dir, 'observations')):
+    os.mkdir(os.path.join(work_dir, 'observations'))
 if not os.path.isdir(country_dir):
     os.mkdir(country_dir)
-if not os.path.isdir(os.path.join(os.getcwd(), 'observations', str(country))):
-    os.mkdir(os.path.join(os.getcwd(), 'observations', str(country)))
+if not os.path.isdir(os.path.join(work_dir, 'observations', str(country))):
+    os.mkdir(os.path.join(work_dir, 'observations', str(country)))
 
 files = os.listdir(country_dir)
 for f in files:
     if f not in ['make_demand_manual.xlsx', 'demand.tss']:
         os.remove(os.path.join(country_dir, f))
-files = os.listdir(os.path.join(os.getcwd(), 'observations', str(country)))
+files = os.listdir(os.path.join(work_dir, 'observations', str(country)))
 for f in files:
-    if not os.path.isdir(os.path.join(os.getcwd(), 'observations', \
+    if not os.path.isdir(os.path.join(work_dir, 'observations', \
                                       str(country), f)):
-        os.remove(os.path.join(os.getcwd(), 'observations', str(country), f))
+        os.remove(os.path.join(work_dir, 'observations', str(country), f))
 
 # create the clone map
 corine_dir = os.path.join(data_dir, 'Corine')
@@ -434,15 +431,10 @@ for a_name in os.listdir(corine_dir):
         report(urban, os.path.join('observations', country, \
                                    'urb' + a_name[13:15] + '.map'))
         
-        # 3. make simpler initial land use map only for 1990
-        if a_name[13:15] == '90':
+        # 3. make simpler initial land use map only for observation years
+        if a_name[13:15] in ['90','00','06','12','18']:
             simple_lu = simplify_lu_map(lu)
-            report(simple_lu, os.path.join(country_dir, 'init_lu.map'))
-
-        # 4. make simpler initial land use map only for 2006
-        if a_name[13:15] == '06':
-            simple_lu = simplify_lu_map(lu)
-            report(simple_lu, os.path.join(country_dir, 'init_lu_06.map'))
+            report(simple_lu, os.path.join(country_dir, 'init_lu'+str(a_name[13:15])+'.map'))
 
 # Select the dir for the temporal working files
 temp_dir = os.path.join(data_dir, 'temporal_data')
@@ -452,7 +444,7 @@ print('-------------------- Reference raster --------------------')
 raster_name = os.listdir(corine_dir)[0]
 print('Reference raster name ' + raster_name)
 ref_raster = os.path.join(corine_dir, raster_name, raster_name + '.tif')
-    
+   
 # 4. road map outside loop
 print('------------------------- Roads -------------------------')
 # Road dataset will be reprojected and rasterized and saved into 'raster' folder inside the road_dir.
@@ -482,7 +474,6 @@ print('-------------------- Train stations --------------------')
 # Train station dataset will be reprojected and rasterized and saved into 'raster' folder inside the railways_dir.
 # 'raster' folder needs to exist.
 railway_dir = os.path.join(data_dir, 'railways')
-
 print('Creating train stations map in: ', country,'...')
 
 ### 1. Select the train stations
@@ -565,7 +556,6 @@ dem_files = os.listdir(temp_dir)
 for f in dem_files:
     os.remove(os.path.join(temp_dir, f))
 
-
 print('------------ 3. No-go map ------------')
 # Combine the maps into the no-go map
 # NATURA2000 and slope >30 degrees (around 58%) are excluded
@@ -581,15 +571,21 @@ one_mask = boolean(null_mask + 1)
 report(one_mask, os.path.join(country_dir, 'onemask.map'))
 
 # Blocks (zones) for the calibration
-command = 'resample -r ' + str(zone_size) + ' ' + \
-          os.path.join(country_dir, 'onemask.map') + ' resamp.map'
+strings = ['resample -r ' + str(zone_size) + ' ' + \
+          os.path.join(country_dir, 'onemask.map') + ' resamp.map']      
+command = "".join(strings)
 os.system(command)
-os.system('pcrcalc unique.map = uniqueid(resamp.map)')
+
+strings = ['pcrcalc unique.map =','uniqueid(resamp.map)']
+command = "".join(strings)
+os.system(command)
+
 command = 'resample unique.map zones.map --clone ' + \
           os.path.join(country_dir, 'onemask.map')
 os.system(command)
-os.system('pcrcalc ' + os.path.join(country_dir, 'zones.map') + \
-          ' = nominal(zones.map)')
+command = 'pcrcalc ' + os.path.join(country_dir, 'zones.map') + \
+          ' = nominal(zones.map)'
+os.system(command)
 os.remove('zones.map')
 os.remove('resamp.map')
 os.remove('unique.map')
@@ -600,28 +596,6 @@ zones = readmap(os.path.join(country_dir, 'zones.map'))
 samplePoints = pcreq(areaminimum(unique, zones), unique)
 samplePoints = uniqueid(samplePoints)
 
-""" Create a dictionairy containing numbers of zones for calibration and validation
-Zone numbers are assigned randomly"""
-
-zone_numbers = [*range(1,parameters.getNumberOfZones()+1)]
-# Assign randomly half of the zones to the calibration phase
-calibration_zones = random.sample(zone_numbers, int(len(zone_numbers)/2))
-validation_zones = zone_numbers
-# Assign the rest of the zones to the validation phase
-for x in calibration_zones:
-    validation_zones.remove(x)
-
-mask_zones = {
-'calibration': calibration_zones,
-'validation': validation_zones
-}
-
-### remove zones with zero urban in 2000
-##urb2000 = readmap('observations\urb00')
-##av = areaaverage(scalar(urb2000), zones)
-##zones = ifthen(av > 0, zones)
-##report(zones, 'input_data\zones.map')
-
 # Create sample points for each zone
 samplePointsCondition = ifthen(samplePoints > 0, boolean(1))
 samplePointsCondition = uniqueid(samplePointsCondition)
@@ -629,25 +603,6 @@ report(samplePointsCondition, os.path.join(country_dir, 'sampPoint.map'))
 command = 'map2col --unitcell ' + os.path.join(country_dir, 'sampPoint.map') + \
           ' ' + os.path.join(country_dir, 'sampPoint.col')
 os.system(command)
-
-# Create sample points for calibration and validation zones:
-for goal in mask_zones.keys():
-    conditions = country_dir + "/" + str(goal) + "_zones.txt"
-    a_file = open(conditions,"w")
-
-    for z in mask_zones[goal]:
-        a_file.write(str(z)+"\t"+str(1)+"\n")   
-    a_file.close()
-
-    calibrationMap = lookupscalar(conditions,samplePoints)
-    calibrationZoneMap = lookupscalar(conditions,scalar(zones))
-    report(calibrationZoneMap, 'zones_'+str(goal)+'.map')
-    
-    samplePointsCondition = ifthen(calibrationMap==1, samplePoints)
-    report(samplePointsCondition, os.path.join(country_dir,'sampPoint_'+str(goal)[0:3]+'.map'))
-    command = 'map2col --unitcell ' + os.path.join(country_dir,'sampPoint_'+str(goal)[0:3]+'.map') + \
-              ' ' + os.path.join(country_dir,'sampPoint_'+str(goal)[0:3]+'.col')
-    os.system(command)
 
 # Create a sample point for one cell in the study area (for one metric for the whole study area)
 ## Find corrdinates of the middle of the study area
@@ -668,22 +623,14 @@ report(samplePointsNr, os.path.join(country_dir, 'sampPointNr.map'))
 command = 'map2col --unitcell ' + os.path.join(country_dir, 'sampPointNr.map') + \
           ' ' + os.path.join(country_dir, 'sampPointNr.col')
 os.system(command)
-
-# 9. create calibration and validation masks
-for key in mask_zones.keys():
-    mask_cal = scalar(0)
-    for aZone in mask_zones[key]:
-        mask_cal = ifthenelse(aZone==scalar(zones), mask_cal + 1, mask_cal)
-    mask_cal = ifthen(mask_cal==1, boolean(1))
-    report(mask_cal, country_dir + '/zones_'+key+'.map')
-    
-# 10. summary statistics with no stochasticity
+ 
+# 9. summary statistics with no stochasticity
 print('---------------------- Statistics ----------------------')
 print('------------ CLC area ------------')
 area = {}
 
 for year in ['90','00','06','12','18']:
-    amap = readmap(os.path.join(os.getcwd(), 'observations', \
+    amap = readmap(os.path.join(work_dir, 'observations', \
                                 country, 'urb' + year + '.map'))
     # collect total area data for demand
     area[year] = float(maptotal(scalar(amap)))
@@ -691,15 +638,12 @@ print('Area from CLC:')
 print(area)
 print('')
 
-# 11. realizations and their summary statistics
+# 10. realizations and their summary statistics
 print('------------ Realizations ------------')
-calibrationMask = readmap(country_dir + '/zones_calibration')
-validationMask = readmap(country_dir + '/zones_validation')
-
 # list of pairs of actual year and time step
-if not os.path.exists(os.path.join(os.getcwd(), 'observations', \
+if not os.path.exists(os.path.join(work_dir, 'observations', \
                                    country, 'realizations')):
-    os.mkdir(os.path.join(os.getcwd(), 'observations', country, 'realizations'))
+    os.mkdir(os.path.join(work_dir, 'observations', country, 'realizations'))
 
 avs = {}
 mins = {}
@@ -707,9 +651,9 @@ maxs = {}
 for i in range(1, realizations + 1):
     print(i)
     # make directories for the realizations
-    if not os.path.exists(os.path.join(os.getcwd(), 'observations', country, \
+    if not os.path.exists(os.path.join(work_dir, 'observations', country, \
                                        'realizations', str(i))):
-        os.mkdir(os.path.join(os.getcwd(), 'observations', country, \
+        os.mkdir(os.path.join(work_dir, 'observations', country, \
                               'realizations', str(i)))
     # map with random numbers but with correlation by moving window
     randmap = windowaverage(uniform(1), corr_window_size * celllength())
@@ -717,7 +661,7 @@ for i in range(1, realizations + 1):
     prev = None
     # Year numbers are adjusted to the time step numbers
     for year in [('90', 1), ('00', 11), ('06', 17), ('12', 23), ('18', 29)]: 
-        amap = readmap(os.path.join(os.getcwd(), 'observations', \
+        amap = readmap(os.path.join(work_dir, 'observations', \
                                     country, 'urb' + year[0] + '.map'))
         # change some of the NEW urban cells, not the existing ones
         if prev is not None:
@@ -729,9 +673,6 @@ for i in range(1, realizations + 1):
             ##aguila(new_map)
         else:
             new_map = amap
-        # Select the urban areas only for the calibration and validation area
-        new_map_cal = ifthen(calibrationMask, new_map)
-        new_map_val = ifthen(validationMask, new_map)
         
         # TO_DO collect total area data for demand
         cells = float(maptotal(scalar(new_map)))
@@ -754,31 +695,18 @@ for i in range(1, realizations + 1):
                                                         zones)
 
         j=0
-        
         for aname in metric_names:
             observedmap = listOfSumStats[j]
             report(observedmap, \
                generateNameT(os.path.join(base, str(i), aname), \
                             year[1]))
-            j+=1
-
-            # Save the metrics for calibration and validation based on the area
-            # For metrics that are calculated for the whole map (pd) of for the biggest patch (cilp)          
-            if aname in ['cilp','pd']:
-                stat_cal = metrics.calculateSumStats(new_map_cal,[aname],\
-                                                        zones)
-                stat_val = metrics.calculateSumStats(new_map_val,[aname],\
-                                                        zones)
-                report(stat_cal[0], generateNameT(os.path.join(base, str(i), aname+'_cal'),year[1]))
-                report(stat_val[0], generateNameT(os.path.join(base, str(i), aname+'_val'),year[1]))
-       
+            j+=1      
         prev = amap
         
 print('Stochastic area:')        
 print(mins)
 print(maxs)
 print(avs)
-
 
 # 11. create random unfirom map
 uniformMap = uniform(1)
