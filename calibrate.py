@@ -6,12 +6,10 @@ import metrics
 import numpy as np
 import parameters
 from pcraster.framework import *
-from numba import njit
+import matplotlib.pyplot as plt
+import csv
 
 #### Script to find calibrate LU model
-
-# Work directory:
-work_dir = parameters.getWorkDir()
 
 # Get metrics
 metricList = parameters.getSumStats()
@@ -30,7 +28,8 @@ obsTimeSteps = parameters.getObsTimesteps()
 
 # Path to the folder with the metrics npy arrays stored
 country = parameters.getCountryName()
-arrayFolder = os.path.join(work_dir,'results',country,'metrics')
+arrayFolder = os.path.join(os.getcwd(),'results',country,'metrics')
+
 
 #################
 ### FUNCTIONS ###
@@ -40,50 +39,46 @@ def getModelledArray(metric,scenario=None,aim=None,case=None):
   if case is None:
     folder = arrayFolder
   else:
-    folder = os.path.join(work_dir,'results',case,'metrics')
-  return np.load(os.path.join(folder, metric + '.npy'),allow_pickle=True)
+    folder = os.path.join(os.getcwd(),'results',case,'metrics')
+  return np.load(os.path.join(folder, metric + '.npy'))
 
 def getObservedArray(metric,scenario=None,aim=None,case=None):
   if case is None:
     folder = arrayFolder
   else:
-    folder = os.path.join(work_dir,'results',case,'metrics')
-  return np.load(os.path.join(folder, metric + '_obs.npy'),allow_pickle=True)
-
-def getSubsetArray(metric,index,scenario=None,aim=None,case=None):
-  if case is None:
-    folder = arrayFolder
-  else:
-    folder = os.path.join(work_dir,'results',case,'metrics')
-  return np.load(os.path.join(folder, metric+'_subset_' + str(index) + '.npy'),allow_pickle=True)
+    folder = os.path.join(os.getcwd(),'results',case,'metrics')
+  return np.load(os.path.join(folder, metric + '_obs.npy'))
   
 def getParameterConfigurations(case=None):
   if case is None:
     folder = arrayFolder
   else:
-    folder = os.path.join(work_dir,'results',case,'metrics')
+    folder = os.path.join(os.getcwd(),'results',case,'metrics')
   return np.load(os.path.join(folder, 'parameter_sets.npy'))
 
 def getKappaArray(scenario=None,aim=None,case=None):
   if case is None:
     folder = arrayFolder
   else:
-    folder = os.path.join(work_dir,'results',case,'metrics') 
-  return np.load(os.path.join(folder, 'kappa.npy'))
+    folder = os.path.join(os.getcwd(),'results',case,'metrics')
+  else:  
+    return np.load(os.path.join(folder, 'kappa.npy'))
 
 def getKappaSimulationArray(aim=None,scenario=None, case=None):
   if case is None:
     folder = arrayFolder
   else:
-    folder = os.path.join(work_dir,'results',case,'metrics')
-  return np.load(os.path.join(folder, 'kappa_simulation.npy'))
+    folder = os.path.join(os.getcwd(),'results',case,'metrics')
+  else:  
+    return np.load(os.path.join(folder, 'kappa_simulation.npy'))
 
 def getAllocationArray(aim=None,scenario=None,case=None):
   if case is None:
     folder = arrayFolder
   else:
-    folder = os.path.join(work_dir,'results',case,'metrics')  
-  return np.load(os.path.join(folder, 'allocation_disagreement.npy'))
+    folder = os.path.join(os.getcwd(),'results',case,'metrics')
+  else:  
+    return np.load(os.path.join(folder, 'allocation_disagreement.npy'))
 
 def getAveragedArray(array, scenario, aim):
   # period is a list containing indexes of selected years, it is defined by the scenario
@@ -118,90 +113,29 @@ def createDiffArray(metric, scenario, aim, case=None):
         theArray[row,col][zone][0] = modelled[obsTimeSteps[row]-1,col][1][zone][0] - observed[row,0][1][zone][0]  
   return theArray
 
-def saveArray(array,name):
-  fileName = os.path.join(arrayFolder, str(name))
-  # Clear the directory if needed
-  if os.path.exists(fileName + '.npy'):
-      os.remove(fileName + '.npy')
-  # Save the data  
-  np.save(fileName, array)
-  
-@njit(parallel=True)
-def getValidCells(u_array):
-  # Get the number of valid cells in the map 
-  cells = len(u_array)
-  nanCells = float(np.sum(np.isnan(u_array)))
-  validCells = cells - nanCells
-  return validCells
-
-@njit(parallel=True)
-def K_calculations(row,col,obs0,obs1,mod0,mod1,cArray,allocationArray,kappaArray,validCells):
-  # Find states. Each cell has only one of four states.
-  # Observed -> modelled
-  # 1. urban -> urban
-  # 2. urban -> non-urban
-  # 3. non-urban -> urban
-  # 4. non-urban -> non-urban
-  state1 = np.where(obs1 & mod1,1,0)
-  state2 = np.where(obs1 & mod0,2,0)
-  state3 = np.where(obs0 & mod1,3,0)
-  state4 = np.where(obs0 & mod0,4,0)
- 
-  # Save state of each cell into the array
-  allStates = state1+state2+state3+state4
-
-  # Fill the contingency table (Pontius and Millones, 2011, Table 2):
-  cArray[0,0] = np.sum(allStates == 1)/validCells
-  cArray[1,0] = np.sum(allStates == 2)/validCells
-  cArray[0,1] = np.sum(allStates == 3)/validCells
-  cArray[1,1] = np.sum(allStates == 4)/validCells
-  cArray[2,0] = (np.sum(allStates == 1)+np.sum(allStates == 2))/validCells
-  cArray[2,1] = (np.sum(allStates == 3)+np.sum(allStates == 4))/validCells
-  cArray[0,2] = (np.sum(allStates == 1)+np.sum(allStates == 3))/validCells
-  cArray[1,2] = (np.sum(allStates == 2)+np.sum(allStates == 4))/validCells
-  cArray[2,2] = 1
-
-  # Calculate quantity disagreemnt (Pontius and Millones, 2011) (2)
-  q_urban = np.absolute(cArray[0,0]+cArray[1,0]-(cArray[0,0]+cArray[0,1]))
-  q_non_urban = np.absolute(cArray[0,1]+cArray[1,1]-(cArray[1,0]+cArray[1,1]))
-  Q = (q_urban + q_non_urban) / 2 # (3)
-
-  # Calculate allocation disagreement (Pontius and Millones, 2011): (4)
-  a_urban = 2 * np.minimum(cArray[1,0], cArray[0,1])
-  a_non_urban = 2 * np.minimum(cArray[0,1], cArray[1,0])
-  A = (a_urban + a_non_urban) / 2 # (5)
-
-  # Calculate the proportion correct
-  C = cArray[0,0] + cArray[1,1] # (6)
-  
-  # Calculate the total disagreement
-  D = 1 - C # = Q + A (7)
-
-  # Calculate fractions of agreement:
-  E = cArray[0,2]*cArray[2,0] + cArray[1,2]*cArray[2,1] # (8,9)
-  
-  # Calculate Kappa
-  K_standard = (C-E)/(1-E) # (11)
-  #print('year: ', str(row[1]),', parameter set: ', str(col), ', Kappa standard:',K_standard)
-  
-  # Save Kapa in array
-  kappaArray[row[0],col] = K_standard
-  # Save errors
-  allocationArray[row[0],col] = A
-  
 def calculateKappa(scenario=None, aim=None):
-  # Create arrays to store the metrices by Pontius (allocation disagreement)
+  # Create arrays to store the metrices by Pontius (quantity disagreement and allocation disagreement)
+  quantityArray = np.zeros((len(obsTimeSteps),numberOfIterations))
   allocationArray = np.zeros((len(obsTimeSteps),numberOfIterations))
+  # Create array to store transition states:
+  transArray = np.zeros((len(obsTimeSteps),numberOfIterations,3,3))
   # Create array to store Kappa
-  kappaArray = np.zeros((len(obsTimeSteps),numberOfIterations)) 
+  kappaArray = np.zeros((len(obsTimeSteps),numberOfIterations))
+    
   # Load data:
-  urbObs = np.array(getObservedArray('urb'))
+  urbObs = getObservedArray('urb')
+  cells = len(urbObs[0,0,1])
+  nanCells = sum(np.isnan(urbObs[0,0,1]))
+  validCells = cells - nanCells
+      
   # Loop observed years. For each year, calculate Kappa between observed map and modelled map:
   for row in enumerate(obsTimeSteps):
-    # Get the number of valid cells in the map 
-    validCells = getValidCells(urbObs[row[0],0,1])
+    print(row)
     # Load modelled urban for the given obs year
-    urbMod = getSubsetArray('urb',row[1])
+    urbMod = np.load(os.path.join(arrayFolder, 'urb_subset_'+str(row[1]) + '.npy'))
+    if scenario==3:
+      urbMod = subsetUrbanZones(urbMod,aim)
+
     # Define conditions to compare simulated and actual (observed) maps
     obs1 = (urbObs[row[0],0,1] == 1)
     obs0 = (urbObs[row[0],0,1] == 0)
@@ -210,125 +144,181 @@ def calculateKappa(scenario=None, aim=None):
     for col in range(0,numberOfIterations):
       # Create contingency table, full of zeros (to calculate Kappa)
       cArray = np.zeros((3,3))
+      # Create population table, full of zeros (to calculate quantity disagreement and allocation disagreement)
+      popMatrix = np.zeros((3,3))
         
       # For year 1990 (first observation time step) there is a perfect agreement:
       if row[0] == 0:
         kappaArray[row[0],col] = 1.0
+        transArray[row[0],col] = cArray
         
       else:
         # Define conditions to compare simulated and actual (observed) maps
         mod1 = (urbMod[0,col,1] == 1)
         mod0 = (urbMod[0,col,1] == 0)
 
-        K_calculations(row,col,obs0,obs1,mod0,mod1,cArray,allocationArray,kappaArray,validCells)
+        # Find states. Each cell has only one of four states.
+        # Observed -> modelled
+        # 1. urban -> urban
+        # 2. urban -> non-urban
+        # 3. non-urban -> urban
+        # 4. non-urban -> non-urban
+        state1 = np.where(obs1 & mod1,1,0)
+        state2 = np.where(obs1 & mod0,2,0)
+        state3 = np.where(obs0 & mod1,3,0)
+        state4 = np.where(obs0 & mod0,4,0) 
+
+        # Save state of each cell into the array
+        allStates = state1+state2+state3+state4
+
+        # Fill the contingency table (Pontius and Millones, 2011, Table 2):
+        cArray[0,0] = sum(allStates == 1)/validCells
+        cArray[1,0] = sum(allStates == 2)/validCells
+        cArray[0,1] = sum(allStates == 3)/validCells
+        cArray[1,1] = sum(allStates == 4)/validCells
+        cArray[2,0] = (sum(allStates == 1)+sum(allStates == 2))/validCells
+        cArray[2,1] = (sum(allStates == 3)+sum(allStates == 4))/validCells
+        cArray[0,2] = (sum(allStates == 1)+sum(allStates == 3))/validCells
+        cArray[1,2] = (sum(allStates == 2)+sum(allStates == 4))/validCells
+        cArray[2,2] = 1
         
+        transArray[row[0],col] = cArray
+
+        # Calculate quantity disagreemnt (Pontius and Millones, 2011) (2)
+        q_urban = np.absolute(cArray[0,0]+cArray[1,0]-(cArray[0,0]+cArray[0,1]))
+        q_non_urban = np.absolute(cArray[0,1]+cArray[1,1]-(cArray[1,0]+cArray[1,1]))
+        Q = (q_urban + q_non_urban) / 2 # (3)
+
+        # Calculate allocation disagreement (Pontius and Millones, 2011): (4)
+        a_urban = 2 * np.minimum(cArray[1,0], cArray[0,1])
+        a_non_urban = 2 * np.minimum(cArray[0,1], cArray[1,0])
+        A = (a_urban + a_non_urban) / 2 # (5)
+
+        # Calculate the proportion correct
+        C = cArray[0,0] + cArray[1,1] # (6)
+        
+        # Calculate the total disagreement
+        D = 1 - C # = Q + A (7)
+
+        # Calculate fractions of agreement:
+        E = cArray[0,2]*cArray[2,0] + cArray[1,2]*cArray[2,1] # (8,9)
+        
+        # Calculate Kappa
+        K_standard = (C - E) / (1 - E) # (11)
+        print('year: ', str(row[1]),', parameter set: ', str(col), ', Kappa standard:',K_standard)
+        
+        # Save Kapa in array
+        kappaArray[row[0],col] = K_standard
+        
+        # Save errors
+        quantityArray[row[0],col] = Q
+        allocationArray[row[0],col] = A
+
   # Save all the metrices
-  saveArray(kappaArray,'kappa')
-  saveArray(allocationArray,'allocation_disagreement')
+  metrices = {
+    'kappa': kappaArray,
+    'quantity_disagreement': quantityArray,
+    'allocation_disagreement': allocationArray,
+    'transition_matrix': transArray
+    }
+  for name in metrices.keys():
+    fileName = os.path.join(arrayFolder, str(name))
+
+    # Clear the directory if needed
+    if os.path.exists(fileName + '.npy'):
+        os.remove(fileName + '.npy')
+
+    # Save the data  
+    np.save(fileName, metrices[name])
+    
   print('Kappa and Pontius metrices calculated and saved as npy files')
-  
-######################################################
-# KAPPA SIMULATION                                   #
-######################################################
-def calculateKappaSimulation(scenario=None, aim=None): 
+
+def calculateKappaSimulation(scenario=None, aim=None):
   # Create array to store Kappa Simulation (by Van Vliet):
   kappaSimulation = np.zeros((len(obsTimeSteps),numberOfIterations))
+    
   # Load data:
   urbObs = getObservedArray('urb')  
-  # Get the number of not NaN cells
-  validCells = getValidCells(urbObs[0,0,1])
-  # Select the original map
-  originals = getOriginal(urbObs[0,0,1], validCells)
-  #original_0,original_1,p_org0,p_org1 = getOriginal(urbObs[0,0,1], validCells)
+  cells = len(urbObs[0,0,1])
+  nanCells = sum(np.isnan(urbObs[0,0,1]))
+  validCells = cells - nanCells
+
+  # Define conditions (urban and non-urban cells) in the original map (1990):
+  original_0 = (urbObs[0,0,1] == 0) #non-urban
+  original_1 = (urbObs[0,0,1] == 1) #urban
+  p_org0 = sum(original_0)/validCells
+  p_org1 = sum(original_1)/validCells
+      
   # Loop observed years:
   for row in enumerate(obsTimeSteps):
-    if row == 3:
-      #original_0,original_1,p_org0,p_org1 = getOriginal(urbObs[2,0,1], validCells)
-      originals = getOriginal(urbObs[2,0,1], validCells)
     # Load modelled urban for the given obs year
-    urbMod = getSubsetArray('urb',row[1])
+    urbMod = np.load(os.path.join(arrayFolder, 'urb_subset_'+str(row[1]) + '.npy'))
+
     # Define conditions to compare simulated and actual (observed) maps
     obs1 = (urbObs[row[0],0,1] == 1)
     obs0 = (urbObs[row[0],0,1] == 0)
-    # Get transitions from the original map
-    transitions = getTransitions(obs0,obs1,originals[0],originals[1],validCells)
+    # Define conditions and calculate the transitions:
+    act_0_0 = np.where(obs0 & original_0,1,0)
+    act_0_1 = np.where(obs1 & original_0,1,0)
+    act_1_0 = np.where(obs0 & original_1,1,0)
+    act_1_1 = np.where(obs1 & original_1,1,0)
+    p_act_0_0 = sum(act_0_0)/validCells
+    p_act_0_1 = sum(act_0_1)/validCells
+    p_act_1_0 = sum(act_1_0)/validCells
+    p_act_1_1 = sum(act_1_1)/validCells
+    
     # Loop parameter sets:
     for col in range(0,len(urbMod[0])):
+       
       # For year 1990 (first observation time step) there is a perfect agreement:
       if row[0] in [0]:
         kappaSimulation[row[0],col] = 1.0
+        
       else:
         # Define conditions to compare simulated and actual (observed) maps
         mod1 = (urbMod[0,col,1] == 1)
         mod0 = (urbMod[0,col,1] == 0)
+
         # Calculate P0 between simulated and actual map (by Van Vliet):
-        PO = getPO(obs0,obs1,mod0,mod1,validCells)
+        PO_urban = sum(obs1 & mod1)/validCells
+        PO_non_urban = sum(obs0 & mod0)/validCells
+        PO = PO_urban + PO_non_urban
+
+        # Define conditions to compare transitions in original and simulated maps
+        sim_0_0 = np.where(mod0 & original_0,1,0)
+        sim_0_1 = np.where(mod1 & original_0,1,0)
+        sim_1_0 = np.where(mod0 & original_1,1,0)
+        sim_1_1 = np.where(mod1 & original_1,1,0)
+        
         # Calculate PE Transition (Van Vliet, 2013, Eq. 2.7):
-        PE_transition = getPE_transition(mod0,mod1,originals,validCells,transitions)
-        # Calculate Kappa Simulation (Van Vliet, 2013)
-        Ks_values(row,col,kappaSimulation,PO,PE_transition)       
+        p_sim_0_0 = sum(sim_0_0)/validCells
+        p_sim_0_1 = sum(sim_0_1)/validCells
+        p_sim_1_0 = sum(sim_1_0)/validCells
+        p_sim_1_1 = sum(sim_1_1)/validCells
+        
+        PE_transition = p_org0 * (p_act_0_0 * p_sim_0_0 + p_act_0_1 * p_sim_0_1) +\
+                        p_org1 * (p_act_1_0 * p_sim_1_0 + p_act_1_1 * p_sim_1_1)
+
+        # Calculate Kappa Simulation (Van Vliet, 2013, Eq. 2.9):
+        K_simulation = (PO - PE_transition) / (1 - PE_transition)
+        
+        print('year: ', str(row[1]),', parameter set: ', str(col), ', Kappa simulation:',K_simulation)
+        
+        # Save Kappa Simulation in array
+        kappaSimulation[row[0],col] = K_simulation
+      
+  # Set the name of the file
+  fileName = os.path.join(arrayFolder, str('kappa_simulation'))
+  if scenario==3:
+    fileName = os.path.join(arrayFolder, 'kappa_simulation_'+str(aim[:3]))
+      
+  # Clear the directory if needed
+  if os.path.exists(fileName + '.npy'):
+      os.remove(fileName + '.npy')
+
   # Save the data  
-  saveArray(kappaSimulation,'kappa_simulation')
+  np.save(fileName, kappaSimulation)
 
-@njit(parallel=True)
-def getOriginal(urb_array, validCells):
-  # Define conditions (urban and non-urban cells) in the original map (1990 or 2006):
-  original_0 = (urb_array == 0) #non-urban
-  original_1 = (urb_array == 1) #urban
-  p_org0 = float(np.sum(original_0)/validCells)
-  p_org1 = float(np.sum(original_1)/validCells)
-  return original_0,original_1,p_org0,p_org1
-
-@njit(parallel=True)
-def getTransitions(obs0,obs1,original_0,original_1,validCells):
-  # Define conditions and calculate the transitions:
-  act_0_0 = np.where(obs0 & original_0,1,0)
-  act_0_1 = np.where(obs1 & original_0,1,0)
-  act_1_0 = np.where(obs0 & original_1,1,0)
-  act_1_1 = np.where(obs1 & original_1,1,0)
-  p_act_0_0 = float(np.sum(act_0_0)/validCells)
-  p_act_0_1 = float(np.sum(act_0_1)/validCells)
-  p_act_1_0 = float(np.sum(act_1_0)/validCells)
-  p_act_1_1 = float(np.sum(act_1_1)/validCells)
-  return p_act_0_0,p_act_0_1,p_act_1_0,p_act_1_1
- 
-@njit(parallel=True)
-def getPO(obs0,obs1,mod0,mod1,validCells):
-  PO_urban = float(np.sum(obs1 & mod1)/validCells)
-  PO_non_urban = float(np.sum(obs0 & mod0)/validCells)
-  PO = PO_urban + PO_non_urban
-  return PO
-
-@njit(parallel=True)
-def getPE_transition(mod0,mod1,originals,validCells,transitions):
-  # Get proportion of LU classes in original map
-  original_0,original_1,p_org0,p_org1 = originals
-  # Get transitions from the original map
-  p_act_0_0,p_act_0_1,p_act_1_0,p_act_1_1 = transitions
-  # Define conditions to compare transitions in original and simulated maps
-  sim_0_0 = np.where(mod0 & original_0,1,0)
-  sim_0_1 = np.where(mod1 & original_0,1,0)
-  sim_1_0 = np.where(mod0 & original_1,1,0)
-  sim_1_1 = np.where(mod1 & original_1,1,0)
-  # Get transitions from the simulated (modelled) map
-  p_sim_0_0 = float(np.sum(sim_0_0)/validCells)
-  p_sim_0_1 = float(np.sum(sim_0_1)/validCells)
-  p_sim_1_0 = float(np.sum(sim_1_0)/validCells)
-  p_sim_1_1 = float(np.sum(sim_1_1)/validCells)
-  # Calculate PE Transition (Van Vliet, 2013, Eq. 2.7):
-  PE_transition = p_org0 * (p_act_0_0 * p_sim_0_0 + p_act_0_1 * p_sim_0_1) +\
-                  p_org1 * (p_act_1_0 * p_sim_1_0 + p_act_1_1 * p_sim_1_1)
-  return PE_transition
-
-@njit()
-def Ks_values(row,col,kappaSimulation,PO,PE_transition): 
-  # Calculate Kappa Simulation (Van Vliet, 2013, Eq. 2.9):
-  K_simulation = (PO - PE_transition) / (1 - PE_transition)
-  # Save Kappa Simulation in array
-  kappaSimulation[row[0],col] = K_simulation
-
-######################################################
-  
 def calcRMSE(metric, scenario, aim, case=None):
   diffArray = createDiffArray(metric,scenario,aim,case)
   # Get the number of parameter sets and number of zones
@@ -417,6 +407,13 @@ def getMultiObjectiveIndex(metric, w_RMSE,w_Kappa,scenario, case=None):
   calibratedIndex, = np.where(ranked == 0)
   
   return int(calibratedIndex)
+
+def saveResults(array, scenario, fileName):
+  with open(os.path.join(arrayFolder,'Scenario'+'_'+str(scenario)+'_'+fileName),
+            'w', newline='') as file:
+    writer = csv.writer(file, delimiter='\t')
+    for row in array:
+      writer.writerow(row)
 
 def getLog():
   log = [
@@ -511,7 +508,7 @@ def getValidationResults():
   goal_functions = all_metrices
   validation_metrices = all_metrices + ['Ks','A']
   # validation on 3 case studies and 2 scenarios
-  validationResults = np.empty((len(validation_metrices),len(goal_functions)*len(case_studies)*2))
+  validationResults = np.empty((len(validation_metrices),len(goal_functions)*3*2))
   # Lop validation metrices, to get their values:
   for i,v_m in enumerate(validation_metrices):
     j=0
@@ -575,4 +572,95 @@ def getValidationResults_multiobjective(weights):
           j+=1
   return validationResults 
 
+###############################################################################
+############################ CALBRATE AND VALIDATE ############################
+###############################################################################
+
+def calibrate_validate(scenario):
+  # Get parameter values
+  p = getCalibratedParameters(scenario)
+  # Get the parameter sets' indices only
+  indexes = np.array(p)[:,1]
+
+  c={}
+  for aim in ['calibration', 'validation']:
+    kappaArray = getKappaArray(scenario,aim)
+    aim_period = parameters.getCalibrationPeriod()[scenario][aim]
+    
+    # create the array to store the calibration values
+    v = np.zeros((len(metricList)+1,len(metricList)+1))
+    for i, index in enumerate(indexes):
+      for j, metricCol in enumerate(metricList+['kappa']):
+        if metricCol == 'kappa':
+          # Calculate the mean Kappa for the selected scenario
+          v[i,j] = np.mean(kappaArray[aim_period, int(index)])
+        else:
+          # Calculate the mean RMSE for the selected senario
+          rmseArray = calcRMSE(metricCol,scenario,aim)
+          v[i,j] = np.mean(rmseArray[aim_period, int(index)])
+    c[aim] = v
+
+  # Create a list containing all errors
+  errors = [['Calibration:']]+list(c['calibration'])+[['Validation:']]+list(c['validation'])
+  # Save the errors
+  saveResults(['Scenario '+str(scenario)]+getLog()+list(p)+errors, scenario, 'calibration_validation.csv')
+
+def multiobjective(scenario):
+  # Define weights for the multi-objective calibration. Weights are assigned to RMSE and kappa values.
+  # function arguents: weight_min,weight_max+1,weight_step
+  weight_min = 0
+  weight_max = 10
+  weight_step = 1
+  weights = range(weight_min,weight_max+weight_step,weight_step)
+  # Create array to store multiobjective validation results. The array stores indices and validation results:
+  result = np.empty((len(metricList),1),dtype='object')
+  # 4 rows: index / RMSE / Kappa / goal function for each metric
+  # Columns: weight combinations (e.g. 0: [RMSE_weight = weight_min, Kappa_weight = weight_max])
+  ncols = int((weight_max-weight_min)/weight_step)+1
+  # get Kappa for validation before the loop
+  kappa = getKappaArray(scenario, 'validation')
+  # Get kappa values for selected period
+  avKappa = getAveragedArray(kappa, scenario, 'validation')
+  # Normalize kappa array
+  norKappa = getNormalizedArray(avKappa, kappa=True)
+ 
+  # Calibrate goal function for each metric          
+  for row,metric in enumerate(metricList):
+    multiobjective = np.zeros((4,ncols))
+    for w in weights:
+      # Assign weights
+      rmse_weight = w/10
+      kappa_weight = 1 - rmse_weight    
+      # Get the index of the calibrated parameter set based on the multi-objective goal function
+      multiIndex = getMultiObjectiveIndex(metric,rmse_weight,kappa_weight,scenario,'calibration')
+      # Validate
+      # Get the RMSE array
+      rmse = calcRMSE(metric, scenario,'validation')
+      # Get RMSE values for selected period
+      avRMSE = getAveragedArray(rmse, scenario, 'validation')
+      # Normalize RMSE array
+      norRMSE = getNormalizedArray(avRMSE)
+      # Save selected index, the average RMSE and the average Kappa
+      multiobjective[0, w] = multiIndex
+      multiobjective[1, w] = avRMSE[multiIndex]
+      multiobjective[2, w] = avKappa[multiIndex]
+      # Results of the goal function for the validation data
+      multiobjective[3, w] = rmse_weight * norRMSE[multiIndex] + kappa_weight * norKappa[multiIndex]
+    result[row,0] = multiobjective
+
+  # Save results
+  saveResults(result, scenario, 'multiobjective.csv')
+
+  # Save results as npy
+  # Set the name of the file
+  fileName = os.path.join(arrayFolder, 'scenario_'+str(scenario)+'_multiobjective')
+  # Clear the directory if needed
+  if os.path.exists(fileName + '.npy'):
+      os.remove(fileName + '.npy')
+  # Save the data  
+  np.save(fileName, result)
+    
+  return result
+
+  
 
