@@ -1,10 +1,7 @@
 """Urban expansion model, parameters
-Judith Verstegen 2019-06-07
-"""
+Judith Verstegen and Katarzyna Goch 2019-06-07
 
-def getWorkDir():
-  import os
-  return os.getcwd()
+"""
 
 def getNrTimesteps():
   """Return nr of time steps.
@@ -37,12 +34,12 @@ def getCalibrationPeriod():
 
   period = {
     1: {
-      'calibration': [1,2],
-      'validation': [3,4]
+      'calibration': [2],
+      'validation': [4]
       },
     2: {
-      'calibration': [3,4],
-      'validation': [1,2]
+      'calibration': [4],
+      'validation': [2]
       }}
   return period
 
@@ -88,12 +85,8 @@ def getSumStats():
   # 'fdi': Fractal dimension index
   # 'wfdi': Area weighted mean patch fractal dimension index
   # 'pd': Patch density
-  # 'cohes': # Patch Cohesion Index in a zone
-  # 'ed': # Edge Density
-  # 'lpi': # Largest Patch Index
-  # 'contag': # Contagion Index 
   
-  sumStats = ['cilp', 'fdi', 'wfdi', 'pd', 'cohes', 'ed', 'lpi', 'contag']
+  sumStats = ['cilp', 'fdi', 'wfdi', 'pd', 'ed']
   return sumStats
 
 def getCovarName():
@@ -241,7 +234,7 @@ def getColFiles():
     'cilp': 'sampSinglePoint.col',  # single point in the middle of the study area
     'pd': 'sampSinglePoint.col',    # single point in the middle of the study area
     'urb': 'sampPointNr.col',       # point for each cell
-    'cohes': 'sampPoint.col',       # each zone
+    'cohesion': 'sampPoint.col',    # each zone
     'ed': 'sampPoint.col',          # each zone
     'lpi': 'sampSinglePoint.col',   # single point in the middle of the study area
     'contagion': 'sampPoint.col'    # each zone
