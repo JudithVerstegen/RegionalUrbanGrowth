@@ -146,7 +146,7 @@ def calculateSumStats(systemState, listOfSumStats, zones, validation=False):
       wFractalDimensionIndexOneCell = ifthen(oneCellPerPatch, wFractalDimensionIndex)
       WFDI = areaaverage(wFractalDimensionIndexOneCell, zones)
       listOfMaps.append(WFDI)
-    elif aStat == 'cohesion': # Patch Cohesion Index in a zone
+    elif aStat == 'cohes': # Patch Cohesion Index in a zone
       ### measures the physical connectedness of the corresponding patch type
       summedPerimeter = areatotal(perimeter, zones) # in cell units
       summedPerimeterArea = areatotal(perimeter * sqrt(patchSizes),zones)
@@ -162,7 +162,7 @@ def calculateSumStats(systemState, listOfSumStats, zones, validation=False):
       biggestPatchSize = mapmaximum(patchSizes) # largest patch area in the cell unit
       LPI = biggestPatchSize/map_area # largest patch area in the cell unit
       listOfMaps.append(LPI)
-    elif aStat == 'contagion': # Contagion Index in a zone
+    elif aStat == 'contag': # Contagion Index in a zone
       # ratio of the the observed contagion to the maximum possible contagion for the given number of LU types
       P_urb = areatotal(ifthen(boolean(clumps),scalar(1))/zone_area,zones)# proportion of the selected land use type in a zone
       P_nonurb = 1-P_urb
