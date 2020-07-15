@@ -3,19 +3,25 @@ Judith Verstegen, 2019-05-09
 
 """
 import random
-random.seed(12)
+random.seed(10)
 import math
 from pcraster import *
 from pcraster.framework import *
 setrandomseed(10)
 import parameters
-import uncertainty
+#import uncertainty
 import pickle 
 import metrics
 import numpy as np
 np.random.seed(10)
-import mcaveragevariance
-import time
+import sys
+#import mcaveragevariance
+
+# Work directory
+work_dir = parameters.getWorkDir()
+
+# Input value
+input_index = int(sys.argv[1])
 
 #######################################
 
@@ -498,7 +504,7 @@ class LandUseChangeModel(DynamicModel):
     self.weightDict = {1: weights}
     # input and output folders
     country = parameters.getCountryName()
-    results_mainfolder = os.path.join(os.getcwd(), 'results')
+    results_mainfolder = os.path.join(work_dir, 'results')
     if not os.path.isdir(results_mainfolder):
       os.mkdir(results_mainfolder)
     output_mainfolder = os.path.join(results_mainfolder, country)
@@ -526,8 +532,11 @@ class LandUseChangeModel(DynamicModel):
     self.uniformMap = self.readmap(self.inputfolder + '/uniform')
     # AT SOME POINT WITH STOCHASTIC INPUT
     # in that case land use should not include urban
-    self.landuse = self.readmap(self.inputfolder + '/init_lu')
-    self.landuse06 = self.readmap(self.inputfolder + '/init_lu_06')
+    self.landuse = self.readmap(self.inputfolder + '/init_lu90')
+    self.landuse00 = self.readmap(self.inputfolder + '/init_lu00')
+    self.landuse06 = self.readmap(self.inputfolder + '/init_lu06')
+    self.landuse12 = self.readmap(self.inputfolder + '/init_lu12')
+    self.landuse18 = self.readmap(self.inputfolder + '/init_lu18')
     self.initialUrb = self.landuse == 1
     self.roads = self.readmap(self.inputfolder + '/roads')
     self.noGoMap = cover(self.readmap(self.inputfolder + '/nogo'), \
@@ -536,8 +545,6 @@ class LandUseChangeModel(DynamicModel):
     self.samplePoints = self.readmap(self.inputfolder + '/sampPoint')
     self.sumStats = parameters.getSumStats()
     self.yieldMap = scalar(self.oneMask)
-    self.calibrationMask = self.readmap(self.inputfolder + '/zones_calibration')
-    self.validationMask = self.readmap(self.inputfolder + '/zones_validation')
 
     # List of landuse types in order of 'who gets to choose first'
     self.landUseList = parameters.getLandUseList()
@@ -579,6 +586,7 @@ class LandUseChangeModel(DynamicModel):
     self.landUse.calculateStaticSuitabilityMaps(self.yieldMap)
 
   def dynamic(self):
+    self.report(self.environment, os.path.join(self.outputfolder,'env'))
     timeStep = self.currentTimeStep()
     print('\ntime step', timeStep)
     
@@ -625,47 +633,26 @@ class LandUseChangeModel(DynamicModel):
       # the map with the metric or urban area is removed to save disk space
       os.remove(path)
 
-    # If in the time step the validation period starts, read in the land use map
+    # Read in the land use map for an observation data
+    if timeStep == 11: # year 2000
+      self.landUse.setEnvironment(self.landuse00) 
     if timeStep == 17: # year 2006
-      self.environment = self.landuse06
-    
-# Define brute force calibration
-def brute_force():
-  # Prepeare empty list for the calibration parameters:
-  parameters_list = []
-  # Set step size for calibration
-  min_p = parameters.getParametersforCalibration()[0]
-  max_p = parameters.getParametersforCalibration()[1]
-  stepsize = parameters.getParametersforCalibration()[2]
-
-  # Assure that steps in the loop have 3 decimal place only
-  p_steps = np.around(np.arange(min_p, max_p+stepsize, stepsize),decimals=3)
-  print(p_steps)
-
-  # Print calibration properties
-  print('\n################################################')
-  print('Run LU_urb model')
-  print('Case study: ', parameters.getCountryName())
-  print('Number of iterations: ', parameters.getNumberofIterations())
-  print('Min parameter value: ', min_p)
-  print('Max parameter value: ', max_p)
-  print('Parameter step: ', stepsize)
-
-  # Get the possible combination of parameters:
-  for p1,p2,p3,p4 in ((a,b,c,d) for a in p_steps for b in p_steps for c in p_steps for d in p_steps):
-    sumOfParameters = p1+p2+p3+p4
-    if (sumOfParameters > 0.9999 and sumOfParameters < 1.0001):
-      parameters_list.append([p1,p2,p3,p4])
-
-  # Return a list with parameters combinations
-  return parameters_list
+      self.landUse.setEnvironment(self.landuse06)
+    if timeStep == 23: # year 2012
+      self.landUse.setEnvironment(self.landuse12)
+    if timeStep == 29: # year 2018
+      self.landUse.setEnvironment(self.landuse18)
   
 ############
 ### MAIN ###
 ############
 
-start_time = time.time()
-parameters_list = brute_force()
+# Open the file with parameter combinations and save it as a list
+parameters_file = os.path.join(work_dir, 'parameters.txt')
+params = []
+with open(parameters_file,"r") as f:
+    params = f.readlines() # readlines() returns a list of items, each item is a line in your file
+
 nrOfTimeSteps = parameters.getNrTimesteps()
 print('Number of time steps: ', nrOfTimeSteps)
 #nrOfSamples = parameters.getNrSamples() # This variable is not being used as MC was eliminated from the model
@@ -688,17 +675,12 @@ preMCLandUse.determineSpeedRoads(roads)
 loopCount = 0
 
 # Run the model
-for p_combination in parameters_list:
-  loopCount = loopCount + 1
-  print('\n################################################')
-  print('Model Run: ',loopCount,'. Parameters used: ',p_combination)
-  myModel = LandUseChangeModel(loopCount, p_combination)
-  dynamicModel = DynamicFramework(myModel, nrOfTimeSteps)
-  dynamicModel.run()               
-
+p_combination = [float(x) for x in list(params[input_index].strip('\n').strip('[]').split(','))]
 print('\n################################################')
-print("--- Program execution: ", str(int((time.time() - start_time))/60), " minutes ---")
-
+print('Model Run: ',input_index,'. Parameters used: ',p_combination)
+myModel = LandUseChangeModel(input_index+1, p_combination)
+dynamicModel = DynamicFramework(myModel, nrOfTimeSteps)
+dynamicModel.run()               
 
 ## USED TO BE THE POSTLOOP; SAVED FOR LATER USE
 ##print('\nrunning postmcloop...')
