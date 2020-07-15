@@ -1,17 +1,16 @@
 # -*- coding: cp1252 -*-
 import pickle
+#from collections import deque
 import os
 import metrics
 import numpy as np
 import parameters
 import calibrate
 from pcraster.framework import *
+import matplotlib.pyplot as plt
 
 #### Script to read in the metrics saved as the result of the LU_urb.py script.
 #### Metrics are transformed into an array
-
-# Work directory:
-work_dir = '/scratch/tmp/k_goch01'
 
 # Get metrics
 metricNames = parameters.getSumStats()
@@ -30,12 +29,13 @@ refArray = parameters.getColFiles()
 
 # Path to the folder with the metrics stored
 country = parameters.getCountryName()
-resultFolder = os.path.join(work_dir,'results',country)
+resultFolder = os.path.join(os.getcwd(),'results',country)
 output_mainfolder = os.path.join(resultFolder, "metrics")
 
 #################
 ### FUNCTIONS ###
 #################
+
 
 def openPickledSamplesAndTimestepsAsNumpyArray(basename,iterations,timesteps, \
                                                obs=False):
@@ -107,7 +107,7 @@ def setNameClearSave(basename, output, obs=False):
 ### SAVE OUTPUTS OF THE MODEL ###
 #################################
 
-########### Save the OBSERVED metrics and urban areas
+########### Save the observed metrics and urban areas
 # Metrics:
 for aVariable in metricNames:  
   output_obs = openPickledSamplesAndTimestepsAsNumpyArray(aVariable, obsSampleNumbers,obsTimeSteps, True)
@@ -117,7 +117,7 @@ for aVariable in metricNames:
 output_urb_obs = openPickledSamplesAndTimestepsAsNumpyArray('urb', obsSampleNumbers,obsTimeSteps, True)
 setNameClearSave('urb', output_urb_obs,obs=True)
 
-########### Save the MODELLED metrics and urban areas
+########### Save the modelled metrics and urban areas
 # Metrics:
 for aVariable in metricNames:
   output_mod = openPickledSamplesAndTimestepsAsNumpyArray(aVariable, iterations, timeSteps, False)
@@ -133,6 +133,7 @@ parameter_sets = subset_urb_mod[0,:,0]
 setNameClearSave('parameter_sets', parameter_sets, obs=False)
 
 print("Modelled and observed metrics and urban areas saved as npy files")
+
 '''
 ########### Delete all number folders
 files = os.listdir(resultFolder)
@@ -149,6 +150,24 @@ print("All number folders deleted.")
 ########### Calculate Kappa statistics
 calibrate.calculateKappa()
 calibrate.calculateKappaSimulation()
+
+
+##############################
+### CALIBRATE AND VALIDATE ###
+##############################
+
+# Get the calibration and validation results for 3 scenarios:
+# 1: calibrate on year 2000-2006 valdate on 2012-2018
+# 2: calibrate on years 2012-2018 validate on 200-2006
+"""
+for scenario in [1,2]:
+  print('Scenario '+str(scenario))
+  # Calibrate, validate and save the results as csv file
+  calibrate.calibrate_validate(scenario)
+  print("Model calibrated and validated")
+  # Perform validation based on multi-objective calibration
+  calibrate.multiobjective(scenario) 
+  print("Model calibrated using multi-objective goal function and validated")"""
 
   
 
