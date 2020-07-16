@@ -592,42 +592,6 @@ def getResultArray_all_cases(gf_metric, v_metric, weights):
   outArray[:,1] = array1
   return outArray
 
-def errorStatistics(weights, alpha = 0.05):
-  """
-  Trial function
-  Statistical test results of difference of metric errors between single and multiobjecctive goal functions
-  All cases together
-  NO SIGNIFICANT RESULTS
-  """
-  weights=[0.5,0.5]
-  
-  # Create array to store the results:
-  statArray = np.empty((len(metricNames),len(validation_metrices)))
-  for gf_m, v_m in [[gf_m, v_m] for gf_m in metricNames for v_m in validation_metrices ]:
-    # Get results array (2D) with all cases combined. First column: single objective, second column: multiobjective:
-    rArray = getResultArray_all_cases(gf_m,v_m,weights)
-    # Create array containing differences
-    d = rArray[:,0]-rArray[:,1]
-    # normality test
-    stat, p = stats.shapiro(d)
-    # fill the array
-    if p > alpha:
-      # Normal distribution, TTest_ind
-      test = 'TTest_ind'
-    else:
-      # Not normal distribution, MannWhitneyU test
-      test = 'MannWhitneyU'
-
-    # Run statistics
-    sTestResults = sTest(rArray[:,0], rArray[:,1], test)
-    
-    if sTestResults[1] < alpha:
-      print('gf: K+',gf_m,'validated on:',v_m)
-      print(sTestResults)
-      print('significant')
-      print(np.mean(rArray[:,0]))
-      print(np.mean(rArray[:,1]))
-
 def zonalErrorStatistics(weights, test, alpha = 0.05):
   """
   Trial function for statistical test based on errors, only zonal statistics
@@ -1515,6 +1479,7 @@ def plotGoalFunctionEverySet(): #DONE
   # Set the name and clear the directory if needed
   setNameClearSave('calibration_all_sets', scenario=None)
 
+
 def plotParameters(): #DONE
   """
   Plot bars presenting parameters (0-1, y axis) for 5 goal funcstions (x axis)
@@ -1717,7 +1682,7 @@ def plotObsAndMod():
   # For FDI and WFDI plots values for zones on the diagonal of the case study area (zones: 0,5,10,15)
   """
   ## 1. Create the figure
-  fig = plt.figure(figsize=(10,12)) # Figure size set to give 16 cm of width
+  fig = plt.figure(figsize=(6,20)) # Figure size set to give 16 cm of width
   fig.align_ylabels()
   
   # Set linestyle for each scenario
@@ -1727,8 +1692,8 @@ def plotObsAndMod():
   
   i=1
   for m,metric in enumerate(metricNames):
-    axs1 = plt.subplot(4,2,i)
-    axs2 = plt.subplot(4,2,i+1, sharey=axs1)
+    axs1 = plt.subplot(len(metricNames),2,i)
+    axs2 = plt.subplot(len(metricNames),2,i+1, sharey=axs1)
     plt.subplots_adjust(wspace=0.2, hspace=0.2)
     # Create list to store limits:
     limits_min= []
@@ -1823,7 +1788,7 @@ def plotObsAndMod():
       
     i+=2
 
-  # Move the legend outside of the plot box. Put it below, with the zones in two rows.:
+  '''# Move the legend outside of the plot box. Put it below, with the zones in two rows.:
   leg=axs2.legend(
     bbox_to_anchor=(-1-0.2,-0.35, 2.2, 0.2),
     loc="upper left",
@@ -1833,7 +1798,7 @@ def plotObsAndMod():
     borderaxespad=0.)
 
   leg.get_frame().set_edgecolor('darkviolet')
-  leg.get_frame().set_linewidth(0.50)
+  leg.get_frame().set_linewidth(0.50)'''
   
   # Set the name and clear the directory if needed
   setNameClearSave('obs_and_mod')
@@ -1847,8 +1812,8 @@ def plotValidation(errors_or_kappas):  # Done
   errors_or_kappas in ['errors','kappas']
   """
   rows = {
-    'errors':[0,1,2,3,6],
-    'kappas': [4,5]
+    'errors':[0,1,2,3,4,5,6,7,10],
+    'kappas': [8,9]
     }
   
   # Get the array with validation results for selected validation metrics:
@@ -1924,7 +1889,6 @@ def plotValidation(errors_or_kappas):  # Done
  
   # Set the name and clear the directory if needed
   setNameClearSave('plotValidation_'+errors_or_kappas, scenario=None)
-#plotValidation('kappas')
 
 def plotMultiobjectiveImprovementToLocationalMetric(weights,loc_metric, positive=False):
   """
@@ -2178,7 +2142,7 @@ def plotNonDominatedSolutions(metrics):
     # Select non-dominated calibration solutions
     non_dominated = is_pareto_efficient_simple(results['calibration'][country][scenario])
     # Get validation values
-    v = results['validation'][country][scenario]
+    v = results['calibration'][country][scenario]
     # Subset non-dominated calibration results
     r_nd = v[non_dominated]
     # Find the maximum values
@@ -2214,6 +2178,12 @@ def plotNonDominatedSolutions(metrics):
     
   axs[0,0].legend(fontsize=6)
   # Save plot and clear
-  setNameClearSave('2_non-dominated-scatter_'+'_'.join(metrics))
+  setNameClearSave('non-dominated-scatter_'+'_'.join(metrics))
 
-plotParameters()
+plotNonDominatedSolutions(['wfdi','cohes','A'])
+
+#plotValidation('kappas')
+#plotValidation('errors')
+#plotObsAndMod()
+
+#saveMultiobjectiveValidationResults_to_excel([0.5,0.5])
