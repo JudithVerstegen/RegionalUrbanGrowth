@@ -15,7 +15,7 @@ work_dir = parameters.getWorkDir()
 
 # Get metrics
 metricList = parameters.getSumStats()
-all_metrices = metricList+['kappa']
+all_metrices = metricList+['A']
 case_studies = ['IE','IT','PL']
 
 # Get the number of parameter iterations and number of time step defined in the parameter.py script
@@ -374,6 +374,18 @@ def getKappaIndex(scenario,aim,case=None):
   KAPPAranks = np.subtract(np.amax(KAPPAranks),KAPPAranks)
   
   return KAPPAranks
+
+def getAllocationIndex(scenario,aim,case=None):
+  # get the array with A values for the whole study area or the selected zones only
+  allocationArr = getAllocationArray(scenario, aim, case)
+  # get the A for the selected year
+  aAllocation = getAveragedArray(allocationArr,scenario,aim)
+  # order the parameter sets
+  allocationOrder = aAllocation.argsort()
+  # rank the parameter sets
+  allocationRanks = allocationOrder.argsort()
+  
+  return allocationRanks
 
 def getCalibratedIndeks(metric,scenario,case=None): 
   if metric == 'kappa':
