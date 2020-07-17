@@ -15,8 +15,9 @@ work_dir = parameters.getWorkDir()
 
 # Get metrics
 metricList = parameters.getSumStats()
-all_metrices = metricList+['A']
-case_studies = ['IE','IT','PL']
+locationalMetric = parameters.getLocationalAccuracyMetric()
+all_metrices = metricList+locationalMetric
+case_studies = parameters.getCaseStudies()
 
 # Get the number of parameter iterations and number of time step defined in the parameter.py script
 nrOfTimesteps=parameters.getNrTimesteps()
@@ -102,6 +103,7 @@ def getNormalizedArray(array, kappa=None):
   return a_norm
 
 def createDiffArray(metric, scenario, aim, case=None):
+  # Get the modelled and observed data
   modelled = getModelledArray(metric, scenario, aim, case)
   observed = getObservedArray(metric, scenario, aim, case)
   # Get the number of parameter configurations
@@ -388,9 +390,12 @@ def getAllocationIndex(scenario,aim,case=None):
   return allocationRanks
 
 def getCalibratedIndeks(metric,scenario,case=None): 
-  if metric == 'kappa':
+  if metric in ['kappa','Ks']:
     # Get the ranked parameter sets based on Kappa
     ranked = getKappaIndex(scenario,'calibration',case)
+  elif metric =='A':
+    # Get the ranked parameter sets based on A
+    ranked = getAllocationIndex(scenario,'calibration',case)
   else:
     # Get the ranked parameter sets based on RMSE
     ranked = getRankedRMSE(metric,scenario,'calibration',case)    
@@ -429,14 +434,6 @@ def getMultiObjectiveIndex(metric, w_RMSE,w_Kappa,scenario, case=None):
   calibratedIndex, = np.where(ranked == 0)
   
   return int(calibratedIndex)
-
-def getLog():
-  log = [
-    ['country: ',parameters.getCountryName()],
-    ['observed time steps: ', parameters.getObsTimesteps()],
-    ['parameters (min, max, step): ',parameters.getParametersforCalibration()],
-    ['alpha: ',parameters.getAlphaValue()]]
-  return log
 
 def getCalibratedParameters(calibrationScenario):
   # create an array of metric names, indexes of the parameters and the parameters' values
@@ -512,6 +509,49 @@ def getTopCalibratedParameters_multiobjective(metric, weights, scenario, numberO
       topArray[i, j] = p[0][j-4]
   return topArray
 
+def getResultsEverySet(metrics,aim):
+  ''' Create a dictionairy: results[country][scenario]
+      Dict stores an array with shape: number of parameter sets x number of metrics
+      Array stores calibration/validation values for each set for both scenarios '''
+  
+  # Create array to store calibration/validation results for all metrics
+  results = {}
+  # Get the number of parameter sets
+  parameters=range(0,numberOfIterations)
+    
+  for c in case_studies:
+    results[c]={}
+    for s in [1,2]:
+      results[c][s] = np.empty([numberOfIterations,len(metrics)])   
+  
+  # Loop all the countries:
+  for country in case_studies:
+    # Get data
+    resultFolder = os.path.join(os.getcwd(),'results',country, 'metrics')
+
+    i=0
+    # Loop all the metrics:
+    for m in metrics:
+      # Loop calibration scenarios:
+      for scenario in [1,2]:
+        # Load data
+        if m == 'kappa':
+          an_array = getKappaArray(scenario,aim,case=country)
+        elif m == 'Ks':
+          an_array = getKappaSimulationArray(scenario,aim,case=country)
+        elif m == 'A':
+          an_array = getAllocationArray(scenario,aim,case=country)
+        else:
+          an_array = calcRMSE(m,scenario,aim,case=country)
+
+        # get the calibration value of the metric for every set
+        av_array = getAveragedArray(an_array,scenario,aim)
+        # Save results inside the array
+        results[country][scenario][:,i] = av_array
+      i = i+1
+      
+  return results 
+  
 def getValidationResults():
   """
   Create a 2D array matrix:
