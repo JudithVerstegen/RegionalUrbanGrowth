@@ -18,12 +18,18 @@ from openpyxl import load_workbook
 #### Global variables:
 # Get metrics
 metricNames = parameters.getSumStats()
-all_metrices = metricNames+['kappa']
-case_studies = ['IE','IT','PL']
+locationalMetric = parameters.getLocationalAccuracyMetric()
+all_metrices = metricNames+locationalMetric
+
+# Get case studies
+country = parameters.getCountryName()
+case_studies = parameters.getCaseStudies()
+# Name the possible combinations of case studies and countries:
+cases = [(country,scenario) for country in case_studies for scenario in [1,2]]
 
 # Get number of zones and parameters
 numberOfZones = parameters.getNumberOfZones()
-numberOfParameters = parameters.getNumberofIterations() # use this one only for colors
+numberOfParameters = parameters.getNumberofIterations()
 
 # Create colors for zones and parameters
 zoneColors = plt.cm.rainbow(np.linspace(0,1,numberOfZones))
@@ -39,7 +45,6 @@ obsTimeSteps = parameters.getObsTimesteps()
 observedYears = [parameters.getObsYears()[y] for y in obsTimeSteps]
 
 # Path to the folder with the metrics stored
-country = parameters.getCountryName()
 resultFolder = os.path.join(os.getcwd(),'results',country, 'metrics')
 
 # Set plotting variables
@@ -56,19 +61,14 @@ plt.rc('ytick', labelsize=VERY_SMALL)    # fontsize of the tick labels
 plt.rc('legend', fontsize=VERY_SMALL)    # legend fontsize
 plt.rc('figure', titlesize=SMALL_SIZE)   # fontsize of the figure title
 
-'''tickDict = {
-  'fontsize': VERY_SMALL,
-  'fontweight': 'bold'}'''
+# Name the calibration and validation metrices and functions
+metric_units = [ 'RMSE' for i in metricNames ] + locationalMetric
+calibration_metrices = [ m.upper() for m in metricNames ] + locationalMetric
+validation_metrices = calibration_metrices + locationalMetric
+goal_functions = ['f('+x.upper()+')' for x in metricNames] + ['h('+locationalMetric[0]+')']
+validation_functions = goal_functions
+mo_goal_functions = ['q('+cm+','+str(locationalMetric)+')' for cm in calibration_metrices[:-1]]
 
-# Name the calibratio and validation metrices and functions
-metric_units = ['RMSE','RMSE','RMSE','RMSE','RMSE','RMSE','RMSE','RMSE','K','Ks','A']
-calibration_metrices = [ m.upper() for m in metricNames ] + ['K']
-validation_metrices = calibration_metrices + ['Ks', 'A']
-goal_functions = ['f('+x.upper()+')' for x in metricNames] + ['h1(K)']
-validation_functions = goal_functions + ['h2(Ks)','h3(A)']
-mo_goal_functions = ['q('+cm+',K)' for cm in calibration_metrices[:-1]]
-# Name the possible combinations of case studies and countries:
-cases = [(country,scenario) for country in case_studies for scenario in [1,2]]
 #################
 ### FUNCTIONS ###
 #################
@@ -96,7 +96,7 @@ def setNameClearSave(figName, scenario=None):
   plt.close('all')
 
 def getAverageResultsArrayEverySet(aim):
-  results = np.empty((len(all_metrices),6,286)) # 6=3 case studies * 2 scenarios, 165 parameter sets
+  results = np.empty((len(all_metrices),6,numberOfParameters)) # 6=3 case studies * 2 scenarios, 165 parameter sets
   for i,m in enumerate(all_metrices):
     j=0
     for country in case_studies:
@@ -111,70 +111,6 @@ def getAverageResultsArrayEverySet(aim):
         results[i,j] = av_array
         j+=1
   return results
-
-#dummykappa
-'''c = ['g','b','r']
-
-for country in case_studies:
-  index1 = calibrate.getCalibratedIndeks('kappa',1,case=country)
-  index2 = calibrate.getCalibratedIndeks('kappa',2,case=country)
-  print(index1,index2)
-  an_array1 = calibrate.getKappaArray(case=country)
-  an_array2 = calibrate.getKappaSimulationArray(case=country)
-  plt.plot([1990,2000,2006,2012,2018],an_array1[:,index1],'-', label='Kappa '+country)
-  plt.plot([1990,2000,2006,2012,2018],an_array2[:,index1],'--', label='Kappa Simulation '+country)
-  plt.legend()
-    
-  plt.xticks([1990,2000,2006,2012,2018],[1990,2000,2006,2012,2018])
-  plt.ylim([0.55,1.2])
-
-  plt.show()'''
-
-
-def createNormalizedResultDict(metrics,aim):
-  # Create array to store calibration/validation results for all metrics
-  results = {}
-  # Get the number of parameter sets
-  parameterSets = calibrate.getParameterConfigurations()
-  n = len(parameterSets)
-  parameters=range(0,n)
-    
-  for c in case_studies:
-    results[c]={}
-    for s in [1,2]:
-      results[c][s] = np.empty([n,len(metrics)])   
-  
-  # Loop all the countries:
-  for country in case_studies:
-    # Get data
-    resultFolder = os.path.join(os.getcwd(),'results',country, 'metrics')
-
-    i=0
-    # Loop all the metrics:
-    for m in metrics:
-      # Loop calibration scenarios:
-      for scenario in [1,2]:
-        # Load data
-        if m == 'kappa':
-          an_array = calibrate.getKappaArray(scenario,aim,case=country)
-        elif m == 'Ks':
-            an_array = calibrate.getKappaSimulationArray(scenario,aim,case=country)
-        elif m == 'A':
-          an_array = calibrate.getAllocationArray(scenario,aim,case=country)
-        else:
-          an_array = calibrate.calcRMSE(m,scenario,aim,case=country)
-
-        # get the calibration value of the metric for every set
-        av_array = calibrate.getAveragedArray(an_array,scenario,aim)
-        if m in ['kappa','Ks']:
-          k = True
-        else:
-          k = False
-        n_array = calibrate.getNormalizedArray(av_array,kappa=k)
-        results[country][scenario][:,i] = n_array
-      i = i+1
-      
-  return results 
 
 def is_pareto_efficient_simple(costs):
   """
@@ -945,7 +881,7 @@ def plotUrbChangesMod(scenario): #DONE
   cmap_obs = colors.ListedColormap(c_obs)
   ## 2. Loop and plot modellled countries
   # Select the time steps
-  period = parameters.getCalibrationPeriod()[scenario]['validation'] # scenario 1 calibration: [1,2]
+  period = parameters.getCalibrationPeriod()[scenario]['validation'] # scenario 1 validation: [3,4]
   selected_time_steps = np.array(parameters.getObsTimesteps())[period] #[1,11,17,23,29]
 
   i=0
@@ -1482,24 +1418,23 @@ def plotGoalFunctionEverySet(): #DONE
 
 def plotParameters(): #DONE
   """
-  Plot bars presenting parameters (0-1, y axis) for 5 goal funcstions (x axis)
-  There are 5 metrics, 3 case studies, 2 scenarios --> 15 bars
+  Plot bars presenting parameters (0-1, y axis) for goal functions (x axis)
   Ignore the warning
   """
  
   # Create figure
-  fig = plt.figure(figsize=(8,3))
+  fig = plt.figure(figsize=(3,2))
   ax=[ fig.add_subplot(111) for i in [1,2] ] # Add subplot for each scenario
   drivers = ['NEIGH', 'TRAIN', 'TRAVEL', 'LU']
   ind = np.arange(len(all_metrices))    # the x locations for the groups
-  width = 0.13 # width of a bar
-  space = 0.02 # space between case studies
+  width = 0.15 # width of a bar
+  space = 0.01 # space between case studies
   alpha = {1:0.9,2:0.6}
   parameterSets = calibrate.getParameterConfigurations()
   plt.ylabel('parameters')
   plt.ylim([0,1.1])
-  plt.xlim([-0.5,10])
-  fig.text(0.42, 0.02,"goal function")
+  plt.xlim([-0.5,4])
+  fig.text(0.5, -0.05,"goal function",ha='center')
   plt.xticks(ind, goal_functions)
 
   # Create a dictionairy to store lists with parameters. Lenght of dict = no of drivers
@@ -1520,14 +1455,13 @@ def plotParameters(): #DONE
 
   for driver in range(len(drivers)):
     for scenario in [1,2]:
-      print('scenario: ',scenario,'driver', drivers[driver])
       np.set_printoptions(precision=2, linewidth=100)
-      print(np.array(p_dict[scenario][driver]))
   #Assign positions of bars for each scenario:
   positions = {
     1:np.array([[i - (2.5*width+space),i - 0.5*width,i + (1.5*width+space)] for i in ind ]).flatten(),
     2:np.array([[i - (1.5*width+space),i + 0.5*width,i + (2.5*width+space)] for i in ind ]).flatten()}
   # Now plot the bars. For each scenario, the bars are plotted as a different ax
+
   for scenario in [1,2]:
     bottom=0
     for driver in range(len(drivers)):
@@ -1543,11 +1477,11 @@ def plotParameters(): #DONE
       bottom = bottom + np.array(p_dict[scenario][driver])
 
   # Draw lines dividing scenario bars and add annotation with the country symbol
-  for xtick in [0,1,2,3,4]:
+  for xtick in ind:
     for c,country in enumerate(case_studies):
       p = xtick-2*width-space+c*(2*width+space)
       plt.axvline(p, alpha=0.5,c='white',linestyle='--', linewidth=0.5)
-      plt.annotate(country,xy=(p,1.01), rotation=0, color="darkviolet",ha='center',weight='bold')
+      plt.annotate(country,xy=(p,1.01), rotation=0,ha='center')
 
   #Create a legend
   handles, labels = ax[0].get_legend_handles_labels()
@@ -1568,7 +1502,7 @@ def plotParameters(): #DONE
     mode="expand",
     bbox_transform=ax[0].transAxes,
     borderaxespad=0.)
-  leg2.get_frame().set_edgecolor('darkviolet')
+  leg2.get_frame().set_edgecolor('black')
   leg2.get_frame().set_linewidth(0.50)
   for i,lh in enumerate(leg2.legendHandles): 
     lh.set_alpha(alpha[i+1])
@@ -2110,80 +2044,177 @@ def plotMultiobjectiveImprovementToLocationalMetric(weights,loc_metric, positive
 #plotMultiobjectiveImprovementToLocationalMetric([0.5,0.5],'K', positive=True)
 #plotMultiobjectiveImprovementToLocationalMetric([0.5,0.5],'K', positive=False)
 
-def plotNonDominatedSolutions(metrics):
+
+def plotNonDominatedSolutions():
   '''
   Find non-dominated combinations of metric values (for each parameter set)
-  Plot 6 suplots, for each case study and scenario
-  in each case study x and y axis show values of two metrics
+  Plot 1 plot fopr a country in scenario 1
+  x and y axis show values of two metrics
   thrid metric value is presented with shape
   '''
+  # Only for scenario 1
+  scenario = 1
+  # Select metrics used in the plot
+  metrics = metricNames+locationalMetric
   # Create the figure
-  fig, axs = plt.subplots(3,2, figsize=(4,5), sharex=True, sharey=True)
+  fig, ax = plt.subplots(len(case_studies),2, figsize=(5,8))#, sharex=True, sharey=True)
+  # Arrange subplots:
+  plt.subplots_adjust(wspace=0.25, hspace=0.45)
   # Add y label
-  fig.text(0, 0.5, 'normalized value of metric '+metrics[0].upper(), va='center', rotation='vertical')
+  fig.text(0, 0.5, 'RMSE ('+metrics[0].upper()+')', va='center', rotation='vertical')
   # Add x label
-  fig.text(0.5, 0, 'normalized value of metric '+metrics[1].upper(), ha='center')
-  
-  # Get normalized (0-1) results of validation metrics
+  fig.text(0.5, 0, 'RMSE ('+metrics[1].upper()+')', ha='center')
+  # Get results of validation metrics
   results = {
-    'calibration':createNormalizedResultDict(metrics,'calibration'),
-    'validation':createNormalizedResultDict(metrics,'validation')}
-  # Set the number of parameter combinations
-  iterations = len(calibrate.getParameterConfigurations())
+    'calibration':calibrate.getResultsEverySet(metrics,'calibration'),
+    'validation':calibrate.getResultsEverySet(metrics,'validation')}
+  
   # Set the subplot indices:
   i=j=0
   i_index = lambda x,y: x+1 if y==1 else x
   j_index = lambda x: x+1 if x==0 else 0
-  
-  # Loop each simulation
-  for country, scenario in cases:
-    # Assign the number of non-dominated solutions
-    count=0
-    # Select non-dominated calibration solutions
+
+  ## First, plot points only
+  # Plot Pareto fronts for calibration in one column and validation in second columns
+  # Prepare a loop
+  plots = [(country,aim) for country in case_studies for aim in ['calibration','validation']]
+  # Loop to plot each case study
+  for country, aim in plots:
+    # Get metric values
+    v = results[aim][country][scenario]
+    # Select non-dominated CALIBRATION solutions
     non_dominated = is_pareto_efficient_simple(results['calibration'][country][scenario])
-    # Get validation values
-    v = results['calibration'][country][scenario]
     # Subset non-dominated calibration results
     r_nd = v[non_dominated]
     # Find the maximum values
     max0, max1, max2 = r_nd.max(axis=0)
+    # Find the minimum values
+    min0, min1, min2 = r_nd.min(axis=0)
+    # Normalize the third metric values to get the scale for the marker
+    scale = calibrate.getNormalizedArray(r_nd[:,2])
+    # Replace the smallest element
+    scale[scale==0] = 0.01
     # Plot a scatter plot:
-    axs[i,j].scatter(
+    ax[i,j].scatter(
       r_nd[:,0],
       r_nd[:,1],
-      s=20*np.power(r_nd[:,2],3),
+      s=np.power(300,scale),
       facecolors=countryColors[country],
       edgecolors='none',
-      alpha=0.3,
-      label = metrics[2])
-    # Plot the point with the maximum size again
-    s_r_nd = r_nd[r_nd[:,2]==max2]
-    axs[i,j].scatter(
+      alpha=0.3)
+    # Set x and y limits
+    ax[i,j].set_xlim(left=min0-(max0-min0)*0.1,right=max0+(max0-min0)*0.1)
+    ax[i,j].set_ylim(bottom=min1-(max1-min1)*0.1,top=max1+(max1-min1)*0.1)
+
+    ## Second, select the 4 solutions
+    # Create a mask to subset selected CALIBRATED solutions. Use them in validation plot as well!
+    if aim == 'calibration':
+      # Set conditions for finding minimum metric values
+      c0 = r_nd[:,0] == min0
+      c1 = r_nd[:,1] == min1
+      c2 = r_nd[:,2] == min2
+      # Create a mask to find the minimum metrics
+      c_mask = [any(tup) for tup in zip(c0, c1, c2)]
+    # Get the selected solution
+    s0 = r_nd[c0].flatten() # minimum metric 0
+    s1 = r_nd[c1].flatten() # minimum metric 1
+    s2 = r_nd[c2].flatten() # minimum metric 2
+    # Find the fourth number.
+    if aim == 'calibration':
+      # Find minimum values of metrics from the 3 selected solutions
+      min0s, min1s, min2s = np.stack((s0,s1,s2)).min(axis=0)
+      max0s, max1s, max2s = np.stack((s0,s1,s2)).max(axis=0)
+      # The ideal point is in the middle of all the values
+      s4 = np.array([max0s-(max0s-min0s)/2,max1s-(max1s-min1s)/2,max2s-(max2s-min2s)/2])
+      # Get the difference between the non-dominated point and the "ideal" point
+      r_nd_s4 = r_nd-s4
+      # Sum the absolute differences along each row
+      r_nd_s4_sum = np.sum(np.abs(r_nd_s4),axis=1)
+      # Create a boolean mask selecting the point with the minimum distance to the "ideal" point
+      r_nd_s4_mask = r_nd_s4_sum==np.min(r_nd_s4_sum)
+      
+    # Get the 'middle' point
+    s3 = r_nd[r_nd_s4_mask].flatten()
+
+    # Plot the point with the minimum errors for 3 metric values
+    s_r_nd = r_nd[c_mask]
+    ax[i,j].scatter(
       s_r_nd[:,0],
       s_r_nd[:,1],
-      s=20*np.power(s_r_nd[:,2],3),
+      s=np.power(300,scale)[c_mask],
       facecolors='none',
       edgecolors=countryColors[country],
-      alpha=0.7,
-      label = f'Highest {metrics[2]}')
-    # Set the left border
-    axs[i,j].set_xlim(left=-0.05)
-    axs[i,j].set_ylim(bottom=-0.05)
+      alpha=0.7)
     
+    # Plot the fourth solution point
+    ax[i,j].scatter(
+      s3[0],
+      s3[1],
+      s=np.power(300,scale)[r_nd_s4_mask],
+      facecolors='none',
+      edgecolors=countryColors[country],
+      alpha=0.7)
+    # Print the number of the selected solution next to the point
+    ax[i,j].text(s0[0],s0[1],'P0',va='center',ha='center')
+    ax[i,j].text(s1[0],s1[1],'P1',va='center',ha='center')
+    ax[i,j].text(s2[0],s2[1],'P2',va='center',ha='center')
+    ax[i,j].text(s3[0],s3[1],'P3',va='center',ha='center')
+    # Create shapes and labels for legend:
+    numElems = 3
+    labels = np.round(np.linspace(max2, min2, numElems),4)
+    # Get the indices"
+    idx = np.round(np.linspace(0, len(scale) - 1, numElems)).astype(int)
+    # Get the scales of the markers
+    scales = [np.sort(scale)[i] for i in idx]
+    # Create the legend shapes
+    circles = [mlines.Line2D(
+      [0],[0],
+      marker='o',
+      color='w',
+      label=labels[i],
+      markerfacecolor=countryColors[country],
+      markeredgecolor=countryColors[country],
+      markeredgewidth=0.5,
+      alpha=0.3,
+      markersize=15*scales[i]) for i in range(len(labels))]
+    # Plot the legend
+    leg = ax[i,j].legend(
+        handles=circles,
+        title=metrics[2],
+        bbox_to_anchor=(0., 1.01,1,0.01),
+        loc='lower center',
+        mode="expand",
+        ncol=7,
+        borderaxespad=0.,
+        fontsize=6,
+        handletextpad = 0.01,
+        handlelength=2,
+        borderpad=1)
+    leg.get_frame().set_edgecolor('black')
+    leg.get_frame().set_linewidth(0.50)
+    # Specify the number of ticks on both or any single axes
+    ax[i,j].locator_params(tight=True, nbins=5)
+    # Get the limits of the ax
+    x0=ax[i,j].get_xlim()[0]
+    x1=ax[i,j].get_xlim()[1]
+    y0=ax[i,j].get_ylim()[0]
+    y1=ax[i,j].get_ylim()[1]
     # Print the number of non-dominated solutions in the bottom left corner
-    axs[i,j].text(0,0,'n='+str(len(r_nd)))
+    ax[i,j].text(
+      x0+(x1-x0)*.01,
+      y0+(y1-y0)*.01,
+      'n='+str(len(r_nd)),
+      fontsize=6,
+      weight='bold')
     # Get the indices of subplots:
     i=i_index(i,j)
     j=j_index(j)
     
-  axs[0,0].legend(fontsize=6)
+  # Add titles
+  ax[0,0].set_title('CALIBRATION', y=1.2)
+  ax[0,1].set_title('VALIDATION', y=1.2)
+  #ax[0,1].text(0.5, 1, 'VALIDATION', ha='center')  
   # Save plot and clear
   setNameClearSave('non-dominated-scatter_'+'_'.join(metrics))
 
-plotNonDominatedSolutions(['wfdi','cohes','A'])
-
-#plotValidation('kappas')
-#plotValidation('errors')
-#plotObsAndMod()
-
-#saveMultiobjectiveValidationResults_to_excel([0.5,0.5])
+plotNonDominatedSolutions()
