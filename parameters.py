@@ -74,7 +74,13 @@ def getCountryName():
 
   name = 'PL'
   return name
-  
+
+def getCaseStudies():
+  """ Returns the case studies for analysis """
+  # case studies: 'IT', 'IE', 'PL'
+
+  cases = ['IE', 'IT', 'PL']
+  return cases
   
 def getCovarOn():
   """Return 1 if filtering with covariance matrix is required."""  
@@ -93,8 +99,15 @@ def getSumStats():
   # 'lpi': # Largest Patch Index
   # 'contag': # Contagion Index 
   
-  sumStats = ['cilp', 'fdi', 'wfdi', 'pd', 'cohes', 'ed', 'lpi', 'contag']
+  sumStats = ['wfdi','cohes'] #['cilp', 'fdi', 'wfdi', 'pd', 'cohes', 'ed', 'lpi', 'contag']
   return sumStats
+
+def getLocationalAccuracyMetric():
+  """ Returns locational metric used in the calibration """
+  # Locational metrics: 'K', 'Ks', 'A'
+
+  locationalMetric = ['A']
+  return locationalMetric
 
 def getCovarName():
   name = 'cov_nrz'
