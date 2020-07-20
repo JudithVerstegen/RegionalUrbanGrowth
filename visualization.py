@@ -83,6 +83,9 @@ def clearCreatePath(path, name):
   return wPath
   
 def setNameClearSave(figName, scenario=None):
+  # Set the font type to readible for Adobe
+  plt.rcParams['pdf.fonttype'] = 42
+  plt.rcParams['ps.fonttype'] = 42
   # Set the name and clear the directory if needed
   if scenario is None:
     name = ''
@@ -90,9 +93,11 @@ def setNameClearSave(figName, scenario=None):
     name = '_scenario_'+str(scenario)
   # Create figure dir
   fig_dir = os.path.join(os.getcwd(),'results','figures')
-  wPath = clearCreatePath(fig_dir, figName+name)
+  wPath = clearCreatePath(fig_dir, figName+name+'.png')
   # Save plot and clear    
-  plt.savefig(os.path.join(resultFolder,wPath), bbox_inches = "tight",dpi=300)
+  plt.savefig(os.path.join(resultFolder,wPath),
+              bbox_inches = "tight",
+              dpi=300)
   plt.close('all')
 
 def getAverageResultsArrayEverySet(aim):
@@ -2045,6 +2050,8 @@ def plotMultiobjectiveImprovementToLocationalMetric(weights,loc_metric, positive
 #plotMultiobjectiveImprovementToLocationalMetric([0.5,0.5],'K', positive=False)
 
 
+#### PLOTS FOR THE ARTICLE ###
+  
 def plotNonDominatedSolutions():
   '''
   Find non-dominated combinations of metric values (for each parameter set)
@@ -2054,118 +2061,130 @@ def plotNonDominatedSolutions():
   '''
   # Only for scenario 1
   scenario = 1
-  # Select metrics used in the plot
-  metrics = metricNames+locationalMetric
-  # Create the figure
+  ## Create the figure
   fig, ax = plt.subplots(len(case_studies),2, figsize=(5,8))#, sharex=True, sharey=True)
   # Arrange subplots:
-  plt.subplots_adjust(wspace=0.25, hspace=0.45)
+  plt.subplots_adjust(wspace=0.35, hspace=0.35)
   # Add y label
-  fig.text(0, 0.5, 'RMSE ('+metrics[0].upper()+')', va='center', rotation='vertical')
+  fig.text(0, 0.5, 'RMSE ('+all_metrices[0].upper()+')', va='center', rotation='vertical')
   # Add x label
-  fig.text(0.5, 0, 'RMSE ('+metrics[1].upper()+')', ha='center')
-  # Get results of validation metrics
-  results = {
-    'calibration':calibrate.getResultsEverySet(metrics,'calibration'),
-    'validation':calibrate.getResultsEverySet(metrics,'validation')}
+  fig.text(0.5, 0, 'RMSE ('+all_metrices[1].upper()+')', ha='center')
   
-  # Set the subplot indices:
-  i=j=0
-  i_index = lambda x,y: x+1 if y==1 else x
-  j_index = lambda x: x+1 if x==0 else 0
+  ## 1.
+  # Get results of validation metrics for all cases 
+  results = {
+    'calibration':calibrate.getResultsEverySet('calibration'),
+    'validation':calibrate.getResultsEverySet('validation')}
 
-  ## First, plot points only
-  # Plot Pareto fronts for calibration in one column and validation in second columns
-  # Prepare a loop
-  plots = [(country,aim) for country in case_studies for aim in ['calibration','validation']]
-  # Loop to plot each case study
-  for country, aim in plots:
+  ## 2.
+  # For each case study create a selection (mask) of non-dominated solutions identified in calibration
+  # and a selection of four solutions: for 3 objectives and one multi-objective
+  i=0
+  for country in case_studies:
+    ## 3. Get calibration values
     # Get metric values
-    v = results[aim][country][scenario]
+    v_c = results['calibration'][country][scenario]
     # Select non-dominated CALIBRATION solutions
     non_dominated = is_pareto_efficient_simple(results['calibration'][country][scenario])
     # Subset non-dominated calibration results
-    r_nd = v[non_dominated]
+    r_nd_c = v_c[non_dominated]
     # Find the maximum values
-    max0, max1, max2 = r_nd.max(axis=0)
+    max0, max1, max2 = r_nd_c.max(axis=0)
     # Find the minimum values
-    min0, min1, min2 = r_nd.min(axis=0)
-    # Normalize the third metric values to get the scale for the marker
-    scale = calibrate.getNormalizedArray(r_nd[:,2])
-    # Replace the smallest element
-    scale[scale==0] = 0.01
-    # Plot a scatter plot:
-    ax[i,j].scatter(
-      r_nd[:,0],
-      r_nd[:,1],
-      s=np.power(300,scale),
-      facecolors=countryColors[country],
-      edgecolors='none',
-      alpha=0.3)
-    # Set x and y limits
-    ax[i,j].set_xlim(left=min0-(max0-min0)*0.1,right=max0+(max0-min0)*0.1)
-    ax[i,j].set_ylim(bottom=min1-(max1-min1)*0.1,top=max1+(max1-min1)*0.1)
-
-    ## Second, select the 4 solutions
-    # Create a mask to subset selected CALIBRATED solutions. Use them in validation plot as well!
-    if aim == 'calibration':
-      # Set conditions for finding minimum metric values
-      c0 = r_nd[:,0] == min0
-      c1 = r_nd[:,1] == min1
-      c2 = r_nd[:,2] == min2
-      # Create a mask to find the minimum metrics
-      c_mask = [any(tup) for tup in zip(c0, c1, c2)]
+    min0, min1, min2 = r_nd_c.min(axis=0)
+    # Set conditions for finding minimum metric values
+    c0 = r_nd_c[:,0] == min0
+    c1 = r_nd_c[:,1] == min1
+    c2 = r_nd_c[:,2] == min2
     # Get the selected solution
-    s0 = r_nd[c0].flatten() # minimum metric 0
-    s1 = r_nd[c1].flatten() # minimum metric 1
-    s2 = r_nd[c2].flatten() # minimum metric 2
-    # Find the fourth number.
-    if aim == 'calibration':
-      # Find minimum values of metrics from the 3 selected solutions
-      min0s, min1s, min2s = np.stack((s0,s1,s2)).min(axis=0)
-      max0s, max1s, max2s = np.stack((s0,s1,s2)).max(axis=0)
-      # The ideal point is in the middle of all the values
-      s4 = np.array([max0s-(max0s-min0s)/2,max1s-(max1s-min1s)/2,max2s-(max2s-min2s)/2])
-      # Get the difference between the non-dominated point and the "ideal" point
-      r_nd_s4 = r_nd-s4
-      # Sum the absolute differences along each row
-      r_nd_s4_sum = np.sum(np.abs(r_nd_s4),axis=1)
-      # Create a boolean mask selecting the point with the minimum distance to the "ideal" point
-      r_nd_s4_mask = r_nd_s4_sum==np.min(r_nd_s4_sum)
-      
+    s0 = r_nd_c[c0].flatten() # minimum metric 0
+    s1 = r_nd_c[c1].flatten() # minimum metric 1
+    s2 = r_nd_c[c2].flatten() # minimum metric 2
+    # Find minimum values of metrics from the 3 selected solutions
+    min0s, min1s, min2s = np.stack((s0,s1,s2)).min(axis=0)
+    max0s, max1s, max2s = np.stack((s0,s1,s2)).max(axis=0)
+    # The ideal point is in the middle of all the values
+    s3_ideal = np.array([max0s-(max0s-min0s)/2,max1s-(max1s-min1s)/2,max2s-(max2s-min2s)/2])
+    # Get the difference between the non-dominated point and the "ideal" point
+    r_nd_c_s3 = r_nd_c - s3_ideal
+    # Sum the absolute differences along each row
+    r_nd_c_s3_sum = np.sum(np.abs(r_nd_c_s3),axis=1)
+    # Create a boolean mask selecting the point with the minimum distance to the "ideal" point
+    c3 = r_nd_c_s3_sum==np.min(r_nd_c_s3_sum)
     # Get the 'middle' point
-    s3 = r_nd[r_nd_s4_mask].flatten()
-
-    # Plot the point with the minimum errors for 3 metric values
-    s_r_nd = r_nd[c_mask]
-    ax[i,j].scatter(
-      s_r_nd[:,0],
-      s_r_nd[:,1],
-      s=np.power(300,scale)[c_mask],
-      facecolors='none',
-      edgecolors=countryColors[country],
-      alpha=0.7)
+    s3 = r_nd_c[c3].flatten()
+    # Create a mask to find the values selected in terms of four objectives
+    c_mask = [any(tup) for tup in zip(c0, c1, c2, c3)]
     
-    # Plot the fourth solution point
-    ax[i,j].scatter(
-      s3[0],
-      s3[1],
-      s=np.power(300,scale)[r_nd_s4_mask],
-      facecolors='none',
-      edgecolors=countryColors[country],
-      alpha=0.7)
-    # Print the number of the selected solution next to the point
-    ax[i,j].text(s0[0],s0[1],'P0',va='center',ha='center')
-    ax[i,j].text(s1[0],s1[1],'P1',va='center',ha='center')
-    ax[i,j].text(s2[0],s2[1],'P2',va='center',ha='center')
-    ax[i,j].text(s3[0],s3[1],'P3',va='center',ha='center')
+    ## 4. Get validation values
+    # Get metric values
+    v_v = results['validation'][country][scenario]
+    # Subset non-dominated calibration results
+    r_nd_v = v_v[non_dominated]
+
+    ## 5. Get the scale of the values, taking into account both calibration and validation values
+    # Join calibration and validation results for third metric
+    r_nd_2 = np.concatenate((r_nd_c[:,2],r_nd_v[:,2]), axis = 0)
+    # Normalize the third metric values to get the scale for the marker
+    scale = calibrate.getNormalizedArray(r_nd_2)
+    # Revert the scale to align the marker size with the represented value (smaller value => smalller marker)
+    scale = np.subtract(1,scale)
+    # Replace the smallest element to enable log scale
+    scale[scale==0] = 0.01
+    # Transform into log scale. Multiply by a large number in order to have only poitive log values
+    marker_base = 1.5
+    scale = np.power(marker_base,-np.log(r_nd_2))
+
+    ## 6. Set x and y limits
+    for j in [0,1]:
+      # Combine calibration and validation results to find the total min and max values
+      r_nd_all = np.concatenate((r_nd_c, r_nd_v),axis =0)
+      # Find the maximum values
+      max0_r_nd, max1_r_nd, max2_r_nd = r_nd_all.max(axis=0)
+      # Find the minimum values
+      min0_r_nd, min1_r_nd, min2_r_nd = r_nd_all.min(axis=0)
+      # Set the limits
+      ax[i,j].set_xlim(left=min0_r_nd-(max0_r_nd-min0_r_nd)*0.1,right=max0_r_nd+(max0_r_nd-min0_r_nd)*0.1)
+      ax[i,j].set_ylim(bottom=min1_r_nd-(max1_r_nd-min1_r_nd)*0.1,top=max1_r_nd+(max1_r_nd-min1_r_nd)*0.1)
+      
+
+    ## 6 Plot calibration and validation results
+    j=0
+    for r_nd in [r_nd_c, r_nd_v]:
+      # Plot a scatter plot
+      ax[i,j].scatter(
+        r_nd[:,0],
+        r_nd[:,1],
+        s=np.split(scale,2)[j],
+        facecolors=countryColors[country],
+        edgecolors='none',
+        alpha=0.3)
+      # Plot the point with the minimum errors for 4 objectives
+      s_r_nd = r_nd[c_mask]
+      ax[i,j].scatter(
+        s_r_nd[:,0],
+        s_r_nd[:,1],
+        s=np.split(scale,2)[j][c_mask],
+        facecolors='none',
+        edgecolors='k',#countryColors[country],
+        alpha=0.9)
+      
+      # 7. Print the number of the selected solution next to the point
+      for p,c in enumerate([c0,c1,c2,c3]):
+        a_point = r_nd[c].flatten()
+        ax[i,j].text(a_point[0],a_point[1],'P'+str(p+1)+' '+str(np.round(a_point[2],3)),va='center',ha='center',
+                     fontsize=3)
+      j+=1
+    ## 9. Create a legend
     # Create shapes and labels for legend:
-    numElems = 3
-    labels = np.round(np.linspace(max2, min2, numElems),4)
-    # Get the indices"
-    idx = np.round(np.linspace(0, len(scale) - 1, numElems)).astype(int)
+    numElems = 7
+    labels = np.round(np.linspace(np.min(r_nd_2), np.max(r_nd_2), numElems),4)
+    # Get the indices
+    idx = np.round(np.linspace(0, len(r_nd_2) - 1, numElems)).astype(int)
     # Get the scales of the markers
+    #scales = [np.sort(-np.log(r_nd_2))[i] for i in idx]
     scales = [np.sort(scale)[i] for i in idx]
+    print(scales)
     # Create the legend shapes
     circles = [mlines.Line2D(
       [0],[0],
@@ -2176,45 +2195,45 @@ def plotNonDominatedSolutions():
       markeredgecolor=countryColors[country],
       markeredgewidth=0.5,
       alpha=0.3,
-      markersize=15*scales[i]) for i in range(len(labels))]
+      markersize=scales[i]) for i in range(len(labels))]
     # Plot the legend
-    leg = ax[i,j].legend(
+    leg = ax[i,0].legend(
         handles=circles,
-        title=metrics[2],
-        bbox_to_anchor=(0., 1.01,1,0.01),
+        title=all_metrices[2],
+        bbox_to_anchor=(0., 1.01,2.35,0.01),
         loc='lower center',
         mode="expand",
-        ncol=7,
+        ncol=numElems,
         borderaxespad=0.,
         fontsize=6,
         handletextpad = 0.01,
         handlelength=2,
-        borderpad=1)
-    leg.get_frame().set_edgecolor('black')
-    leg.get_frame().set_linewidth(0.50)
+        borderpad=1,
+        frameon=False)
     # Specify the number of ticks on both or any single axes
-    ax[i,j].locator_params(tight=True, nbins=5)
+    ax[i,0].locator_params(tight=True, nbins=5)
+    ax[i,1].locator_params(tight=True, nbins=5)
+    # Print the number of the non-dominated solutions on the left subplot
     # Get the limits of the ax
-    x0=ax[i,j].get_xlim()[0]
-    x1=ax[i,j].get_xlim()[1]
-    y0=ax[i,j].get_ylim()[0]
-    y1=ax[i,j].get_ylim()[1]
+    x0=ax[i,0].get_xlim()[0]
+    x1=ax[i,0].get_xlim()[1]
+    y0=ax[i,0].get_ylim()[0]
+    y1=ax[i,0].get_ylim()[1]
     # Print the number of non-dominated solutions in the bottom left corner
-    ax[i,j].text(
+    ax[i,0].text(
       x0+(x1-x0)*.01,
       y0+(y1-y0)*.01,
-      'n='+str(len(r_nd)),
+      'n='+str(len(r_nd_c)),
       fontsize=6,
       weight='bold')
     # Get the indices of subplots:
-    i=i_index(i,j)
-    j=j_index(j)
+    i+=1
     
   # Add titles
   ax[0,0].set_title('CALIBRATION', y=1.2)
   ax[0,1].set_title('VALIDATION', y=1.2)
   #ax[0,1].text(0.5, 1, 'VALIDATION', ha='center')  
   # Save plot and clear
-  setNameClearSave('non-dominated-scatter_'+'_'.join(metrics))
+  setNameClearSave('non-dominated-scatter_'+'_'.join(all_metrices)+'_NEW')
 
 plotNonDominatedSolutions()
