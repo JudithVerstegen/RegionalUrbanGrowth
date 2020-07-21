@@ -509,7 +509,7 @@ def getTopCalibratedParameters_multiobjective(metric, weights, scenario, numberO
       topArray[i, j] = p[0][j-4]
   return topArray
 
-def getResultsEverySet(metrics,aim):
+def getResultsEverySet(aim):
   ''' Create a dictionairy: results[country][scenario]
       Dict stores an array with shape: number of parameter sets x number of metrics
       Array stores calibration/validation values for each set for both scenarios '''
@@ -522,7 +522,7 @@ def getResultsEverySet(metrics,aim):
   for c in case_studies:
     results[c]={}
     for s in [1,2]:
-      results[c][s] = np.empty([numberOfIterations,len(metrics)])   
+      results[c][s] = np.empty([numberOfIterations,len(all_metrices)])   
   
   # Loop all the countries:
   for country in case_studies:
@@ -531,7 +531,7 @@ def getResultsEverySet(metrics,aim):
 
     i=0
     # Loop all the metrics:
-    for m in metrics:
+    for m in all_metrices:
       # Loop calibration scenarios:
       for scenario in [1,2]:
         # Load data
