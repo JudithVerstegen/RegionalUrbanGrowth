@@ -8,6 +8,7 @@ import parameters
 import calibrate
 #from pcraster.framework import *
 import matplotlib.pyplot as plt
+import matplotlib.cm
 from matplotlib import colors
 import matplotlib.patches as mpatches
 import matplotlib.lines as mlines
@@ -2103,14 +2104,16 @@ def plotNonDominatedSolutions():
     # Find minimum values of metrics from the 3 selected solutions
     min0s, min1s, min2s = np.stack((s0,s1,s2)).min(axis=0)
     max0s, max1s, max2s = np.stack((s0,s1,s2)).max(axis=0)
-    # The ideal point is in the middle of all the values
-    s3_ideal = np.array([max0s-(max0s-min0s)/2,max1s-(max1s-min1s)/2,max2s-(max2s-min2s)/2])
-    # Get the difference between the non-dominated point and the "ideal" point
-    r_nd_c_s3 = r_nd_c - s3_ideal
-    # Sum the absolute differences along each row
-    r_nd_c_s3_sum = np.sum(np.abs(r_nd_c_s3),axis=1)
+    # The ideal point is in the 0 point of axes
+    s3_ideal = np.array([0,0,0])
+    # Get the normalized values of non-dominated solutions in order to compare them
+    r_nd_c_n = (r_nd_c.max(axis=0) - r_nd_c) / (r_nd_c.max(axis=0) - r_nd_c.min(axis=0))
+    # Get the difference between the non-dominated points and the "ideal" point
+    r_nd_c_s3 = np.array(
+      [np.linalg.norm(r - s3_ideal) for r in r_nd_c_n]
+      )
     # Create a boolean mask selecting the point with the minimum distance to the "ideal" point
-    c3 = r_nd_c_s3_sum==np.min(r_nd_c_s3_sum)
+    c3 = r_nd_c_s3==np.min(r_nd_c_s3)
     # Get the 'middle' point
     s3 = r_nd_c[c3].flatten()
     # Create a mask to find the values selected in terms of four objectives
@@ -2129,11 +2132,6 @@ def plotNonDominatedSolutions():
     scale = calibrate.getNormalizedArray(r_nd_2)
     # Revert the scale to align the marker size with the represented value (smaller value => smalller marker)
     scale = np.subtract(1,scale)
-    # Replace the smallest element to enable log scale
-    scale[scale==0] = 0.01
-    # Transform into log scale. Multiply by a large number in order to have only poitive log values
-    marker_base = 1.5
-    scale = np.power(marker_base,-np.log(r_nd_2))
 
     ## 6. Set x and y limits
     for j in [0,1]:
@@ -2148,35 +2146,50 @@ def plotNonDominatedSolutions():
       ax[i,j].set_ylim(bottom=min1_r_nd-(max1_r_nd-min1_r_nd)*0.1,top=max1_r_nd+(max1_r_nd-min1_r_nd)*0.1)
       
 
-    ## 6 Plot calibration and validation results
-    j=0
-    for r_nd in [r_nd_c, r_nd_v]:
+    ## 7. Plot calibration and validation results
+    # Create a colormap
+    a_cmap = plt.cm.get_cmap('RdYlBu', len(r_nd_2)).reversed()
+    print(np.split(scale,2)[j])
+    # Loop calibration and validation values
+    for j, r_nd in enumerate([r_nd_c, r_nd_v]):
       # Plot a scatter plot
-      ax[i,j].scatter(
+      plot_all = ax[i,j].scatter(
         r_nd[:,0],
         r_nd[:,1],
-        s=np.split(scale,2)[j],
-        facecolors=countryColors[country],
-        edgecolors='none',
-        alpha=0.3)
+        marker='x',
+        s=20,
+        linewidth=0.5,
+        c = a_cmap(np.split(scale,2)[j]),
+        cmap=a_cmap,
+        alpha=0.7)
+      # add a colorbar
+      '''fig.colorbar(
+        plot_all,
+        orientation='horizontal')'''
+      
       # Plot the point with the minimum errors for 4 objectives
       s_r_nd = r_nd[c_mask]
-      ax[i,j].scatter(
+      # Get the indices of the mask
+      inx = [i for i, x in enumerate(c_mask) if x]
+      # Plot the selected solutions
+      plot_solutions = ax[i,j].scatter(
         s_r_nd[:,0],
         s_r_nd[:,1],
-        s=np.split(scale,2)[j][c_mask],
-        facecolors='none',
-        edgecolors='k',#countryColors[country],
-        alpha=0.9)
+        s=50,
+        linewidths=4,
+        marker='x',
+        c = a_cmap(np.split(scale,2)[j][inx]),
+        cmap=a_cmap,
+        alpha=0.7)
       
-      # 7. Print the number of the selected solution next to the point
+      # 8. Print the number of the selected solution next to the point
       for p,c in enumerate([c0,c1,c2,c3]):
         a_point = r_nd[c].flatten()
         ax[i,j].text(a_point[0],a_point[1],'P'+str(p+1)+' '+str(np.round(a_point[2],3)),va='center',ha='center',
                      fontsize=3)
-      j+=1
-    ## 9. Create a legend
-    # Create shapes and labels for legend:
+      
+    ## 9. Create a legend and adjust the plot
+    '''# Create shapes and labels for legend:
     numElems = 7
     labels = np.round(np.linspace(np.min(r_nd_2), np.max(r_nd_2), numElems),4)
     # Get the indices
@@ -2184,7 +2197,6 @@ def plotNonDominatedSolutions():
     # Get the scales of the markers
     #scales = [np.sort(-np.log(r_nd_2))[i] for i in idx]
     scales = [np.sort(scale)[i] for i in idx]
-    print(scales)
     # Create the legend shapes
     circles = [mlines.Line2D(
       [0],[0],
@@ -2209,7 +2221,16 @@ def plotNonDominatedSolutions():
         handletextpad = 0.01,
         handlelength=2,
         borderpad=1,
-        frameon=False)
+        frameon=False)'''
+    
+    '''leg = fig.colorbar(
+      plot_all,
+      ax=ax[i,0],
+      orientation = 'horizontal')
+    leg.ax.set_title(all_metrices[2])'''
+
+    
+
     # Specify the number of ticks on both or any single axes
     ax[i,0].locator_params(tight=True, nbins=5)
     ax[i,1].locator_params(tight=True, nbins=5)
@@ -2226,14 +2247,13 @@ def plotNonDominatedSolutions():
       'n='+str(len(r_nd_c)),
       fontsize=6,
       weight='bold')
-    # Get the indices of subplots:
+
     i+=1
-    
   # Add titles
   ax[0,0].set_title('CALIBRATION', y=1.2)
   ax[0,1].set_title('VALIDATION', y=1.2)
   #ax[0,1].text(0.5, 1, 'VALIDATION', ha='center')  
   # Save plot and clear
-  setNameClearSave('non-dominated-scatter_'+'_'.join(all_metrices)+'_NEW')
+  setNameClearSave('non-dominated-scatter_'+'_'.join(all_metrices)+'_NEW1')
 
 plotNonDominatedSolutions()
