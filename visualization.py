@@ -8,6 +8,7 @@ import parameters
 import calibrate
 #from pcraster.framework import *
 import matplotlib.pyplot as plt
+import matplotlib.gridspec as gridspec
 import matplotlib.cm
 from matplotlib import colors
 import matplotlib.patches as mpatches
@@ -2054,6 +2055,7 @@ def plotMultiobjectiveImprovementToLocationalMetric(weights,loc_metric, positive
 #### PLOTS FOR THE ARTICLE ###
   
 def plotNonDominatedSolutions():
+  from mpl_toolkits.axes_grid1.inset_locator import inset_axes
   '''
   Find non-dominated combinations of metric values (for each parameter set)
   Plot 1 plot fopr a country in scenario 1
@@ -2062,14 +2064,17 @@ def plotNonDominatedSolutions():
   '''
   # Only for scenario 1
   scenario = 1
-  ## Create the figure
-  fig, ax = plt.subplots(len(case_studies),2, figsize=(5,8))#, sharex=True, sharey=True)
+  ## Create the figure. 
+  fig = plt.figure(constrained_layout=True, figsize=(5,7.5))#, sharex=True, sharey=True)
+  # Apply gridspec
+  spec = fig.add_gridspec(nrows=len(case_studies)*2,ncols=2,hspace=1.5,wspace=.5,
+                          height_ratios=np.array([ [0.1,1] for i in case_studies]).flatten())
   # Arrange subplots:
-  plt.subplots_adjust(wspace=0.35, hspace=0.35)
+  #plt.subplots_adjust(wspace=0.35, hspace=0.35)
   # Add y label
-  fig.text(0, 0.5, 'RMSE ('+all_metrices[0].upper()+')', va='center', rotation='vertical')
+  fig.text(-0.01, 0.5, 'RMSE ('+all_metrices[0].upper()+')', va='center', rotation='vertical')
   # Add x label
-  fig.text(0.5, 0, 'RMSE ('+all_metrices[1].upper()+')', ha='center')
+  fig.text(0.5, -0.03, 'RMSE ('+all_metrices[1].upper()+')', ha='center')
   
   ## 1.
   # Get results of validation metrics for all cases 
@@ -2080,9 +2085,10 @@ def plotNonDominatedSolutions():
   ## 2.
   # For each case study create a selection (mask) of non-dominated solutions identified in calibration
   # and a selection of four solutions: for 3 objectives and one multi-objective
-  i=0
-  for country in case_studies:
-    ## 3. Get calibration values
+  for i,country in enumerate(case_studies):
+    i = i*2
+
+    ## 4. Get calibration values
     # Get metric values
     v_c = results['calibration'][country][scenario]
     # Select non-dominated CALIBRATION solutions
@@ -2109,9 +2115,7 @@ def plotNonDominatedSolutions():
     # Get the normalized values of non-dominated solutions in order to compare them
     r_nd_c_n = (r_nd_c.max(axis=0) - r_nd_c) / (r_nd_c.max(axis=0) - r_nd_c.min(axis=0))
     # Get the difference between the non-dominated points and the "ideal" point
-    r_nd_c_s3 = np.array(
-      [np.linalg.norm(r - s3_ideal) for r in r_nd_c_n]
-      )
+    r_nd_c_s3 = np.array([np.linalg.norm(r - s3_ideal) for r in r_nd_c_n])
     # Create a boolean mask selecting the point with the minimum distance to the "ideal" point
     c3 = r_nd_c_s3==np.min(r_nd_c_s3)
     # Get the 'middle' point
@@ -2132,28 +2136,50 @@ def plotNonDominatedSolutions():
     scale = calibrate.getNormalizedArray(r_nd_2)
     # Revert the scale to align the marker size with the represented value (smaller value => smalller marker)
     scale = np.subtract(1,scale)
+    # Combine calibration and validation results to find the total min and max values
+    r_nd_all = np.concatenate((r_nd_c, r_nd_v),axis =0)
+    # Find the maximum values
+    max0_r_nd, max1_r_nd, max2_r_nd = r_nd_all.max(axis=0)
+    # Find the minimum values
+    min0_r_nd, min1_r_nd, min2_r_nd = r_nd_all.min(axis=0)
 
-    ## 6. Set x and y limits
-    for j in [0,1]:
-      # Combine calibration and validation results to find the total min and max values
-      r_nd_all = np.concatenate((r_nd_c, r_nd_v),axis =0)
-      # Find the maximum values
-      max0_r_nd, max1_r_nd, max2_r_nd = r_nd_all.max(axis=0)
-      # Find the minimum values
-      min0_r_nd, min1_r_nd, min2_r_nd = r_nd_all.min(axis=0)
-      # Set the limits
-      ax[i,j].set_xlim(left=min0_r_nd-(max0_r_nd-min0_r_nd)*0.1,right=max0_r_nd+(max0_r_nd-min0_r_nd)*0.1)
-      ax[i,j].set_ylim(bottom=min1_r_nd-(max1_r_nd-min1_r_nd)*0.1,top=max1_r_nd+(max1_r_nd-min1_r_nd)*0.1)
-      
-
-    ## 7. Plot calibration and validation results
+    ## 10. Create the legend 
     # Create a colormap
     a_cmap = plt.cm.get_cmap('RdYlBu', len(r_nd_2)).reversed()
-    print(np.split(scale,2)[j])
+    a_norm= colors.Normalize(vmin=r_nd_2.min(), vmax=r_nd_2.max())
+    # Create a colorbar
+    a_bar = matplotlib.cm.ScalarMappable(
+      norm = a_norm, 
+      cmap = a_cmap)
+    a_bar.set_array([])
+    # Add a subplot with a full width
+    c_ax = fig.add_subplot(spec[i,:])
+    # Adjust the size of the colorbar to the size of the ax
+    axins1 = inset_axes(c_ax, width="100%",height="50%",
+                        bbox_to_anchor=(0.01, 0.2, 1, 1),
+                        bbox_transform=c_ax.transAxes)
+    #c_bar.imshow(np.reshape(r_nd_2,(1,len(r_nd_2))),cmap=a_cmap)
+    c_bar = plt.colorbar(
+      a_bar,
+      cax=axins1,
+      orientation='horizontal')
+    # Add the label with the locational metric
+    c_bar.set_label(all_metrices[2])
+    # Move the label above the bar
+    c_bar.ax.xaxis.set_label_position('top')
+    # Hide the ax as we need the colorbar only :)
+    c_ax.set_frame_on(False)
+    c_ax.xaxis.set_visible(False)
+    c_ax.yaxis.set_visible(False)    
+
+    ## 7. Plot calibration and validation results
+    i+=1
     # Loop calibration and validation values
     for j, r_nd in enumerate([r_nd_c, r_nd_v]):
+      # Add an axis for all non dominated results
+      ax_all = fig.add_subplot(spec[i,j])
       # Plot a scatter plot
-      plot_all = ax[i,j].scatter(
+      ax_all.scatter(
         r_nd[:,0],
         r_nd[:,1],
         marker='x',
@@ -2162,97 +2188,78 @@ def plotNonDominatedSolutions():
         c = a_cmap(np.split(scale,2)[j]),
         cmap=a_cmap,
         alpha=0.7)
-      # add a colorbar
-      '''fig.colorbar(
-        plot_all,
-        orientation='horizontal')'''
       
       # Plot the point with the minimum errors for 4 objectives
       s_r_nd = r_nd[c_mask]
       # Get the indices of the mask
       inx = [i for i, x in enumerate(c_mask) if x]
+      # Add an axis for seected points
+      ax_selected = fig.add_subplot(spec[i,j])
       # Plot the selected solutions
-      plot_solutions = ax[i,j].scatter(
+      ax_selected.scatter(
         s_r_nd[:,0],
         s_r_nd[:,1],
-        s=50,
-        linewidths=4,
+        s=75,
+        linewidths=5,
         marker='x',
         c = a_cmap(np.split(scale,2)[j][inx]),
         cmap=a_cmap,
-        alpha=0.7)
+        alpha=0.9)
       
-      # 8. Print the number of the selected solution next to the point
+      ## 8. Print the number of the selected solution next to the point
       for p,c in enumerate([c0,c1,c2,c3]):
         a_point = r_nd[c].flatten()
-        ax[i,j].text(a_point[0],a_point[1],'P'+str(p+1)+' '+str(np.round(a_point[2],3)),va='center',ha='center',
-                     fontsize=3)
+        ax_selected.text(a_point[0],
+                         a_point[1],
+                         'P'+str(p+1),
+                         va='center',
+                         ha='center')
       
-    ## 9. Create a legend and adjust the plot
-    '''# Create shapes and labels for legend:
-    numElems = 7
-    labels = np.round(np.linspace(np.min(r_nd_2), np.max(r_nd_2), numElems),4)
-    # Get the indices
-    idx = np.round(np.linspace(0, len(r_nd_2) - 1, numElems)).astype(int)
-    # Get the scales of the markers
-    #scales = [np.sort(-np.log(r_nd_2))[i] for i in idx]
-    scales = [np.sort(scale)[i] for i in idx]
-    # Create the legend shapes
-    circles = [mlines.Line2D(
-      [0],[0],
-      marker='o',
-      color='w',
-      label=labels[i],
-      markerfacecolor=countryColors[country],
-      markeredgecolor=countryColors[country],
-      markeredgewidth=0.5,
-      alpha=0.3,
-      markersize=scales[i]) for i in range(len(labels))]
-    # Plot the legend
-    leg = ax[i,0].legend(
-        handles=circles,
-        title=all_metrices[2],
-        bbox_to_anchor=(0., 1.01,2.35,0.01),
-        loc='lower center',
-        mode="expand",
-        ncol=numElems,
-        borderaxespad=0.,
+      ## 9. Adjust the plot
+      # Set the limits
+      ax_all.set_xlim(left=min0_r_nd-(max0_r_nd-min0_r_nd)*0.1,right=max0_r_nd+(max0_r_nd-min0_r_nd)*0.1)
+      ax_all.set_ylim(bottom=min1_r_nd-(max1_r_nd-min1_r_nd)*0.1,top=max1_r_nd+(max1_r_nd-min1_r_nd)*0.1)
+
+      # Specify the number of ticks on both or any single axes
+      ax_all.locator_params(tight=True, nbins=5)
+      ax_all.locator_params(tight=True, nbins=5)
+      # Print the number of the non-dominated solutions on the left subplot
+      # Get the limits of the ax
+      x0=ax_all.get_xlim()[0]
+      x1=ax_all.get_xlim()[1]
+      y0=ax_all.get_ylim()[0]
+      y1=ax_all.get_ylim()[1]
+      # Assign the subplot names
+      ids = ['a','b','c','d','e','f']
+      # Print the subplot id
+      ax_all.text(
+        x1-(x1-x0)*.05,
+        y1-(y1-y0)*.05,
+        ids[i-1+j],
         fontsize=6,
-        handletextpad = 0.01,
-        handlelength=2,
-        borderpad=1,
-        frameon=False)'''
+        weight='bold')
+        
+      # Print the number of non-dominated solutions in the bottom left corner
+      if j==0:
+        ax_all.text(
+          x0+(x1-x0)*.01,
+          y0+(y1-y0)*.01,
+          'n='+str(len(r_nd_c)),
+          fontsize=6,
+          weight='bold')
+        # Print the case study name
+        cities = {case_studies[0]:'Dublin',case_studies[1]:'Milan',case_studies[2]:'Warsaw',}
+        ax_all.text(
+          x0-(x1-x0)*.25,
+          y0+(y1-y0)*.5,
+          cities[country],
+          weight='bold',
+          rotation = 'vertical')
     
-    '''leg = fig.colorbar(
-      plot_all,
-      ax=ax[i,0],
-      orientation = 'horizontal')
-    leg.ax.set_title(all_metrices[2])'''
-
-    
-
-    # Specify the number of ticks on both or any single axes
-    ax[i,0].locator_params(tight=True, nbins=5)
-    ax[i,1].locator_params(tight=True, nbins=5)
-    # Print the number of the non-dominated solutions on the left subplot
-    # Get the limits of the ax
-    x0=ax[i,0].get_xlim()[0]
-    x1=ax[i,0].get_xlim()[1]
-    y0=ax[i,0].get_ylim()[0]
-    y1=ax[i,0].get_ylim()[1]
-    # Print the number of non-dominated solutions in the bottom left corner
-    ax[i,0].text(
-      x0+(x1-x0)*.01,
-      y0+(y1-y0)*.01,
-      'n='+str(len(r_nd_c)),
-      fontsize=6,
-      weight='bold')
-
-    i+=1
   # Add titles
-  ax[0,0].set_title('CALIBRATION', y=1.2)
-  ax[0,1].set_title('VALIDATION', y=1.2)
-  #ax[0,1].text(0.5, 1, 'VALIDATION', ha='center')  
+  fig.text(0.28,-0.01,'CALIBRATION',ha='center',weight='bold')
+  fig.text(0.78,-0.01,'VALIDATION', ha='center',weight='bold') 
+    
   # Save plot and clear
   setNameClearSave('non-dominated-scatter_'+'_'.join(all_metrices)+'_NEW1')
 
