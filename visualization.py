@@ -26,12 +26,15 @@ all_metrices = metricNames+locationalMetric
 # Get case studies
 country = parameters.getCountryName()
 case_studies = parameters.getCaseStudies()
+# Get calibration scenarios
+scenarios = parameters.getCalibrationScenarios()
 # Name the possible combinations of case studies and countries:
-cases = [(country,scenario) for country in case_studies for scenario in [1,2]]
+cases = [(country,scenario) for country in case_studies for scenario in scenarios]
 
 # Get number of zones and parameters
 numberOfZones = parameters.getNumberOfZones()
 numberOfParameters = parameters.getNumberofIterations()
+
 
 # Create colors for zones and parameters
 zoneColors = plt.cm.rainbow(np.linspace(0,1,numberOfZones))
@@ -66,7 +69,7 @@ plt.rc('figure', titlesize=SMALL_SIZE)   # fontsize of the figure title
 # Name the calibration and validation metrices and functions
 metric_units = [ 'RMSE' for i in metricNames ] + locationalMetric
 calibration_metrices = [ m.upper() for m in metricNames ] + locationalMetric
-validation_metrices = calibration_metrices + locationalMetric
+validation_metrices = calibration_metrices
 goal_functions = ['f('+x.upper()+')' for x in metricNames] + ['h('+locationalMetric[0]+')']
 validation_functions = goal_functions
 mo_goal_functions = ['q('+cm+','+str(locationalMetric)+')' for cm in calibration_metrices[:-1]]
@@ -107,7 +110,7 @@ def getAverageResultsArrayEverySet(aim):
   for i,m in enumerate(all_metrices):
     j=0
     for country in case_studies:
-      for scenario in [1,2]:
+      for scenario in scenarios:
         # an_array is an array of arrays (contains rmse/kappa arrays for every p set)
         if m == 'kappa':
           an_array = calibrate.getKappaArray(scenario,aim,case=country)
@@ -119,24 +122,11 @@ def getAverageResultsArrayEverySet(aim):
         j+=1
   return results
 
-def is_pareto_efficient_simple(costs):
-  """
-  Find the pareto-efficient points
-  :param costs: An (n_points, n_costs) array
-  :return: A (n_points, ) boolean array, indicating whether each point is Pareto efficient
-  """
-  is_efficient = np.ones(costs.shape[0], dtype = bool)
-  for i, c in enumerate(costs):
-      if is_efficient[i]:
-          is_efficient[is_efficient] = np.any(costs[is_efficient]>c, axis=1)  # Keep any point with a lower cost
-          is_efficient[i] = True  # And keep self
-  return is_efficient
-
 def getCountryColors():
   alpha = {1:0.9,2:0.6}
   c_color=[]
   for case in case_studies:
-    for s in [1,2]:
+    for s in scenarios:
       a_color = colors.to_rgba(countryColors[case])[:-1]+(alpha[s],)
       c_color.append(a_color)
   return c_color
@@ -186,7 +176,7 @@ def getSingleGoalFunctionStats(gf_metric,no_top_solutions):
   statArray = np.empty((no_top_solutions,len(validation_functions)))
   # Get data for each case and scenario seperately:
   i=0
-  for country, scenario in [ [c,s] for c in case_studies for s in [1,2]]:
+  for country, scenario in [ [c,s] for c in case_studies for s in scenarios]:
     if gf_metric == 'K':
       # Get ranked parameter sets based on Kappa:
       ranked = calibrate.getKappaIndex(scenario,'calibration',country)
@@ -248,7 +238,7 @@ def getMultiobjectiveGoalFunctionStats(no_top_solutions, weights):
   for m, metric in enumerate(metricNames):
     i=0
     for country in case_studies:
-      for scenario in [1,2]:
+      for scenario in scenarios:
         # Get ranked parameter sets based on nultiobjective goal function:
         ranked_multiobjective = calibrate.getRankedMultiobjective(metric,weights,scenario,'calibration',country)
         # Make an ampty list for top indices:
@@ -340,10 +330,10 @@ def saveValidationResults_to_excel():
   # Get validation results
   results = calibrate.getValidationResults()
   # Get the cases
-  cases =[country+str(scenario) for country in case_studies for scenario in [1,2]]
+  cases =[country+str(scenario) for country in case_studies for scenario in scenarios]
   # Assign rows and columns names
   rows = validation_metrices
-  cols = [gf+'_'+case for gf in goal_functions for case in cases]
+  cols = [ case+'_'+gf for case in cases for gf in goal_functions ]
   # Save as excel file
   saveArrayAsExcel(results, 'validation_results_excel', sheet_name = 'val_results',
                    row_names=rows, col_names=cols)
@@ -352,12 +342,52 @@ def saveMultiobjectiveValidationResults_to_excel(weights):
   # Get validation results
   results = calibrate.getValidationResults_multiobjective(weights)
   # Get the cases
-  cases =[country+str(scenario) for country in case_studies for scenario in [1,2]]
+  cases =[country+str(scenario) for country in case_studies for scenario in scenarios]
   # Assign rows and columns names
   rows = validation_metrices
   cols = [gf+'_'+case for gf in mo_goal_functions for case in cases   ]
   # Save as excel file
   saveArrayAsExcel(results, 'validation_multiobjective_results_excel', sheet_name = 'val_results',
+                   row_names=rows, col_names=cols)
+  
+def saveNonDominatedValidationResults_to_excel(): # For 4 points
+  scenario=scenarios[0]
+  # Create an array to store the points
+  v_results = np.zeros((4,len(all_metrices)*len(case_studies)))
+  print(v_results.shape)
+  # Get results of validation metrics for all cases 
+  results = {
+    'calibration':calibrate.getResultsEverySet('calibration'),
+    'validation':calibrate.getResultsEverySet('validation')}
+
+  ## 2.
+  # For each case study create a selection (mask) of non-dominated solutions identified in calibration
+  # and a selection of four solutions: for 3 objectives and one multi-objective
+  for i,country in enumerate(case_studies):
+    # Get calibration and validation metric values
+    v_c = results['calibration'][country][scenario]
+    # Subset non-dominated calibration results
+    r_nd_c = calibrate.getNonDominatedResults(v_c)
+    # Get metric values
+    v_v = results['validation'][country][scenario]
+    # Subset non-dominated calibration results
+    r_nd_v = v_v[calibrate.getNonDominatedResults_mask(v_c)]
+    # Create an array of conditions (which keeps their order)
+    c0,c1,c2,c3 = calibrate.get_4_NonDominatedResults_conditions(r_nd_c)
+    # Create an array of points
+    selected_points = calibrate.get_4_NonDominatedResults_points(r_nd_v,c0,c1,c2,c3)
+    # Update the results array
+
+    v_results[:,i*len(all_metrices):i*len(all_metrices)+len(all_metrices)] = selected_points
+  print(selected_points)
+
+  # Get the cases
+  cases =[country+str(scenario) for country in case_studies for scenario in scenarios]
+  # Assign rows and columns names
+  rows = validation_metrices+['j']
+  cols = [ case+'_'+gf for case in cases for gf in goal_functions ]
+  # Save as excel file
+  saveArrayAsExcel(v_results, 'validation_results_excel', sheet_name = 'val_results',
                    row_names=rows, col_names=cols)
 
 def normalityTest(single_gf_metric, no_top_solutions, weights, alpha=0.05):
@@ -387,15 +417,15 @@ def normalityTest(single_gf_metric, no_top_solutions, weights, alpha=0.05):
 def getDataframeStats(df, no_top_solutions):
   # Calculate stats:
   a_min = df.groupby(np.arange(len(df))//no_top_solutions).min()
-  a_min.index=[ c+str(s)+'_min' for c in case_studies for s in [1,2] ]
+  a_min.index=[ c+str(s)+'_min' for c in case_studies for s in scenarios ]
   a_max = df.groupby(np.arange(len(df))//no_top_solutions).max()
-  a_max.index=[ c+str(s)+'_max' for c in case_studies for s in [1,2] ]
+  a_max.index=[ c+str(s)+'_max' for c in case_studies for s in scenarios ]
   a_mean = df.groupby(np.arange(len(df))//no_top_solutions).mean()
-  a_mean.index=[ c+str(s)+'_mean' for c in case_studies for s in [1,2] ]
+  a_mean.index=[ c+str(s)+'_mean' for c in case_studies for s in scenarios ]
   a_median = df.groupby(np.arange(len(df))//no_top_solutions).median()
-  a_median.index=[ c+str(s)+'_median' for c in case_studies for s in [1,2] ]
+  a_median.index=[ c+str(s)+'_median' for c in case_studies for s in scenarios ]
   a_std = df.groupby(np.arange(len(df))//no_top_solutions).std()
-  a_std.index=[ c+str(s)+'_std' for c in case_studies for s in [1,2] ]
+  a_std.index=[ c+str(s)+'_std' for c in case_studies for s in scenarios ]
   # Create df holding stats
   a_stats = pd.concat([a_min,a_max,a_mean,a_median,a_std])
   return a_stats
@@ -406,7 +436,7 @@ def saveTopSolutionsReshaped(single_gf_metric, no_top_solutions, weights):
   # Assign name for single-objetive goal function
   table_name = 'h1(K)_'+str(no_top_solutions)+'_top_solutions_all_cases'
   # Assign row names
-  rows = [ c+str(s)+'_'+str(i) for c in case_studies for s in [1,2] for i in range(no_top_solutions) ]
+  rows = [ c+str(s)+'_'+str(i) for c in case_studies for s in scenarios for i in range(no_top_solutions) ]
   # Convert the array to pd and save as excel file.
   saveArrayAsExcel(results, table_name, sheet_name = 'h1(K)', row_names=rows, col_names = validation_metrices)
   # Convert array to pd
@@ -512,7 +542,7 @@ def getLocationalMetricArrays(gf_metric,loc_metric, country,scenario,weights):
 
 def getResultArray_all_cases(gf_metric, v_metric, weights):
   # Get case studies
-  combinations = [[country,scenario] for country in case_studies for scenario in [1,2]]  
+  combinations = [[country,scenario] for country in case_studies for scenario in scenarios]  
   alist0 = []
   alist1=[]
   # Fill the array
@@ -547,7 +577,7 @@ def zonalErrorStatistics(weights, test, alpha = 0.05):
   for m,metric in enumerate(['fdi','wfdi']):
     i=0
     for country in case_studies:
-      for scenario in [1,2]:
+      for scenario in scenarios:
         rSingleResults = []
         rMultiResults = []
         
@@ -642,11 +672,11 @@ def zonalErrorStatistics(weights, test, alpha = 0.05):
         i+=1
     j+=1
   # Add titles for validation metrics:
-  for v_m, v_metric in enumerate([validation_metrices[i] for i in [1,2]]):
+  for v_m, v_metric in enumerate([validation_metrices[i] for i in scenarios]):
     axs[0,v_m].text(0.5,1.05,v_metric, transform=axs[0,v_m].transAxes,
                      fontsize=10, horizontalalignment='center', weight='bold')
   # Add titles for case studies:
-  combinations = [country+str(scenario) for country in case_studies for scenario in [1,2]]
+  combinations = [country+str(scenario) for country in case_studies for scenario in scenarios]
   for c,case_study in enumerate(combinations):
     axs[c,0].text(-0.25,0.5,case_study, transform=axs[c,0].transAxes,
                      fontsize=10, verticalalignment='center', weight='bold', rotation = 'vertical')
@@ -848,7 +878,7 @@ def plotUrbMod(): #add legend
   ## 2. Loop and plot countries
   i=0
   for c,country in enumerate(case_studies):
-    for scenario in [1,2]:
+    for scenario in scenarios:
       j=0
       for metric in all_metrices:
         theIndex = calibrate.getCalibratedIndeks(metric,scenario,country)
@@ -987,7 +1017,7 @@ def plotTopSolutions(no_top_solutions): #Done
     for c_i,country in enumerate(case_studies):
       # set the color for the plot, dependent on the country:
       c = countryColors[country]
-      for scenario in [1,2]:
+      for scenario in scenarios:
         # Assign position:
         positionDict = {
           0: ind - (2.5*width+space),
@@ -1036,7 +1066,7 @@ def plotTopSolutions(no_top_solutions): #Done
     ax.set_xlim(0.4, 4.6)
   # Create a legend:
   leg = ax.legend([ box['boxes'][0] for box in boxplots ],
-            [x+str(y) for x in case_studies for y in [1,2]],
+            [x+str(y) for x in case_studies for y in scenarios],
             bbox_to_anchor=(0., 1.2, 1, .102),
             loc='lower center',
             ncol=6,
@@ -1079,7 +1109,7 @@ def plotMultiobjectiveTopSolutions(no_top_solutions): #Done
     for c_i,country in enumerate(case_studies):
       # set the color for the plot, dependent on the country:
       c = countryColors[country]
-      for scenario in [1,2]:
+      for scenario in scenarios:
         # Assign position:
         positionDict = {
           0: ind - (2.5*width+space),
@@ -1126,7 +1156,7 @@ def plotMultiobjectiveTopSolutions(no_top_solutions): #Done
     ax.set_xlim(0.4, 4.6)
   # Create a legend:
   leg = ax.legend([ box['boxes'][0] for box in boxplots ],
-            [x+str(y) for x in case_studies for y in [1,2]],
+            [x+str(y) for x in case_studies for y in scenarios],
             bbox_to_anchor=(0., 1.2, 1, .102),
             loc='lower center',
             ncol=6,
@@ -1215,7 +1245,7 @@ def plotTopSolutionsStats(no_top_solutions): #Done
   # Delete last subplot:
   fig.delaxes(axs[3,1])
   # Make patches for the legend:
-  labels = [x+str(y) for x in case_studies for y in [1,2]]
+  labels = [x+str(y) for x in case_studies for y in scenarios]
   patches = [ mpatches.Patch(color=colors[j], label="{l}".format(l=labels[j]) ) for j in range(len(labels)) ]
   leg = axs[0,0].legend(
     handles=patches,
@@ -1322,7 +1352,7 @@ def plotMultiobjectiveTopSolutionsStats(no_top_solutions, weights): #Done
     # Delete last subplot:
     fig.delaxes(axs[3,1])
     # Make patches for the legend:
-    labels = [x+str(y) for x in case_studies for y in [1,2]]
+    labels = [x+str(y) for x in case_studies for y in scenarios]
     patches = [ mpatches.Patch(color=colors[j], label="{l}".format(l=labels[j]) ) for j in range(len(labels)) ]
     leg = axs[0,0].legend(
       handles=patches,
@@ -1379,7 +1409,7 @@ def plotGoalFunctionEverySet(): #DONE
     # Loop all the countries. Each suplot has data for all case studies:
     for country in case_studies:
       # Loop calibration scenarios:
-      for scenario in [1,2]:
+      for scenario in scenarios:
         # set the min and max y axis values:
         amin = limits[m]['min']
         amax = limits[m]['max']
@@ -1431,7 +1461,7 @@ def plotParameters(): #DONE
  
   # Create figure
   fig = plt.figure(figsize=(3,2))
-  ax=[ fig.add_subplot(111) for i in [1,2] ] # Add subplot for each scenario
+  ax=[ fig.add_subplot(111) for i in scenarios ] # Add subplot for each scenario
   drivers = ['NEIGH', 'TRAIN', 'TRAVEL', 'LU']
   ind = np.arange(len(all_metrices))    # the x locations for the groups
   width = 0.15 # width of a bar
@@ -1449,7 +1479,7 @@ def plotParameters(): #DONE
   p_dict = {}
   
   # Fill the data:
-  for scenario in [1,2]:
+  for scenario in scenarios:
     p_dict[scenario]={}
     for driver in range(len(drivers)):
       a_list=[]
@@ -1461,7 +1491,7 @@ def plotParameters(): #DONE
       p_dict[scenario][driver]=a_list
 
   for driver in range(len(drivers)):
-    for scenario in [1,2]:
+    for scenario in scenarios:
       np.set_printoptions(precision=2, linewidth=100)
   #Assign positions of bars for each scenario:
   positions = {
@@ -1469,7 +1499,7 @@ def plotParameters(): #DONE
     2:np.array([[i - (1.5*width+space),i + 0.5*width,i + (2.5*width+space)] for i in ind ]).flatten()}
   # Now plot the bars. For each scenario, the bars are plotted as a different ax
 
-  for scenario in [1,2]:
+  for scenario in scenarios:
     bottom=0
     for driver in range(len(drivers)):
       label = {1:drivers[driver], 2:None}
@@ -1527,7 +1557,7 @@ def plotParametersMultiobjective():
  
   # Create figure
   fig = plt.figure(figsize=(8,3))
-  ax=[ fig.add_subplot(111) for i in [1,2] ] # Add subplot for each scenario
+  ax=[ fig.add_subplot(111) for i in scenarios ] # Add subplot for each scenario
   drivers = ['NEIGH', 'TRAIN', 'TRAVEL', 'LU']
   ind = np.arange(len(metricNames))    # the x locations for the groups
   width = 0.13 # width of a bar
@@ -1545,7 +1575,7 @@ def plotParametersMultiobjective():
   p_dict = {}
   
   # Fill the data:
-  for scenario in [1,2]:
+  for scenario in scenarios:
     p_dict[scenario]={}
     for driver in range(len(drivers)):
       a_list=[]
@@ -1557,7 +1587,7 @@ def plotParametersMultiobjective():
       p_dict[scenario][driver]=a_list
 
   for driver in range(len(drivers)):
-    for scenario in [1,2]:
+    for scenario in scenarios:
       print('scenario: ',scenario,'driver', drivers[driver])
       np.set_printoptions(precision=2, linewidth=100)
       print(np.array(p_dict[scenario][driver]))
@@ -1566,7 +1596,7 @@ def plotParametersMultiobjective():
     1:np.array([[i - (2.5*width+space),i - 0.5*width,i + (1.5*width+space)] for i in ind ]).flatten(),
     2:np.array([[i - (1.5*width+space),i + 0.5*width,i + (2.5*width+space)] for i in ind ]).flatten()}
   # Now plot the bars. For each scenario, the bars are plotted as a different ax
-  for scenario in [1,2]:
+  for scenario in scenarios:
     bottom=0
     for driver in range(len(drivers)):
       label = {1:drivers[driver], 2:None}
@@ -1652,7 +1682,7 @@ def plotObsAndMod():
       limits_mean.append(np.mean(obs_values))
       obs_values_all = np.append(obs_values_all,obs_values)
         
-      for scenario in [1,2]:
+      for scenario in scenarios:
         zonesModelled = calibrate.getModelledArray(metric,scenario,case=country)
         indexCalibratedSet = calibrate.getCalibratedIndeks(metric,scenario,case=country)
 
@@ -1758,13 +1788,15 @@ def plotValidation(errors_or_kappas):  # Done
     }
   
   # Get the array with validation results for selected validation metrics:
+  plot('ERROR new getValidationResults()!!!')
+  pp
   results = calibrate.getValidationResults()[rows[errors_or_kappas],:]
   v_m_subset= [validation_metrices[i] for i in rows[errors_or_kappas]]
   # Create figure
   height = len(rows[errors_or_kappas])*1.1
   fig, axs = plt.subplots(len(rows[errors_or_kappas]),1,figsize=(7.14,height),sharex=True)
   ind = np.arange(len(all_metrices))    # the x locations for the groups
-  n = 3*2 # 3 countries, two scenarios
+  n = 3*len(scenarios) # 3 countries, two scenarios
   width = 0.1 # width of a bar
   space = 0.02 # space between case studies
   alpha = {1:0.9,2:0.6}
@@ -1786,12 +1818,12 @@ def plotValidation(errors_or_kappas):  # Done
   # Prepare colors:
   bar_c=[]
   for case in case_studies:
-    for s in [1,2]:
+    for s in scenarios:
       a_color = colors.to_rgba(countryColors[case])[:-1]+(alpha[s],)
       bar_c.append(a_color)
   # Prepare list for bars and labels
   bars = []
-  labels = [x+str(y) for x in case_studies for y in [1,2]]
+  labels = [x+str(y) for x in case_studies for y in scenarios]
   # Now plot the bars for the selected validation merics. For each metric, the bars are plotted as a different ax
   for v_m,v_metric in enumerate(v_m_subset):
     axs[v_m].set_title(v_m_subset[v_m], pad=2)
@@ -1844,7 +1876,9 @@ def plotMultiobjectiveImprovementToLocationalMetric(weights,loc_metric, positive
     'Ks':5,
     'A':6}
  
-  ## 1. Get the data. 
+  ## 1. Get the data.
+  plot('ERROR new getValidationResults()!!!')
+  pp
   results = calibrate.getValidationResults() # array 7x30
   results_multio = calibrate.getValidationResults_multiobjective(weights)
   ## 2. Calculate the improvement between the metrics values calculated using kappa goal function and multi-o
@@ -1863,7 +1897,7 @@ def plotMultiobjectiveImprovementToLocationalMetric(weights,loc_metric, positive
     improvement[0:4][improvement[0:4]<0] = np.NaN
   
   # Find benchmark for locational metric (coefficient of variation CV for each case):
-  benchmark = np.empty((len(validation_metrices),len(cases),2)) # cases x top and bottom benchmarks
+  benchmark = np.empty((len(validation_metrices),len(cases),len(scenarios))) # cases x top and bottom benchmarks
   # Cretae array to store benchmark
   saveArrayAsExcel([
     ['File containing Coefficient of Variation for each country and scenario'],
@@ -1903,11 +1937,11 @@ def plotMultiobjectiveImprovementToLocationalMetric(weights,loc_metric, positive
   alpha = {1:1, 2:0.6}
   c_color=[]
   for case in case_studies:
-    for s in [1,2]:
+    for s in scenarios:
       a_color = colors.to_rgba(countryColors[case])[:-1]+(alpha[s],)
       c_color.append(a_color)
   # Make a mask for plotting for each case (scenario):
-  n = 3*2
+  n = 3*len(scenarios)
   mask = [i for i in range(n)]
   # Plot improvements on four subplots, each with 4 iteration of axes (as 4 multi-o goal functions)
   i = 0
@@ -2001,7 +2035,7 @@ def plotMultiobjectiveImprovementToLocationalMetric(weights,loc_metric, positive
   ## 4. Create the legends from scratch
   # First, for patches representing the meaning of colors:
   # Make labels patches:
-  labels = [x+str(y) for x in case_studies for y in [1,2]]
+  labels = [x+str(y) for x in case_studies for y in scenarios]
   patches = [ mpatches.Patch(color=c_color[j], label="{l}".format(l=labels[j]) ) for j in range(len(labels)) ]
   # Make the first legend:
   leg1 = axs[0,0].legend(
@@ -2063,7 +2097,7 @@ def plotNonDominatedSolutions():
   thrid metric value is presented with shape
   '''
   # Only for scenario 1
-  scenario = 1
+  scenario = scenarios[0]
   ## Create the figure. 
   fig = plt.figure(constrained_layout=True, figsize=(5,7.5))#, sharex=True, sharey=True)
   # Apply gridspec
@@ -2072,9 +2106,9 @@ def plotNonDominatedSolutions():
   # Arrange subplots:
   #plt.subplots_adjust(wspace=0.35, hspace=0.35)
   # Add y label
-  fig.text(-0.01, 0.5, 'RMSE ('+all_metrices[0].upper()+')', va='center', rotation='vertical')
+  fig.text(-0.01, 0.5, 'RMSE ('+all_metrices[1].upper()+')', va='center', rotation='vertical')
   # Add x label
-  fig.text(0.5, -0.03, 'RMSE ('+all_metrices[1].upper()+')', ha='center')
+  fig.text(0.5, -0.03, 'RMSE ('+all_metrices[0].upper()+')', ha='center')
   
   ## 1.
   # Get results of validation metrics for all cases 
@@ -2091,61 +2125,38 @@ def plotNonDominatedSolutions():
     ## 4. Get calibration values
     # Get metric values
     v_c = results['calibration'][country][scenario]
-    # Select non-dominated CALIBRATION solutions
-    non_dominated = is_pareto_efficient_simple(results['calibration'][country][scenario])
     # Subset non-dominated calibration results
-    r_nd_c = v_c[non_dominated]
-    # Find the maximum values
-    max0, max1, max2 = r_nd_c.max(axis=0)
-    # Find the minimum values
-    min0, min1, min2 = r_nd_c.min(axis=0)
-    # Set conditions for finding minimum metric values
-    c0 = r_nd_c[:,0] == min0
-    c1 = r_nd_c[:,1] == min1
-    c2 = r_nd_c[:,2] == min2
-    # Get the selected solution
-    s0 = r_nd_c[c0].flatten() # minimum metric 0
-    s1 = r_nd_c[c1].flatten() # minimum metric 1
-    s2 = r_nd_c[c2].flatten() # minimum metric 2
-    # Find minimum values of metrics from the 3 selected solutions
-    min0s, min1s, min2s = np.stack((s0,s1,s2)).min(axis=0)
-    max0s, max1s, max2s = np.stack((s0,s1,s2)).max(axis=0)
-    # The ideal point is in the 0 point of axes
-    s3_ideal = np.array([0,0,0])
-    # Get the normalized values of non-dominated solutions in order to compare them
-    r_nd_c_n = (r_nd_c.max(axis=0) - r_nd_c) / (r_nd_c.max(axis=0) - r_nd_c.min(axis=0))
-    # Get the difference between the non-dominated points and the "ideal" point
-    r_nd_c_s3 = np.array([np.linalg.norm(r - s3_ideal) for r in r_nd_c_n])
-    # Create a boolean mask selecting the point with the minimum distance to the "ideal" point
-    c3 = r_nd_c_s3==np.min(r_nd_c_s3)
-    # Get the 'middle' point
-    s3 = r_nd_c[c3].flatten()
-    # Create a mask to find the values selected in terms of four objectives
-    c_mask = [any(tup) for tup in zip(c0, c1, c2, c3)]
+    r_nd_c = calibrate.getNonDominatedResults(v_c)
+    # Create a mask to find the values selected in terms of 3 objectives and 1 multi-objective
+    c_mask = calibrate.get_4_NonDominatedResults_mask(r_nd_c)
     
     ## 4. Get validation values
     # Get metric values
     v_v = results['validation'][country][scenario]
     # Subset non-dominated calibration results
-    r_nd_v = v_v[non_dominated]
-
+    r_nd_v = v_v[calibrate.getNonDominatedResults_mask(v_c)]
+    
     ## 5. Get the scale of the values, taking into account both calibration and validation values
     # Join calibration and validation results for third metric
     r_nd_2 = np.concatenate((r_nd_c[:,2],r_nd_v[:,2]), axis = 0)
-    # Normalize the third metric values to get the scale for the marker
-    scale = calibrate.getNormalizedArray(r_nd_2)
-    # Revert the scale to align the marker size with the represented value (smaller value => smalller marker)
-    scale = np.subtract(1,scale)
+    # Normalize the third metric values to get the scale for the marker between 0 and 1
+    scale = np.array(calibrate.getNormalizedArray(r_nd_2)) # 1=best, 0=worst
+    scale=1-scale
     # Combine calibration and validation results to find the total min and max values
     r_nd_all = np.concatenate((r_nd_c, r_nd_v),axis =0)
-    # Find the maximum values
-    max0_r_nd, max1_r_nd, max2_r_nd = r_nd_all.max(axis=0)
-    # Find the minimum values
-    min0_r_nd, min1_r_nd, min2_r_nd = r_nd_all.min(axis=0)
-
+    
     ## 10. Create the legend 
-    # Create a colormap
-    a_cmap = plt.cm.get_cmap('RdYlBu', len(r_nd_2)).reversed()
+    # Create a colormap   
+    a_cmap = colors.LinearSegmentedColormap.from_list(
+      'custom',
+      [(0, 'mediumspringgreen'), # best 
+       #(np.split(scale,2)[0].max()/2, '#8c96c6'),
+       (np.split(scale,2)[1].max(), 'royalblue'), # <== good ones
+       (np.split(scale,2)[0].min(), '#f000ff'), # ==> bad ones
+       #(0.5*(np.split(scale,2)[1].min()+1), '#66c2a4'),
+       (1,'indigo')], # worst
+       N=len(r_nd_2))
+    # Normalize the colors
     a_norm= colors.Normalize(vmin=r_nd_2.min(), vmax=r_nd_2.max())
     # Create a colorbar
     a_bar = matplotlib.cm.ScalarMappable(
@@ -2162,7 +2173,8 @@ def plotNonDominatedSolutions():
     c_bar = plt.colorbar(
       a_bar,
       cax=axins1,
-      orientation='horizontal')
+      orientation='horizontal',
+      label=country)
     # Add the label with the locational metric
     c_bar.set_label(all_metrices[2])
     # Move the label above the bar
@@ -2186,8 +2198,8 @@ def plotNonDominatedSolutions():
         s=20,
         linewidth=0.5,
         c = a_cmap(np.split(scale,2)[j]),
-        cmap=a_cmap,
-        alpha=0.7)
+        alpha=0.7,
+        label="-".join([country,str(j)]))
       
       # Plot the point with the minimum errors for 4 objectives
       s_r_nd = r_nd[c_mask]
@@ -2199,16 +2211,22 @@ def plotNonDominatedSolutions():
       ax_selected.scatter(
         s_r_nd[:,0],
         s_r_nd[:,1],
-        s=75,
-        linewidths=5,
+        s=100,
+        linewidths=10,
         marker='x',
         c = a_cmap(np.split(scale,2)[j][inx]),
         cmap=a_cmap,
-        alpha=0.9)
+        alpha=0.9,
+        label="-".join([country,str(j)]))
       
       ## 8. Print the number of the selected solution next to the point
-      for p,c in enumerate([c0,c1,c2,c3]):
-        a_point = r_nd[c].flatten()
+      # Create an array of conditions (which keeps their order)
+      c0,c1,c2,c3 = calibrate.get_4_NonDominatedResults_conditions(r_nd_c)
+      # Create an array of points
+      selected_points = calibrate.get_4_NonDominatedResults_points(r_nd,c0,c1,c2,c3)
+      # Plot the numbers
+      for p,c in enumerate(selected_points):
+        a_point = c
         ax_selected.text(a_point[0],
                          a_point[1],
                          'P'+str(p+1),
@@ -2216,6 +2234,10 @@ def plotNonDominatedSolutions():
                          ha='center')
       
       ## 9. Adjust the plot
+      # Find the maximum values
+      max0_r_nd, max1_r_nd, max2_r_nd = r_nd_all.max(axis=0)
+      # Find the minimum values
+      min0_r_nd, min1_r_nd, min2_r_nd = r_nd_all.min(axis=0)
       # Set the limits
       ax_all.set_xlim(left=min0_r_nd-(max0_r_nd-min0_r_nd)*0.1,right=max0_r_nd+(max0_r_nd-min0_r_nd)*0.1)
       ax_all.set_ylim(bottom=min1_r_nd-(max1_r_nd-min1_r_nd)*0.1,top=max1_r_nd+(max1_r_nd-min1_r_nd)*0.1)
