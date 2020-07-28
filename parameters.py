@@ -29,6 +29,15 @@ def getObsYears():
   """Returns a dictionairy containing years corresponding to the observation time steps."""
   return {1:1990,11:2000,17:2006,23:2012,29:2018}
 
+def getCalibrationScenarios():  
+  """Returns the calibration scenarios used
+  1: calibration on time steps 1 and 2
+  2: calibration on time step 3 and 4
+  3: calibation over area"""
+
+  scenarios = [1]
+  return scenarios
+
 def getCalibrationPeriod():
   """Returns the indexes of years for calibration and validation from getObsYears().values():
   e.g. [1990, 2000, 2006, 2012, 2018]
