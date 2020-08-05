@@ -554,7 +554,7 @@ def getResultsEverySet(aim):
         results[country][scenario][:,i] = av_array
       i = i+1
       
-  return results 
+  return results
   
 def getValidationResults():
   """
@@ -641,7 +641,7 @@ def getValidationResults_multiobjective(weights):
 ######################
 
 def get_ND_input(scenario,aim,case):
-  ''' Get the calibration'validation values for each set '''
+  ''' Get the calibration\validation values for each set '''
   results = {
     'calibration':getResultsEverySet('calibration'),
     'validation':getResultsEverySet('validation')}
@@ -649,6 +649,10 @@ def get_ND_input(scenario,aim,case):
   v = results[aim][case][scenario]
 
   return v
+
+scenario = 1
+aim = 'validation'
+case = 'PL'
 
 def get_ND_mask(case, scenario):
   """
@@ -687,7 +691,9 @@ def get_ND_indices(case, scenario):
   return nd_indices
 
 def getWeights(solutions=None):
-  ''' Returns an array with weights for all solutions or selected solutions only '''
+  ''' Returns an array with weights for all solutions or selected solutions only
+      Selected solutions are identified by the indices
+      Array size: number of drivers x number of solutions'''
   # Get the paramter sets weights
   parameterSets = getParameterConfigurations()
   # Selec indices if no specific points are requested
@@ -699,14 +705,11 @@ def getWeights(solutions=None):
   weights = np.zeros((len(drivers), len(solutions)))
   # Fill the data for each point
   for i, col in enumerate(weights.T):
-    if solutions == range(len(parameterSets)):
-      weights[:,i] = parameterSets[solutions[i]]
-    else:
-      weights[:,i] = parameterSets[solutions[i]][0]
+    weights[:,i] = parameterSets[solutions[i]]
  
   return weights
 
-def getAverageWeights(case, scenario, indices=None):
+def getAverageWeights(indices=None):
   ''' Returns the average importance (weight) of a given urban growth driver
       for all solutions or selected solutions only '''
   # Get the drivers
@@ -723,15 +726,8 @@ def get_ND_n_masks(case, scenario, trade_off = False, eps=0.9):
   Create a boolean mask of the selected n solutions selected from the non dominated points 
   :param nd_results: An (n_points, costs) array of non-dominated solutions
   :return:
-    a mask for n points for of each objective
-    points in order of objectives
+    a mask for n points for of each objective, points in order of objectives
   """
-  # Get parameters
-  #parameterSets = getParameterConfigurations()
-  # Get the non-dominated mask
-  #nd_mask = get_ND_mask(case, scenario)
-  # Get the non dominated parameter sets only
-  #nd_parameters = parameterSets[nd_mask]
   # Get the results values
   in_results = get_ND(case, scenario, aim='calibration')
   # Create an array to store condition boolean arrays
@@ -742,45 +738,6 @@ def get_ND_n_masks(case, scenario, trade_off = False, eps=0.9):
 
   # Change into an array 
   c_array = np.array(c_list)
-  
-  '''# Create a mask to find the values selected in terms of n objectives
-  c_n_mask = [ any(col) for col in c_array.T ]
-
-  ## Get the last point.
-  # The ideal point is in the 0 point of axes
-  s_ideal = np.array([0,0,0])
-  # Get the normalized values of non-dominated solutions in order to compare them
-  r_nd_c_norm = (in_results.max(axis=0) - in_results) / (in_results.max(axis=0) - in_results.min(axis=0))
-  # Get the difference between the non-dominated points and the "ideal" point
-  r_nd_c_s_mo = np.array([np.linalg.norm(r - s_ideal) for r in r_nd_c_norm])
-  # Rank the distances from the smallest to the biggest. First create a temp array
-  temp = r_nd_c_s_mo.argsort()
-  # Create ranks
-  ranks = numpy.empty_like(temp)
-  # Assign ranks
-  ranks[temp] = numpy.arange(len(r_nd_c_s_mo))
-  # If we're looking for the realistic solutions, include the rationality
-  if trade_off is True:
-    rational = False
-    i=0
-    # Loop to find the rational one
-    while rational is False:
-      # Create a boolean mask selecting the point with the minimum distance to the "ideal" point
-      c_mo = ranks==i
-      # Select the point
-      a_p_set = nd_parameters[c_mo]
-      # If any weight crosses the epsilon, look for the seond closest point:
-      if np.any(a_p_set[0]>eps):
-        i+=1
-      else:
-        rational = True
-  else:
-    c_mo = ranks==0
-
-  # Append to the list
-  c_list.append(c_mo)
-  # Change into an array
-  c_array = np.array(c_list)'''
 
   return c_array
 
@@ -790,17 +747,26 @@ def get_ND_n_indices(case, scenario):
   # Get the n solutions mask array
   n_mask_array = get_ND_n_masks(case, scenario)
   # Subset indices of the n solutions, keeping the order of n objectives
-  n_indices = [indices_nd[condition] for condition in n_mask_array]
+  n_indices = np.array([int(indices_nd[condition]) for condition in n_mask_array])
   
   return n_indices
 
-def get_ND_1_mask(case, scenario, solution_space):
-  ''' Return a mask of the 1 solutions based on the all objectives
+def get_av_mask(case, scenario, solution_space, objectives):
+  ''' Return a mask of the 1 solution, selected as the closest to the average structure of the
+      n objectives or all non-dominated solutions.
+      This solution is selected from the all posible solutions or the non-dominated solutions only
+
+      objectives in ['n_objectives','nd_solutions']
       solution_space in ['all', 'nondominated'] '''
-  # Get the indices of the selected solutions in terms of the n objecitves
-  nd_n_indices = get_ND_n_indices(case, scenario)
+  # Get the indices of the selected solutions to find the averaged structure
+  the_indices = {
+    'n_objectives': get_ND_n_indices(case, scenario),
+    'nd_solutions': get_ND_indices(case, scenario)
+    }
+  #print(the_indices[objectives])
   # Get the average value of the weights
-  n_weights_av = getAverageWeights(case, scenario, nd_n_indices)
+  n_weights_av = getAverageWeights(the_indices[objectives])
+  #print(n_weights_av)
   # Get the weights for every possible paramter set
   weights = {
     'all': getWeights(),
@@ -808,91 +774,79 @@ def get_ND_1_mask(case, scenario, solution_space):
   # Calculate the distance to the averaged weight for every possible set
   distance_to_averaged = np.array(
     [distance.euclidean(n_weights_av, col) for col in weights[solution_space].T])
+  
   # Find the closest point
   theMask = distance_to_averaged==distance_to_averaged.min()
 
   return theMask
 
-def get_ND_1_index(case, scenario, solution_space):
-  ''' Returns index of the 1 solution based on the all objectives
-      solution_space in ['all', 'nondominated'] <- point to be selected from'''
+def get_av_index(case, scenario, solution_space, objectives):
+  ''' Returns index of the 1 solution, selected as the closest to the average structure of the
+      n objectives or all non-dominated solutions.
+      This solution is selected from the all posible solutions or the non-dominated solutions only
+
+      objectives in ['n_objectives','nd_solutions']
+      solution_space in ['all', 'nondominated']'''
   # Get the indices from the solutions space
   indices_space = {
     'all': range(len(getParameterConfigurations())),
     'nondominated': get_ND_indices(case, scenario) }
   # Get the mask with the solution
-  aMask = get_ND_1_mask(case, scenario, solution_space)
+  aMask = get_av_mask(case, scenario, solution_space, objectives)
   # Get the inbdex
-  nd_1_index = np.array(indices_space[solution_space])[aMask]
+  av_index = np.array(indices_space[solution_space])[aMask]
 
-  return nd_1_index
+  return av_index
 
-def get_ND_n_1_indices(case, scenario, solution_space):
+def get_ND_n_1_indices(case, scenario, solution_space, objectives):
   ''' Returns an array with the n+1 indices for n objectives from the non-dominated solutions
-      solution_space in ['all', 'nondominated'] <- point to be selected from'''
+      solution_space in ['all', 'nondominated'] <- point to be selected from
+      objectives in ['n_objectives','nd_solutions']'''
   # Get the indices of the n objectives
   nd_n_indices = get_ND_n_indices(case, scenario)
   # Get the index of the multiobjective solution
-  nd_1_index = get_ND_1_index(case, scenario, solution_space)
-  # Get the array of masks of the selected points
-  nd_n_1_indices = np.append(nd_n_indices, nd_1_index)
+  av_index = get_av_index(case, scenario, solution_space, objectives)
+  # Get the array of the selected indices
+  nd_n_1_indices = np.append(nd_n_indices, av_index)
   
   return nd_n_1_indices
 
-def get_ND_n_1_masks(case, scenario, solution_space):
-  ''' Create n+1 boolean masks of the selected n+1 solutions selected from the non dominated points 
-      solution_space in ['all', 'nondominated'] '''
+def get_ND_n_1_masks(case, scenario, solution_space, objectives): # to mask the non-dominated solutions!
+  ''' Create a boolean masks of the selected n+1 solutions selected from the solution space
+      mask size = len(non dominated solutions)
+      solution_space in ['all', 'nondominated']
+      objectives in ['n_objectives','nd_solutions'] <-- parameter space for multi-objective optimisation'''
   # Get all indices possible
   indices_all = np.arange(len(getParameterConfigurations()))
   # Get the indices of n+1 objectives
-  indices_n_1 = get_ND_n_1_indices(case, scenario, solution_space)
+  indices_n_1 = get_ND_n_1_indices(case, scenario, solution_space, objectives)
   # Create an array of masks
   masks = np.array([aidx == indices_all for aidx in indices_n_1])
-  # Create one mask
+  # Create one mask, without the order of points
   mask = np.array([ np.any(col) for col in masks.T ])
-  # Subset non dominated solutions only
+  # Subset non dominated solutions only. Results array has shape = non dominated solutions
   c_array = mask[get_ND_mask(case, scenario)]
 
   return c_array
 
-def get_ND_n_1(case, scenario, aim, solution_space):
-  ''' Returns n+1 points from the results, keeping their order'''
+def get_ND_n_1(case, scenario, aim, solution_space, objectives):
+  '''
+  Returns n+1 points from the results, keeping their order in line with the objectives
+  (n single-objective and 1 multi-objective)
+  
+  Multi-objective approach parameters:
+  solution_space: selection of points closest to the 'ideal' point in ['all', 'nondominated'] 
+  objectives: recquirement for selecting the 'ideal' point in ['n_objectives','nd_solutions']
+  '''
+  
   # Get results depending on aim
   results_nd = get_ND_input(scenario,aim,case)
   # Get the indices of the n+1 solutions
-  idx_n_1 = get_ND_n_1_indices(case, scenario, solution_space)
+  idx_n_1 = get_ND_n_1_indices(case, scenario, solution_space, objectives)
   # Subset points
   results_nd_n_1 = np.array([results_nd[i] for i in idx_n_1])
 
   return results_nd_n_1
 
-"""
-
-
-def get_ND_n_1_mask(case, scenario, trade_off = None):
-  ''' Flattens the n+1 simension mask into 1D mask. Order of the solutions is lost '''
-  # Get the conditions
-  c_array = get_ND_n_1_masks(case, scenario, trade_off)
-  # Create a mask to find the values selected in terms of four objectives
-  c_mask = [any(col) for col in c_array.T]
-  return c_mask
-
-  
-def get_ND_n_1(case, scenario, aim, solution_space, trade_off = None):
-  ''' Create an array of the selected n+1 points in order of objectives '''
-  # Get the results values
-  out_results = get_ND(case, scenario, aim)
-  # Get the conditions from input array
-  c_array = get_ND_n_1_masks(case, scenario, solution_space)
-  # Create a list to store points
-  p_list =[]
-  # Save a boolean list
-  for i in range(len(c_array)):
-    p_list.append(out_results[c_array[i]].flatten())
-  # Change into an array
-  p_array = np.array(p_list)
-  
-  return p_array
-"""
-
-
+for case in ['IE','IT','PL']:
+  print(get_ND_n_1(case, 1, 'validation', 'all', 'n_objectives'))
