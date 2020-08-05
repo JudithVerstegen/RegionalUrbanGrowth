@@ -16,6 +16,7 @@ import matplotlib.lines as mlines
 import pandas as pd
 import scipy.stats as stats
 from openpyxl import load_workbook
+from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 
 #### Global variables:
 # Get metrics
@@ -2095,14 +2096,16 @@ def plotMultiobjectiveImprovementToLocationalMetric(weights,loc_metric, positive
 
 #### PLOTS FOR THE ARTICLE ###
   
-def plotNonDominatedSolutions(solution_space, trade_off = False):
-  from mpl_toolkits.axes_grid1.inset_locator import inset_axes
+def plotNonDominatedSolutions(solution_space, objectives, trade_off = False):
   '''
   Find non-dominated combinations of metric values (for each parameter set)
   Plot 1 plot fopr a country in scenario 1
   x and y axis show values of two metrics
   thrid metric value is presented with shape color
-  solution_space in ['all', 'nondominated'] to fnid the last, multi-objective point
+
+  Multi-objective approach parameters:
+  solution_space: selection of points closest to the 'ideal' point in ['all', 'nondominated'] 
+  objectives: recquirement for selecting the 'ideal' point in ['n_objectives','nd_solutions']
   '''
   # Only for scenario 1
   scenario = scenarios[0]
@@ -2136,7 +2139,7 @@ def plotNonDominatedSolutions(solution_space, trade_off = False):
     # Subset non-dominated calibration results
     r_nd_c = calibrate.get_ND(country, scenario, aim='calibration')
     # Create a mask to find the values selected in terms of 3 objectives and 1 multi-objective
-    c_mask = calibrate.get_ND_n_1_masks(country, scenario, solution_space)
+    c_mask = calibrate.get_ND_n_1_masks(country, scenario, solution_space, objectives)
     
     ## 4. Get validation values
     # Get metric values
@@ -2150,20 +2153,23 @@ def plotNonDominatedSolutions(solution_space, trade_off = False):
     
     # Normalize the third metric values to get the scale for the marker between 0 and 1
     scale = np.array(calibrate.getNormalizedArray(r_nd_2)) # 1=best, 0=worst
-    scale=1-scale
+    if scenario==1:
+      scale=1-scale
     # Combine calibration and validation results to find the total min and max values
     r_nd_all = np.concatenate((r_nd_c, r_nd_v),axis =0)
     ## 10. Create the legend 
     # Create a colormap   
     a_cmap = colors.LinearSegmentedColormap.from_list(
       'custom',
-      [(0, 'mediumspringgreen'), # best 
-       #(np.split(scale,2)[0].max()/2, '#8c96c6'),
-       (np.split(scale,2)[1].max(), 'royalblue'), # <== good ones
+      [(0, '#ccff44'), # best 
+       # to much colors : (np.split(scale,2)[1].max()/2, '#00bbee'),
+       (np.split(scale,2)[1].max(), '#000088'), # <== good ones
+       (np.split(scale,2)[1].max()+0.000001, '#ffffff'), # white
+       (np.split(scale,2)[0].min()-0.000001, '#ffffff'), # white
        (np.split(scale,2)[0].min(), '#cccc22'), # ==> bad ones
-       #(0.5*(np.split(scale,2)[1].min()+1), '#66c2a4'),
-       (1,'#cc1144')], # worst
-       N=256)
+       (np.split(scale,2)[0].min()+(1-np.split(scale,2)[0].min())/2, '#cc1144'),
+       (1,'#990033')], # worst
+       N=350)
     # Normalize the colors
     a_norm= colors.Normalize(vmin=r_nd_2.min(), vmax=r_nd_2.max())
     # Create a colorbar
@@ -2234,7 +2240,8 @@ def plotNonDominatedSolutions(solution_space, trade_off = False):
         country,
         scenario,
         ['calibration','validation'][j],
-        solution_space)
+        solution_space,
+        objectives)
       # Plot the numbers
       for p,c in enumerate(selected_points):
         a_point = c
@@ -2246,9 +2253,10 @@ def plotNonDominatedSolutions(solution_space, trade_off = False):
       
       ## 9. Adjust the plot
       # Find the maximum values
-      max0_r_nd, max1_r_nd, max2_r_nd = r_nd_all.max(axis=0)
+      max0_r_nd, max1_r_nd, max2_r_nd = r_nd.max(axis=0)
       # Find the minimum values
-      min0_r_nd, min1_r_nd, min2_r_nd = r_nd_all.min(axis=0)
+      min0_r_nd, min1_r_nd, min2_r_nd = r_nd.min(axis=0)
+      ### Remove the common scale:
       # Set the limits
       ax_all.set_xlim(left=min0_r_nd-(max0_r_nd-min0_r_nd)*0.1,right=max0_r_nd+(max0_r_nd-min0_r_nd)*0.1)
       ax_all.set_ylim(bottom=min1_r_nd-(max1_r_nd-min1_r_nd)*0.1,top=max1_r_nd+(max1_r_nd-min1_r_nd)*0.1)
@@ -2262,6 +2270,8 @@ def plotNonDominatedSolutions(solution_space, trade_off = False):
       x1=ax_all.get_xlim()[1]
       y0=ax_all.get_ylim()[0]
       y1=ax_all.get_ylim()[1]
+      
+      ### Remove the common scale:
       # create ticks positions for x,y, and z axis
       x_ticks = np.linspace(min0_r_nd, max0_r_nd, 3)
       y_ticks = np.linspace(min1_r_nd, max1_r_nd, 3)
@@ -2270,6 +2280,7 @@ def plotNonDominatedSolutions(solution_space, trade_off = False):
       ax_all.set_xticklabels('%.4f' % x for x in x_ticks)
       ax_all.set_yticks(y_ticks)
       ax_all.set_yticklabels('%.4f' % y for y in y_ticks)
+      
       #c_bar.ax.set_xticks(ticks(0,1))
       #c_bar.ax.set_xticklabels('%.4f' % z for z in z_ticks)
       # Assign the subplot names
@@ -2303,23 +2314,23 @@ def plotNonDominatedSolutions(solution_space, trade_off = False):
   fig.text(0.78,-0.01,'VALIDATION', ha='center',weight='bold') 
     
   # Save plot and clear
-  aname = ['non-dominated-scatter']+all_metrices+['P4']+[solution_space]
-  setNameClearSave('_'.join(aname))#,fileformat='png')                 
+  aname = [str(scenario)]+['non-dominated-scatter']+all_metrices+['P4']+[solution_space]
+  setNameClearSave('_'.join(aname))#,fileformat='png')
                    
-def plotWeights(solution_space, trade_off = False): #DONE
+def plotWeights(solution_space, objectives, trade_off = False):
   """
   Plot bars presenting weights (0-1, y axis) for each selected point
   for goal functions (x axis) for each case study
-  solution_space: multiobjective point in ['all', 'nondominated'] solutions
+
+  Multi-objective approach parameters:
+  solution_space: selection of points closest to the 'ideal' point in ['all', 'nondominated'] 
+  objectives: recquirement for selecting the 'ideal' point in ['n_objectives','nd_solutions']
   """
   scenario=scenarios[0]
   # Set the actual case studies names:
   
   # Set the params
   drivers = ['NEIGH', 'TRAIN', 'TRAVEL', 'LU']
-  # Get the number of objectives
-  n = len(all_metrices) +1
-  ind = np.arange(n)    # the x locations for the groups
   parameterSets = calibrate.getParameterConfigurations()
 
   # Create the figure
@@ -2332,7 +2343,9 @@ def plotWeights(solution_space, trade_off = False): #DONE
   for c,country in enumerate(case_studies):
     ## Get the data for a country
     # Get the list of the indices of the selected non dominated solutions
-    nd_points_indices = calibrate.get_ND_n_1_indices(country, scenario, solution_space)
+    nd_points_indices = calibrate.get_ND_n_1_indices(country, scenario, solution_space, objectives)
+    # Get the number of optimal solutions
+    ind = np.arange(len(nd_points_indices))    # the x locations for the groups
     # Fill the data for each point
     weights = {}
     for driver in range(len(drivers)):
@@ -2351,6 +2364,7 @@ def plotWeights(solution_space, trade_off = False): #DONE
         bottom=bottom,
         color=driverColors[driver],
         label=drivers[driver])
+      
       bottom = bottom + np.array(weights[driver])
     # Set the ticks on the x axis
     axs[c].set_xticks(ind)
@@ -2372,9 +2386,9 @@ def plotWeights(solution_space, trade_off = False): #DONE
   leg1.set_frame_on(False)
    
   # Set the name and clear the directory if needed
-  aname = 'plotWeights'+'_'+solution_space
+  aname = [str(scenario)]+['weights']+all_metrices+['P4']+[solution_space]
   setNameClearSave(aname, scenario=None)#, fileformat='png')
 
-#plotNonDominatedSolutions('nondominated')
-plotWeights('all', trade_off = False)
-plotWeights('nondominated', trade_off = False)
+#plotNonDominatedSolutions('all','n_objectives')
+#plotWeights('all','n_objectives')
+
