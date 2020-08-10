@@ -134,7 +134,15 @@ def clip_and_convert(in_fn, coords, nodata, datatype):
 
 def select_urban(land_use):
     '''Create a Boolean map of all urban land uses from Corine.Without 122 (roads) and 124 (airports)'''
-    urban = pcrand(scalar(land_use) < 200, pcrand(scalar(land_use) > 0,pcrand(pcrnot(scalar(land_use) == 122), pcrnot(scalar(land_use) == 124))))
+    # Remove nodata values CLC = 999
+    land_use = ifthen(scalar(land_use) != 999, land_use)
+    # Select urban areas
+    urban = pcrand(
+        scalar(land_use) < 200,
+        pcrand(scalar(land_use) > 0,
+               pcrand(pcrnot(scalar(land_use) == 122),
+                      pcrnot(scalar(land_use) == 124))))
+    
     #aguila(urban)
     return urban
     
