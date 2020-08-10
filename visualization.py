@@ -5,6 +5,7 @@ import os
 import metrics
 import numpy as np
 import parameters
+import pcraster as pcr
 import calibrate
 #from pcraster.framework import *
 import matplotlib.pyplot as plt
@@ -44,8 +45,8 @@ zoneColors = plt.cm.rainbow(np.linspace(0,1,numberOfZones))
 parameterColors = plt.cm.rainbow(np.linspace(0,1,numberOfParameters))
 countryColors = {'IE':'mediumspringgreen','IT':plt.cm.rainbow(np.linspace(0,1,3))[0],'PL':plt.cm.rainbow(np.linspace(0,1,3))[2]}
 functionColors = plt.cm.rainbow(np.linspace(0,1,4))
-c_obs = ['crimson', (0.97,0.97,0.94),'black']
-c_mod = ['lavender', 'dimgrey', 'gold']
+c_obs = ['crimson', 'white','black','#d8bfd8']
+c_mod = c_obs#['lavender', 'dimgrey', 'gold']
 driverColors = ['royalblue','mediumvioletred','teal','darkkhaki'] # NEIGH, TRAIN, TRAVEL, LU
 
 # Get the observed time steps. Time steps relate to the year of the CLC data, where 1990 was time step 0.
@@ -2389,6 +2390,162 @@ def plotWeights(solution_space, objectives, trade_off = False):
   aname = [str(scenario)]+['weights']+all_metrices+['P4']+[solution_space]
   setNameClearSave(aname, scenario=None)#, fileformat='png')
 
+def plotUrbChangesMod(solution_space, objectives): #DONE
+  """
+  Figure 4 and Figure 6
+  
+  Plots observed and modelled changes between years 2000 and 2006
+  First column on the left presents the observed chages
+
+  Multi-objective approach parameters:
+  solution_space: selection of points closest to the 'ideal' point in ['all', 'nondominated'] 
+  objectives: recquirement for selecting the 'ideal' point in ['n_objectives','nd_solutions']
+  """
+  scenario = scenarios[0]
+  # Get the number of solutions
+  inx = calibrate.get_ND_n_1_indices(case_studies[0], scenario, solution_space, objectives)
+  # Get the number of optimal solutions
+  ind = len(inx)   # the x locations for the groups
+  # Get the names of the solutions
+  solutions = ['P1','P2','P3','P4']
+    
+  ## 1. Prepare the plot  
+  fig, axs = plt.subplots(len(case_studies),ind+1, sharex=True, sharey=True, figsize=(7,4)) # 16 cm of width
+  # Adjust the spaces
+  plt.subplots_adjust(wspace=0.05, hspace=0.05)
+  # Set colors
+  colorsModelledChange = {-2: c_mod[0],
+                          -1: c_mod[0],
+                          0: c_mod[1],
+                          1: c_mod[2],
+                          2: c_mod[2]}
+  
+  ## 2. Loop and plot modellled countries
+  # Select the time steps
+  period = parameters.getCalibrationPeriod()[scenario]['validation'] # scenario 1 validation: [3,4]
+  selected_time_steps = np.array(parameters.getObsTimesteps())[period] #[1,11,17,23,29]
+  years = [
+    str(np.array(observedYears)[period[0]-1]),
+    str(np.array(observedYears)[period[0]]),
+    str(np.array(observedYears)[period[1]]) ]
+  print(years[0], years[2])
+  
+  i=0
+  
+  for country in case_studies:
+    # Create an empty list to store observed maps
+    obs_maps = []
+    # Get the observed changes
+    for x in [0,1,2]:
+      # Add the map for the observed change! Get the observed maps from CLC data:
+      obs_maps.append(os.path.join(os.getcwd(),'observations',country, 'urb'+years[x][-2:]))
+      # Red the PCRaster format
+      obs_maps[x] = pcr.readmap(obs_maps[x])
+      # Convert the maps to the numpy arrays
+      obs_maps[x] = pcr.pcr2numpy(obs_maps[x],99)
+      # Change the arrays type to float to enable nan
+      obs_maps[x] = obs_maps[x].astype('float')
+      # Change the nodata cells to nans
+      obs_maps[x][obs_maps[x] == 99] = np.nan
+
+    # Create the transition matrix between first two times steps
+    d_obs_0 = np.subtract(obs_maps[1], obs_maps[0])
+    # Create the transition matrix between first two times steps
+    d_obs_1 = np.subtract(obs_maps[2], obs_maps[1])
+    # Add the changes to get the total transition
+    d_obs = np.add(d_obs_0,d_obs_1)
+    # Get the unique values
+    u_obs = np.unique(d_obs[~np.isnan(d_obs)])
+    # Create a colormap for every unique value
+    cmapL = [colorsModelledChange[v] for v in u_obs]
+    cmap_obs = colors.ListedColormap(cmapL)
+    # Plot the observed changes
+    axs[i,0].imshow(d_obs, cmap=cmap_obs)
+    axs[i,0].set(xlabel='observed', ylabel=cities[country])
+    
+    # Loop metrics and for each metric get the change map for seected country, and selected metric (goal function)    
+    j=1
+    # First, get the solutions
+    n_1_indices = calibrate.get_ND_n_1_indices(country, scenario, solution_space, objectives)
+    
+    
+    
+    for m, inx in enumerate(n_1_indices):
+      # Create an empty list to store observed maps
+      mod_maps = []
+      print(country, inx)
+      # Get the data for period:
+      for k in [0,1]:
+        # Add the map for the observed change! Get the observed maps from CLC data:
+        mod_array = calibrate.getModelledArray('urb_subset_'+str(selected_time_steps[k]),case=country)
+        mod_array = mod_array[0,inx,1]
+        mod_maps.append(mod_array)
+        # Reshape it into a size of a map
+        mod_maps[k] = np.reshape(mod_maps[k], (1600,1600))
+      # Calculate the change between modelled and observed
+      d_mod_0 = np.subtract(mod_maps[0], obs_maps[0])
+      d_mod_1 = np.subtract(mod_maps[1], obs_maps[1])
+      # Add the changes to get the full transition
+      d_mod = np.add(d_mod_0, d_mod_1)
+      # Find states in the map to adjust the colors:
+      u = np.unique(d_mod[~np.isnan(d_mod)])
+      cmapL = [colorsModelledChange[v] for v in u]
+      cmap = colors.ListedColormap(cmapL)
+      # Plot
+      axs[i,j].imshow(d_mod, cmap=cmap)
+      axs[i,j].set(xlabel=solutions[m], ylabel=cities[country])
+      
+      j+=1
+    i+=1
+
+  # Adjust ticks and add background
+  for ax in axs.flat:
+    ax.get_xaxis().set_ticks([])
+    ax.get_yaxis().set_ticks([])
+    ax.xticks = ([])
+    ax.label_outer()
+    ax.set(facecolor=c_obs[3])
+
+  # Create two legends. One for observed, one for modelled
+  labels = {0:['urban to non-urban','no change','non-urban to urban', 'no data']}
+  #1:['Modelled:','urban to non-urban','no change','non-urban to urban']}
+  for i,c in enumerate([c_obs]):#,c_mod]):
+    # Make patches:
+    patches = [ mpatches.Patch(color=c[j], label="{l}".format(l=labels[i][j]) ) for j in range(len(labels[i])) ]
+    # Create a legend
+    leg = axs[0,0].legend(
+      handles=patches,
+      title = 'Urban areas transitions: '+years[0]+' to '+years[2],
+      bbox_to_anchor=(0., 1.3, 5+5*0.1, .102),
+      ncol = 4,
+      mode="expand",
+      fontsize=6)
+  #axs[0,0].legend(frameon=False)
+
+  # Set name
+  aname = ['Figure 6 Validation','Figure 4 Calibration']
+  setNameClearSave(aname[scenario-1],scenario=None, fileformat='png')
+
+def plotDemand():
+  # Create the figure
+  plt.figure(figsize=(3.6,2))
+  # Get the data
+  for ic, c in enumerate(case_studies):
+    afile = os.path.join(os.getcwd(),'input_data',c,'make_demand_manual.xlsx')
+    df  = pd.read_excel(io=afile, header=None)
+    d = df.iloc[0:obsTimeSteps[-1],[11]].to_numpy().flatten()
+    #demand[ic] = d
+    plt.plot(d, label = cities[c], c = countryColors[c])
+  plt.legend()
+  plt.xticks(ticks=obsTimeSteps, labels=observedYears)
+  plt.ylabel('Urban areas [ha]')
+  plt.xlabel('Observed years')
+  
+  # Set name
+  aname = 'Figure 1 Urban areas'
+  setNameClearSave(aname,scenario=None, fileformat='png')
+  
+#plotUrbChangesMod('all','n_objectives')  
 #plotNonDominatedSolutions('all','n_objectives')
 #plotWeights('all','n_objectives')
 
