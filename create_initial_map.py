@@ -716,7 +716,7 @@ print(mins)
 print(maxs)
 print(avs)
 
-# 11. create random unfirom map
+# 11. create random uniform map
 uniformMap = uniform(1)
 report(uniformMap, os.path.join(country_dir, 'uniform.map'))
 

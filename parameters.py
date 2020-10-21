@@ -79,9 +79,9 @@ def getParametersforCalibration():
 
 def getCountryName():
   """ Returns the case study symbol """
-  # case studies: 'IT', 'IE', 'PL'
+  # case studies: 'IE', 'IT', 'PL'
 
-  name = 'PL'
+  name = 'IE'
   return name
 
 def getCaseStudies():

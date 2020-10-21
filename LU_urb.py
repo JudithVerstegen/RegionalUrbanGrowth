@@ -55,6 +55,7 @@ class LandUseType:
 
     self.toMeters = parameters.getConversionUnit()
     self.windowLengthRealization = windowLengthRealization
+    self.country = parameters.getCountryName()
     
   def setEnvironment(self, environment):
     """Update the environment (land use map)."""
@@ -98,7 +99,7 @@ class LandUseType:
     neighborSuitability = 1*(nrNeighborsSameLU**2) + f * 2 * maxNr *\
                                nrNeighborsSameLU
     neighborSuitability = self.normalizeMap(neighborSuitability)
-    report(neighborSuitability, 'suit_neigh' + str(self.typeNr))
+    report(neighborSuitability, self.country+'_suit_neigh' + str(self.typeNr))
 ##    maxNr = ((windowLength / celllength())**2) - 1
 ##    report(maxNr, 'test_old')
 ##    neighborSuitability = nrNeighborsSameLU / maxNr
@@ -112,7 +113,7 @@ class LandUseType:
     a = variableList[0]
     normalized = self.normalizeMap(spreadMap)
     roadSuitability = 1 - (normalized ** a)  
-    report(roadSuitability, 'suit_station' + str(self.typeNr))
+    report(roadSuitability, self.country+'_suit_station' + str(self.typeNr))
     return roadSuitability
 
   ## 3
@@ -128,7 +129,7 @@ class LandUseType:
     a = variableList[0]
     normalized = self.normalizeMap(dist)
     travelSuitability = 1 - (normalized ** a)  
-    report(travelSuitability, 'suit_travel' + str(self.typeNr))
+    report(travelSuitability, self.country+'_suit_travel' + str(self.typeNr))
     return travelSuitability
 
   ## 4
@@ -140,7 +141,7 @@ class LandUseType:
       current = ifthenelse(pcreq(self.environment, aKey), \
                            variableDict.get(aKey), current)
     currentLandUseSuitbaility = self.normalizeMap(current)
-    report(currentLandUseSuitbaility, 'suit_curLu' + str(self.typeNr))
+    report(currentLandUseSuitbaility, self.country+'_suit_curLu' + str(self.typeNr))
     return currentLandUseSuitbaility
 
   def getRandom(self):
@@ -251,7 +252,7 @@ class LandUseType:
     suitabilityMap = self.getRandom() * suitabilityMap
     # Normalize the total suitability map and report
     self.totalSuitabilityMap = self.normalizeMap(suitabilityMap)
-    report(self.totalSuitabilityMap, 'suit_tot' + str(self.typeNr))
+    report(self.totalSuitabilityMap, self.country+'_suit_tot' + str(self.typeNr))
     return self.totalSuitabilityMap
 
   def setMaxYield(self, maxYield):
@@ -380,6 +381,7 @@ class LandUse:
     # Map with 0 in study area and No Data outside, used for cover() functions
     self.nullMask = nullMask
     self.toMeters = parameters.getConversionUnit()
+    self.country = parameters.getCountryName()
 
   def setInitialEnvironment(self, environment):
     """Update environment of the 'overall' class ONLY."""
@@ -443,13 +445,13 @@ class LandUse:
     # stations now as boolean
     stations = pcrne(mapStations, 0)
     self.distStations = spread(stations, 0, 1)
-    report(self.distStations, 'distStations.map')
+    report(self.distStations, self.country+'_distStations.map')
     
   def loadDistanceMaps(self):
     """load the distance maps, when they cannot be kept in memory (fork)"""
 ##    print os.getcwd()
-    self.distStations = readmap('distStations')
-    self.relativeFriction = readmap('relativeFriction')
+    self.distStations = readmap(self.country+'_distStations')
+    self.relativeFriction = readmap(self.country+'_relativeFriction')
 
   def determineSpeedRoads(self, nominalMapRoads):
     """Create map with relative speed on raods, using boolean map with roads."""
@@ -458,7 +460,7 @@ class LandUse:
     speed = cover(lookupscalar('speed.txt', nominalMapRoads), \
                   self.nullMask + 5)
     self.relativeFriction = 1.0/speed
-    report(self.relativeFriction, 'relativeFriction.map')
+    report(self.relativeFriction, self.country+'_relativeFriction.map')
   
   def calculateStaticSuitabilityMaps(self, stochYieldMap):
     """Get the part of the suitability maps that remains the same."""
