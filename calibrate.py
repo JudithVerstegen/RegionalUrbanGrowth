@@ -74,21 +74,21 @@ def getKappaArray(scenario=None,aim=None,case=None):
     folder = arrayFolder
   else:
     folder = os.path.join(work_dir,'results',case,'metrics') 
-  return np.load(os.path.join(folder, 'kappa.npy'),allow_pickle=True)
+  return np.load(os.path.join(folder, 'kappa.npy'))
 
 def getKappaSimulationArray(aim=None,scenario=None, case=None):
   if case is None:
     folder = arrayFolder
   else:
     folder = os.path.join(work_dir,'results',case,'metrics')
-  return np.load(os.path.join(folder, 'kappa_simulation.npy'),allow_pickle=True)
+  return np.load(os.path.join(folder, 'kappa_simulation.npy'))
 
 def getAllocationArray(aim=None,scenario=None,case=None):
   if case is None:
     folder = arrayFolder
   else:
     folder = os.path.join(work_dir,'results',case,'metrics')  
-  return np.load(os.path.join(folder, 'allocation_disagreement.npy'),allow_pickle=True)
+  return np.load(os.path.join(folder, 'allocation_disagreement.npy'))
 
 def getAveragedArray(array, scenario, aim):
   # period is a list containing indexes of selected years, it is defined by the scenario
@@ -650,6 +650,10 @@ def get_ND_input(scenario,aim,case):
 
   return v
 
+scenario = 1
+aim = 'validation'
+case = 'PL'
+
 def get_ND_mask(case, scenario):
   """
   Create a boolean mask of the pareto-efficient points
@@ -759,8 +763,10 @@ def get_av_mask(case, scenario, solution_space, objectives):
     'n_objectives': get_ND_n_indices(case, scenario),
     'nd_solutions': get_ND_indices(case, scenario)
     }
+  #print(the_indices[objectives])
   # Get the average value of the weights
   n_weights_av = getAverageWeights(the_indices[objectives])
+  #print(n_weights_av)
   # Get the weights for every possible paramter set
   weights = {
     'all': getWeights(),
@@ -841,3 +847,6 @@ def get_ND_n_1(case, scenario, aim, solution_space, objectives):
   results_nd_n_1 = np.array([results_nd[i] for i in idx_n_1])
 
   return results_nd_n_1
+
+for case in ['IE','IT','PL']:
+  print(get_ND_n_1(case, 1, 'validation', 'all', 'n_objectives'))
