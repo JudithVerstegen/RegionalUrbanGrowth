@@ -329,6 +329,54 @@ def annotate_heatmap(im, p_mask, data=None, valfmt="{x:.2f}",
 def func(x, pos):
   return "{:.2f}".format(x).replace("0.", ".").replace("1.00", "")
 
+def corrSuitabilityMaps():
+  #### Script to find corelation between suitbility maps
+  for country in case_studies:
+    suitDir = os.path.join(os.getcwd(),'results','figures','suitability_maps')
+    workDir = parameters.getWorkDir()
+    resultFolder = os.path.join(workDir,'results',country, 'metrics')
+    fig_dir = os.path.join(os.getcwd(),'results','figures')
+      
+
+    pointFile = 'sampPointNr.col'
+    pointDir = os.path.join(os.getcwd(),'input_data',country, pointFile)
+    file_list = os.listdir(suitDir)
+    file_list = [x for x in file_list if x.startswith(country)]
+    maps = [os.path.join(os.getcwd(),'results','figures','suitability_maps',f) for f in file_list]
+    maps_pairs = [(file_list[i],file_list[j]) for i in range(len(file_list)) for j in range(i+1, len(file_list))]
+    maps_pairs = [(x[8:],y[8:]) for x,y in maps_pairs]
+
+    arrays = []
+    for a_map in maps:
+      arrays.append(metrics.map2Array(a_map,pointDir))
+
+    pairs = [(arrays[i],arrays[j]) for i in range(len(arrays)) for j in range(i+1, len(arrays))]
+
+    for i,pair in enumerate(pairs):
+      # Check for NaNs
+      mask = np.isnan(pair[0]) | np.isnan(pair[1])
+      # Mask, to remove NaNs
+      x = pair[0][~mask]
+      y = pair[1][~mask]
+
+      print(x.shape, y.shape)
+      print(np.corrcoef(x,y))
+      
+      # Plot
+      plt.scatter(x,y,s=0.1)
+      a_string = 'correlation coefficient between '+\
+                 maps_pairs[i][0]+' and '+maps_pairs[i][1]+': '+str(np.corrcoef(x,y)[0,1])
+      plt.title(a_string)
+               
+      plt.xlabel(maps_pairs[i][0])
+      plt.ylabel(maps_pairs[i][1])
+      
+      
+      aPath = os.path.join(fig_dir, country+'_'+maps_pairs[i][0]+'_'+maps_pairs[i][1])
+      plt.savefig(os.path.join(resultFolder,aPath))
+      plt.close('all')
+    print(country,'done')
+
 ##############################    
 #### PLOTS FOR THE ARTICLE ###
 ##############################
