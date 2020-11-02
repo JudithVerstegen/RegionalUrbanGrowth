@@ -141,15 +141,6 @@ def getAverageResultsArrayEverySet(aim): #ok
         j+=1
   return results
 
-def getCountryColors():
-  alpha = {1:0.9,2:0.6}
-  c_color=[]
-  for case in case_studies:
-    for s in scenarios:
-      a_color = colors.to_rgba(countryColors[case])[:-1]+(alpha[s],)
-      c_color.append(a_color)
-  return c_color
-
 def saveArrayAsExcel(array, filename, row_names= None, col_names= None, sheet_name = None):
   # Convert to dataframe
   df = pd.DataFrame(array, index = row_names, columns = col_names)
@@ -217,62 +208,9 @@ def appendArrayAsExcel(df, filename, row_names= None, col_names= None, sheet_nam
   writer.save()
   writer.close()
 
-def getAbsoluteDifferenceArrays(gf_metric,val_metric,country,scenario,weights):
-  """
-  Get the differences between and modelled metrices for single- and multiobjective goal function
-  Metric fdi and wfdi are measured for 16 zones, rest are measured for the whole case study area
-  """ 
-  # Get calibrated index of goal function based on Kappa
-  singleIndex = calibrate.getCalibratedIndeks('kappa', scenario,case=country)
-  # Get calibrated index of multiobjective goal function
-  multiIndex = calibrate.getMultiObjectiveIndex(gf_metric, weights[0],weights[1],scenario, case=country)
-  # Get the differences between observed and modelled metrices
-  diffArray = calibrate.createDiffArray(val_metric, scenario, 'validation', case=country)
-  # Get differences for calibrated Kappa goal function    
-  singleDiffArray = diffArray[:,singleIndex]
-  # Get differences for calibrated multiobjective goal function
-  multiDiffArray = diffArray[:,multiIndex]
-  # Get average values (for validation period) of differences for calibrated Kappa goal function
-  avSingleDiffArray = calibrate.getAveragedArray(singleDiffArray, scenario, 'validation')
-  # Get average values (for validation period) of differences for calibrated multiobjective goal function
-  avMultiDiffArray = calibrate.getAveragedArray(multiDiffArray, scenario, 'validation')
-  # Get absolute values of differences for results calibrated using Kappa goal function
-  absSingleDiffArray = np.absolute(avSingleDiffArray)
-  # Get absolute values of differences for results calibrated using mutlibjective goal function
-  absMultiDiffArray = np.absolute(avMultiDiffArray)
-  
-  return absSingleDiffArray,absMultiDiffArray
-
-def getLocationalMetricArrays(gf_metric,loc_metric, country,scenario,weights):
-  """
-  Get locational metric ('K','Ks','A') values for single- and multiobjective goal function
-  """ 
-  # Get calibrated index of goal function based on Kappa
-  singleIndex = calibrate.getCalibratedIndeks('kappa', scenario,case=country)
-  # Get calibrated index of multiobjective goal function
-  multiIndex = calibrate.getMultiObjectiveIndex(gf_metric, weights[0],weights[1],scenario, case=country)
-  # Get locational metric values
-  if loc_metric == 'K':
-    locationalArray = calibrate.getKappaArray(case=country)
-  elif loc_metric == 'Ks':
-    locationalArray = calibrate.getKappaSimulationArray(case=country)
-  elif loc_metric == 'A':
-    locationalArray = calibrate.getAllocationArray(case=country)
-  # Get locational array fr single objective goal function parameter:
-  singleLocationalArray = locationalArray[:,singleIndex]
-  # Get locational array fr multiobjective goal function parameter:
-  multiLocationalArray = locationalArray[:,multiIndex]
-  # Get average values (for validation period) of singleobjective locational metric
-  avSingleLocationalMetricArray = calibrate.getAveragedArray(singleLocationalArray, scenario, 'validation')
-  # Get average values (for validation period) of multi objective locational metric
-  avMultiLocationalMetricArray = calibrate.getAveragedArray(multiLocationalArray, scenario, 'validation')
-  # Adjust the size to landscape metric and return
-  return np.array([[avSingleLocationalMetricArray]]), np.array([[avMultiLocationalMetricArray]])
-
-
-#############################
-########### PLOTS ###########
-#############################
+#######################################
+########### PLOTS FUNCTIONS ###########
+#######################################
 
 def heatmap(data, row_labels, col_labels, ax=None,
             cbar_kw={}, cbarlabel="", **kwargs):
@@ -309,7 +247,7 @@ def heatmap(data, row_labels, col_labels, ax=None,
     ax.set_yticks(np.arange(data.shape[0]))
     # ... and label them with the respective list entries.
     ax.set_xticklabels(col_labels)
-    ax.set_yticklabels(row_labels)
+    ax.JHJHJJ(row_labels)
 
     # Let the horizontal axes labeling appear on top.
     ax.tick_params(top=True, bottom=False,
@@ -1144,8 +1082,10 @@ def getSpearmanrResult():
   # Save!
   setNameClearSave('Figure X Spearman rank-order correlation coefficient', scenario=None)#, fileformat='png')
 
-## Main function ###
-
+##########
+## MAIN ##
+##########
+  
 def main():
   # Setting used in the article:
   solution_space = 'all'
@@ -1153,24 +1093,27 @@ def main():
   # Variables for testing:
   country = 'IE'
   thisMetric = 'wfdi'
+  aim='calibration'
   
   print('Plotting...')
-  #plotDemand()
+  plotDemand()
   print('Figure 2 plotted')
-  #plotNonDominatedSolutions_singlebar(solution_space, objectives, trade_off = False)
+  plotNonDominatedSolutions_singlebar(solution_space, objectives, trade_off = False)
   print('Figure 3 plotted')
-  #plotWeights(solution_space, objectives, trade_off = False)
+  plotWeights(solution_space, objectives, trade_off = False)
   print('Figure 4 or 7 plotted')
-  #plotUrbanChanges(solution_space, objectives)
+  plotUrbanChanges(solution_space, objectives)
   print('Figure 5 or 6 plotted')
-  #plotMetrics(country, thisMetric)
+  plotMetrics(country, thisMetric)
   print('Figure X plotted')
-  #plotAllocationDisagreement(country)
+  plotAllocationDisagreement(country)
   print('Figure X plotted')
-  #plotGoalFunctionEverySet()
+  plotGoalFunctionEverySet()
   print('Figure X plotted')
-  #getSpearmanrResult()
+  getSpearmanrResult()
   print('Figure X plotted')
+  saveNonDominatedPoints_to_excel(aim, solution_space, objectives)
+  print('Saved metric values')
 
 if __name__ == "__main__":
     main()
