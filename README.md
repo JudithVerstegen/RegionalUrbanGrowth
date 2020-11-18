@@ -9,14 +9,14 @@ https://confluence.uni-muenster.de/display/HPC
 The batch or job scheduling system on PALMA-II is SLURM:
 https://slurm.schedmd.com/documentation.html
 
-# Software required:
+## Software required:
 Python version 3.6, using Numpy version 1.15.4 and the PCRaster Python framework version 4.2.0 or higher.
 Optional Numba library for computation optimization.
 
-# Resources required:
+## Resources required:
 Simulation run for the manuscripted required 64GB RAM. Computation time was ~24h for running and calibrating the model for a case study. 
 
-# Running the model
+## Running the model
 To run the model and analyses for a case study, submit to the cluster the seven numbered jobs in order:
 1_parameter_list.sh 
 Creates a list of input paramaters for urban growth drivers used in every loop run of the model. This job can be run only once for all case studies tested.
