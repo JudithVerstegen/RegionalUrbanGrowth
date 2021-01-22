@@ -10,8 +10,7 @@ The batch or job scheduling system on PALMA-II is SLURM:
 https://slurm.schedmd.com/documentation.html
 
 ## Software required:
-Python version 3.6, using Numpy version 1.15.4 and the PCRaster Python framework version 4.2.0 or higher.
-Optional Numba library for computation optimization.
+Python version 3.7, PCRaster version 4.3, matplotlib version 3.3, gdal version 2.4, pandas version 1.2, scipy version 1.6, numba version 0.52, and openpyxl version 3.0.
 
 ## Resources required:
 Simulation run for the manuscripted required 64GB RAM. Computation time was ~24h for running and calibrating the model for a case study. 

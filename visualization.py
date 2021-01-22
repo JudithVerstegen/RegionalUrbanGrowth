@@ -88,7 +88,7 @@ plt.rc('figure', titlesize=SMALL_SIZE)   # fontsize of the figure title
 
 def clearCreatePath(path, name): #ok
   if not os.path.isdir(path):
-    os.mkdir(path)
+    os.makedirs(path)
   # Create dir of a file
   wPath = os.path.join(path, name)
   if os.path.exists(wPath):

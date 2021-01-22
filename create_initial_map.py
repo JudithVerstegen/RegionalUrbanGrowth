@@ -7,6 +7,8 @@ to generate inputs and calibration data for an urban growth model.
 
 '''
 
+from pcraster import *
+from pcraster.framework import *
 import gdal # version 2.3.3 for Python 3.6
 import metrics
 import numpy as np
@@ -15,8 +17,6 @@ import osr
 import ogr
 import parameters
 import random
-from pcraster import *
-from pcraster.framework import *
 
 ##############
 ### inputs ###

@@ -1,9 +1,5 @@
 *.pyc
 **
 distRoads.map
-sampPoint.map
-clone.map
-clone_old.map
-filter*
 !/input_data/
 

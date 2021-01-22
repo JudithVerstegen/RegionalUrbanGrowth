@@ -67,7 +67,7 @@ def getParameterConfigurations(case=None):
     folder = arrayFolder
   else:
     folder = os.path.join(work_dir,'results',case,'metrics')
-  return np.load(os.path.join(folder, 'parameter_sets.npy'))
+  return np.load(os.path.join(folder, 'parameter_sets.npy'), allow_pickle=True)
 
 def getKappaArray(scenario=None,aim=None,case=None):
   if case is None:
