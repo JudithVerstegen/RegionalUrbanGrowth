@@ -12,6 +12,7 @@ import matplotlib.cm
 from matplotlib import colors
 import matplotlib.patches as mpatches
 import matplotlib.lines as mlines
+from matplotlib.ticker import ScalarFormatter
 import pandas as pd
 import scipy.stats as stats
 from openpyxl import load_workbook
@@ -95,7 +96,7 @@ def clearCreatePath(path, name): #ok
       os.remove(wPath)
   return wPath
   
-def setNameClearSave(figName, scenario=None,fileformat=None): #ok
+def setNameClearSave(figName, scenario=None): #ok
   # Set the font type to readible for Adobe
   plt.rcParams['pdf.fonttype'] = 42
   plt.rcParams['ps.fonttype'] = 42
@@ -104,17 +105,14 @@ def setNameClearSave(figName, scenario=None,fileformat=None): #ok
     name = ''
   else:
     name = '_scenario_'+str(scenario)
-  if fileformat is None:
-    f = 'pdf'
-  else:
-    f = fileformat
-  # Create figure dir
   fig_dir = os.path.join(os.getcwd(),'results','figures')
-  wPath = clearCreatePath(fig_dir, figName+name+'.'+f)
+  wPath1 = clearCreatePath(fig_dir, figName+name+'.png')
+  wPath2 = clearCreatePath(fig_dir, figName+name+'.pdf')
   # Save plot and clear    
-  plt.savefig(os.path.join(resultFolder,wPath),
-              bbox_inches = "tight",
-              dpi=600)
+  plt.savefig(os.path.join(resultFolder,wPath1),
+              bbox_inches = "tight", dpi=600)
+  plt.savefig(os.path.join(resultFolder,wPath2),
+              bbox_inches = "tight")
   plt.close('all')
 
 def getAverageResultsArrayEverySet(aim): #ok
@@ -207,6 +205,11 @@ def appendArrayAsExcel(df, filename, row_names= None, col_names= None, sheet_nam
   # Close the Pandas Excel writer and output the Excel file.
   writer.save()
   writer.close()
+  
+class ScalarFormatterForceFormat(ScalarFormatter):
+  def _set_format(self):#,vmin,vmax):  # Override function that finds format to use.
+    self.format = "%6.2f"  # Give format here
+
 
 #######################################
 ########### PLOTS FUNCTIONS ###########
@@ -651,6 +654,242 @@ def plotNonDominatedSolutions_singlebar(solution_space, objectives, trade_off = 
   # Save plot and clear
   aname = 'Figure 3 Performance'
   setNameClearSave(aname)#, fileformat='png')
+
+### Figure 3 - v2 ###
+
+def plotNonDominatedSolutions_multibar(solution_space, objectives, trade_off = False):
+  '''
+  Find non-dominated combinations of metric values (for each parameter set)
+  Plot 1 plot for a country in scenario 1
+  x and y axis show values of two metrics
+  thrid metric value is presented with shape color
+
+  Multi-objective approach parameters:
+  solution_space: selection of points closest to the 'ideal' point in ['all', 'nondominated'] 
+  objectives: recquirement for selecting the 'ideal' point in ['n_objectives','nd_solutions']
+  '''
+  # Only for scenario 1
+  scenario = scenarios[0]
+  ## Create the figure. 
+  fig = plt.figure(figsize=(5,6))#, sharex=True, sharey=True)
+  # Apply gridspec
+  spec = fig.add_gridspec(nrows=len(case_studies),ncols=3)#,hspace=1.5,wspace=.5,
+                          #height_ratios=np.array([ [0.1,0.9] for i in case_studies]).flatten())
+
+  
+  ## 1.
+  # Get results of validation metrics for all cases 
+  results = {
+    'calibration':calibrate.getResultsEverySet('calibration'),
+    'validation':calibrate.getResultsEverySet('validation')}
+
+  ## 2.
+  # For each case study create a selection (mask) of non-dominated solutions identified in calibration
+  # and a selection of four solutions: for 3 objectives and one multi-objective
+  for i,country in enumerate(case_studies): 
+    i = i
+    print(i)
+
+    ## 4. Get calibration values
+    # Get metric values
+    v_c = results['calibration'][country][scenario]
+    # Subset non-dominated calibration results
+    r_nd_c = calibrate.get_ND(country, scenario, aim='calibration')
+    # Create a mask to find the values selected in terms of 3 objectives and 1 multi-objective
+    c_mask = calibrate.get_ND_n_1_masks(country, scenario, solution_space, objectives)
+    
+    ## 4. Get validation values
+    # Get metric values
+    v_v = results['validation'][country][scenario]
+    # Subset non-dominated calibration results
+    r_nd_v = calibrate.get_ND(country, scenario, aim='validation')
+    
+    ## 5. Get the scale of the values, taking into account both calibration and validation values
+    # Join calibration and validation results for third metric
+    r_nd_2 = np.concatenate((r_nd_c[:,2],r_nd_v[:,2]), axis = 0)
+    
+    # Normalize the third metric values to get the scale for the marker between 0 and 1
+    scale = np.array(calibrate.getNormalizedArray(r_nd_2)) # 1=best, 0=worst
+    if scenario==1:
+      scale=1-scale # 1=worst, 0=best
+    # Combine calibration and validation results to find the total min and max values
+    r_nd_all = np.concatenate((r_nd_c, r_nd_v),axis =0)
+
+    
+    ## 5. Plot calibration and validation results
+    
+    # Loop calibration and validation values
+    for j, r_nd in enumerate([r_nd_c, r_nd_v]):
+      print('j ' + str(j))
+      # Add an axis for all non dominated results
+      ax_all = fig.add_subplot(spec[i,j])
+      # Plot a scatter plot
+      scat = ax_all.scatter(
+        r_nd[:,0],
+        r_nd[:,1],
+        marker='x',
+        s=20,
+        linewidth=0.5,
+        c = r_nd[:,2],#a_cmap(np.split(scale,2)[j]),
+        #cmap=a_cmap,
+        alpha=0.7,
+        label="-".join([country,str(j)]))
+      
+      # Plot (again) the point with the minimum errors for 4 objectives
+      s_r_nd = r_nd[c_mask]
+      # Add an axis for seected points
+      # Plot the selected solutions
+      ax_all.scatter(
+        s_r_nd[:,0],
+        s_r_nd[:,1],
+        s=60,
+        linewidths=6,
+        marker='x',
+        c = s_r_nd[:,2], #a_cmap(np.split(scale,2)[j][inx]),
+        #cmap=a_cmap,
+        alpha=0.9,
+        label="-".join([country,str(j)]))
+      
+      ## 6. Print the number of the selected solution next to the point
+      # Get the array of points
+      selected_points = calibrate.get_ND_n_1(
+        country,
+        scenario,
+        ['calibration','validation'][j],
+        solution_space,
+        objectives)
+      # Plot the numbers
+      for p,c in enumerate(selected_points):
+        a_point = c
+        ax_all.text(a_point[0],
+                    a_point[1],
+                    'P'+str(p+1),
+                    va='center',
+                    ha='center')
+     
+        
+      ## 7. Adjust the plot
+      # # Find the maximum values
+      # max0_r_nd, max1_r_nd, max2_r_nd = r_nd.max(axis=0)
+      # #print(country, j, 'max WFDI', r_nd.max(axis=0)[0], 'max COHESION', r_nd.max(axis=0)[1])
+      # # Find the minimum values
+      # min0_r_nd, min1_r_nd, min2_r_nd = r_nd.min(axis=0)
+      # #print(country, j, 'min WFDI', r_nd.min(axis=0)[0], 'min COHESION', r_nd.min(axis=0)[1])
+      # ### Remove the common scale:
+      # # Set the limits
+      # ax_all.set_xlim(left=min0_r_nd-(max0_r_nd-min0_r_nd)*0.1,right=max0_r_nd+(max0_r_nd-min0_r_nd)*0.1)
+      # ax_all.set_ylim(bottom=min1_r_nd-(max1_r_nd-min1_r_nd)*0.1,top=max1_r_nd+(max1_r_nd-min1_r_nd)*0.1)
+      
+      # Specify the number of ticks on both or any single axes
+      ##ax_all.locator_params(tight=True, nbins=4)
+      ##ax_all.locator_params(tight=True, nbins=4)
+      # Print the number of the non-dominated solutions on the left subplot
+      # Get the limits of the ax
+      x0=ax_all.get_xlim()[0]
+      x1=ax_all.get_xlim()[1]
+      y0=ax_all.get_ylim()[0]
+      y1=ax_all.get_ylim()[1]
+      
+      # ### Remove the common scale:
+      # # create ticks positions for x,y, and z axis
+      # x_ticks = np.linspace(min0_r_nd, max0_r_nd, 3)
+      # y_ticks = np.linspace(min1_r_nd, max1_r_nd, 3)
+      # # Assign 4 ticks and labels to the x, y and z (colorbar)axis.
+      # ax_all.set_xticks(x_ticks)
+      # ax_all.set_xticklabels('%.4f' % x for x in x_ticks)
+      # ax_all.set_yticks(y_ticks)
+      
+      xfmt = ScalarFormatterForceFormat()
+      xfmt.set_powerlimits((0,0))
+      ax_all.xaxis.set_major_formatter(xfmt)
+      
+      yfmt = ScalarFormatterForceFormat()
+      yfmt.set_powerlimits((0,0))
+      ax_all.yaxis.set_major_formatter(yfmt)
+
+      # # Assign the subplot names
+      # ids = ['a','b','c','d','e','f']
+      # # Print the subplot id
+      # ax_all.text(
+      #   x1-(x1-x0)*.075,
+      #   y1-(y1-y0)*.075,
+      #   ids[i-1+j],
+      #   fontsize=6,
+      #   weight='bold')
+        
+      # Print the number of non-dominated solutions in the bottom left corner
+      if j==0:
+        ax_all.text(
+          x0+(x1-x0)*.01,
+          y0+(y1-y0)*.01,
+          'n='+str(len(r_nd_c)),
+          fontsize=6,
+          weight='bold')
+        # Print the case study name and y-label
+        ax_all.set_ylabel(cities[country] + '\n' + 'RMSE ('+all_metrices[1].upper()+')')
+
+      if i == 2:
+        # print x-label
+        ax_all.set_xlabel('\n\n\n\nRMSE ('+all_metrices[0].upper()+')')
+      
+      ## 8. Colorbar 
+      yfmt = ScalarFormatterForceFormat()
+      yfmt.set_powerlimits((0,0))
+      c_bar = plt.colorbar(scat, ax=ax_all, orientation='horizontal',
+                           pad=0.2,
+                           ticks=[np.min(r_nd[:,2]), np.max(r_nd[:,2])],
+                           format=yfmt)   
+      #c_bar.formatter.set_powerlimits((0, 0))
+      # Add the label with the locational metric
+      c_bar.set_label(all_metrices[2], rotation=0, labelpad=-4) 
+      
+    ## 9. Add Spearman rank correlation values
+    scenario=scenarios[0]
+    # Create an array to store the Spearman rho value
+    spearmanMatrix = np.empty((len(all_metrices), 1))
+    # Create an array to store p_value mask
+    p_mask = np.zeros((len(all_metrices), 1))
+    for m, metric in enumerate(all_metrices):
+      rho, p_val = stats.spearmanr(r_nd_c[:,m],r_nd_v[:,m])
+      # Fill the matrix with correlation between the values, if p_val < 0.001
+      spearmanMatrix[m,0] = rho
+      # Fill the significant mask based no p_value
+      if p_val<0.01:
+        p_mask[m,0] = 1
+    print(cities[country])
+    print(spearmanMatrix)
+    print(p_mask)
+    # Plot the heatmaps for every case study
+    ax = fig.add_subplot(spec[i,2])
+    im = heatmap(spearmanMatrix, all_metrices, [''], ax=ax,
+                cmap="PRGn", vmin=-1, vmax=1,cbarlabel="Spearman coeff.")
+    # Add coeff. values. The ones with p_val > 0.01 are black, other are white
+    # "The p-values are not entirely reliable but are probably reasonable for datasets larger than 500 or so."
+    # from: https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.spearmanr.html
+    # annotate_heatmap(im, p_mask, valfmt=matplotlib.ticker.FuncFormatter(func), size=7)
+    annotate_heatmap(im, np.ones((len(all_metrices), 1)), 
+                     valfmt=matplotlib.ticker.FuncFormatter(func), size=7)
+    cbar = fig.colorbar(im, ax=ax, orientation='horizontal')
+    
+    if i == 2:
+      cbar.set_label("\n\nSpearman coeff.", rotation=0, va="bottom", labelpad=4)
+    
+    i+=1
+      
+  # Add tiles
+  fig.text(0.23,0.9,'CALIBRATION\n',ha='center',weight='bold')
+  fig.text(0.51,0.9,'VALIDATION\n', ha='center',weight='bold') 
+  fig.text(0.78,0.9,'SPEARMAN RANK CORR. \nCALIBRATION-VALIDATION', ha='center',weight='bold') 
+  
+  # Arrange subplots:
+  plt.subplots_adjust(bottom=-0.1, wspace=0.3, hspace=0.2)
+
+    
+  # Save plot and clear
+  aname = 'Figure 3 Performance'
+  setNameClearSave(aname)
+
+
 
 ### FIGURE 4 and 7 ###                   
 def plotWeights(solution_space, objectives, trade_off = False):
@@ -1144,24 +1383,24 @@ def main():
   aim='calibration'
   
   print('Plotting...')
-  plotDemand()
-  print('Figure 2 plotted')
-  plotNonDominatedSolutions_singlebar(solution_space, objectives, trade_off = False)
+  # plotDemand()
+  # print('Figure 2 plotted')
+  plotNonDominatedSolutions_multibar(solution_space, objectives, trade_off = False)
   print('Figure 3 plotted')
-  plotWeights(solution_space, objectives, trade_off = False)
-  print('Figure 4 or 7 plotted')
-  plotUrbanChanges(solution_space, objectives)
-  print('Figure 5 or 6 plotted')
-  plotMetrics(country, thisMetric)
-  print('Figure X plotted')
-  plotAllocationDisagreement(country)
-  print('Figure X plotted')
-  plotGoalFunctionEverySet()
-  print('Figure X plotted')
-  getSpearmanrResult()
-  print('Figure X plotted')
-  saveNonDominatedPoints_to_excel(aim, solution_space, objectives)
-  print('Saved metric values')
+  # plotWeights(solution_space, objectives, trade_off = False)
+  # print('Figure 4 or 7 plotted')
+  # plotUrbanChanges(solution_space, objectives)
+  # print('Figure 5 or 6 plotted')
+  # plotMetrics(country, thisMetric)
+  # print('Figure X plotted')
+  # plotAllocationDisagreement(country)
+  # print('Figure X plotted')
+  # plotGoalFunctionEverySet()
+  # print('Figure X plotted')
+  # getSpearmanrResult()
+  # print('Figure X plotted')
+  # saveNonDominatedPoints_to_excel(aim, solution_space, objectives)
+  # print('Saved metric values')
 
 if __name__ == "__main__":
     main()
