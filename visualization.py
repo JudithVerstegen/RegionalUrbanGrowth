@@ -4,7 +4,7 @@ import os
 import metrics
 import numpy as np
 import parameters
-import pcraster as pcr
+#import pcraster as pcr
 import calibrate
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
@@ -15,8 +15,8 @@ import matplotlib.lines as mlines
 from matplotlib.ticker import ScalarFormatter
 import pandas as pd
 import scipy.stats as stats
-from openpyxl import load_workbook
-from mpl_toolkits.axes_grid1.inset_locator import inset_axes
+##from openpyxl import load_workbook
+##from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 
 print("This is a script to plot figures presenting outputs of the urban growth model")
 
@@ -60,7 +60,8 @@ c_obs = ['crimson', 'whitesmoke','black','white']
 c_mod = c_obs#['lavender', 'dimgrey', 'gold']
 driverColors = [(64,64,64),(184,13,72),(43,106,108),(242,151,36)] # NEIGH, TRAIN, TRAVEL, LU
 driverColors = [ (x[0]/256,x[1]/256,x[2]/256) for x in driverColors ]
-# Get the observed time steps. Time steps relate to the year of the CLC data, where 1990 was time step 0.
+# Get the observed time steps.
+# Time steps relate to the year of the CLC data, where 1990 was time step 0.
 obsTimeSteps = parameters.getObsTimesteps()
 observedYears = [parameters.getObsYears()[y] for y in obsTimeSteps]
 
@@ -105,7 +106,7 @@ def setNameClearSave(figName, scenario=None): #ok
     name = ''
   else:
     name = '_scenario_'+str(scenario)
-  fig_dir = os.path.join(os.getcwd(),'results','figures')
+  fig_dir = os.path.join(os.getcwd(),'results','figures_calibration_1990-2000')
   wPath1 = clearCreatePath(fig_dir, figName+name+'.png')
   wPath2 = clearCreatePath(fig_dir, figName+name+'.pdf')
   # Save plot and clear    
@@ -396,7 +397,7 @@ def plotDemand():
   # Get the data
   for ic, c in enumerate(case_studies):
     afile = os.path.join(os.getcwd(),'input_data',c,'make_demand_manual.xlsx')
-    df  = pd.read_excel(io=afile, header=None)
+    df  = pd.read_excel(io=afile, header=None,engine='openpyxl')
     d = df.iloc[0:obsTimeSteps[-1],[11]].to_numpy().flatten()
     d = np.array([d[x-1] for x in obsTimeSteps])
     d = d/100 # Change ha to km2
@@ -404,6 +405,7 @@ def plotDemand():
     axs[0].plot(d, label = cities[c], c = countryColors[c])
     axs[0].set_xticks(ticks=range(len(d)))
     axs[0].set_xticklabels(observedYears)
+    ind = len(obsTimeSteps)+1
     
     d_d = np.empty_like(d)
     for x in range(len(d)):
@@ -411,12 +413,16 @@ def plotDemand():
         d_d[x+1] = (d[x+1]-d[x])/d[0]*100 #[%]
     d_d[0] = 0
     axs[1].bar(
-      np.array([0,1,2,3])+ic/4, d_d[1:], label = cities[c], width=0.2, color = countryColors[c])
+      np.array([1,2])+ic/4,
+      d_d[1:],
+      label = cities[c],
+      width=0.2,
+      color = countryColors[c])
     # Put the y axis to the right
     axs[1].yaxis.set_label_position("right")
     axs[1].yaxis.tick_right()
-    axs[1].set_xticks(np.array([0,1,2,3])+0.25)
-    axs[1].set_xticklabels(['1990-2000','2000-2006','2006-2012','2012-2018'])
+    axs[1].set_xticks(np.array([1,2])+0.25)
+    axs[1].set_xticklabels(['1990-2000','2000-2006'])#,'2006-2012','2012-2018'])
 
   # Assign labels
   axs[0].set_ylabel("Urban areas [km$^2$]")
@@ -899,7 +905,7 @@ def plotWeights(solution_space, objectives, trade_off = False):
 
   Multi-objective approach parameters:
   solution_space: selection of points closest to the 'ideal' point in ['all', 'nondominated'] 
-  objectives: recquirement for selecting the 'ideal' point in ['n_objectives','nd_solutions']
+  objectives: requirement for selecting the 'ideal' point in ['n_objectives','nd_solutions']
   """
   scenario=scenarios[0]
   print('scenario',scenario)
@@ -1027,10 +1033,15 @@ def plotUrbanChanges(solution_space, objectives): #DONE
   # Select the time steps
   period = parameters.getCalibrationPeriod()[scenario]['validation'] # scenario 1 validation: [3,4]
   selected_time_steps = np.array(parameters.getObsTimesteps())[period] #[1,11,17,23,29]
+##  years = [
+##    str(np.array(observedYears)[period[0]-1]),
+##    str(np.array(observedYears)[period[0]]),
+##    str(np.array(observedYears)[period[1]]) ]
+
   years = [
     str(np.array(observedYears)[period[0]-1]),
-    str(np.array(observedYears)[period[0]]),
-    str(np.array(observedYears)[period[1]]) ]
+    str(np.array(observedYears)[period[0]])]
+
   
   i=0
   
@@ -1038,7 +1049,7 @@ def plotUrbanChanges(solution_space, objectives): #DONE
     # Create an empty list to store observed maps
     obs_maps = []
     # Get the observed changes
-    for x in [0,1,2]:
+    for x in [0,1]:#,2]:
       # Add the map for the observed change! Get the observed maps from CLC data:
       obs_maps.append(os.path.join(os.getcwd(),'observations',country, 'urb'+years[x][-2:]))
       # Red the PCRaster format
@@ -1235,6 +1246,7 @@ def plotAllocationDisagreement(country):
   aname = 'Figure Xc Allocation Disagreement ' + country
   setNameClearSave(aname,scenario=None, fileformat='png')
 
+
 ### FIGURE X (additional) ###
 def plotGoalFunctionEverySet(): #DONE
   """
@@ -1249,7 +1261,7 @@ def plotGoalFunctionEverySet(): #DONE
   limits = {}
   # Get the metrics
   calibration_metrices = [ m.upper() for m in metricNames ] + locationalMetric
-  metric_units = [ 'RMSE' for i in metricNames ] + locationalMetric
+  metric_units = [ 'RMSE/std' for i in metricNames ] + locationalMetric
   # Get metric stats
   for i,m in enumerate(calibration_metrices):
     limits[m] = {
@@ -1267,14 +1279,15 @@ def plotGoalFunctionEverySet(): #DONE
   n = len(metricNames)+1 # number of subplots
   
   ## 2. Prepare the plot  
-  fig, axs = plt.subplots(n, figsize=(5,3), sharex = True)
+  fig, axs = plt.subplots(n, figsize=(5,8), sharex = True)
   plt.xlabel('parameter set')
   xticks = np.arange(0, parameters[-1]+10, 15.0)
   xticks=xticks.tolist()+[parameters[-1]]
   plt.xticks(xticks,[int(x) for x in xticks])
   fig.align_ylabels()
   plt.subplots_adjust(hspace=0.4)
-  gf = ['$o_1$','$o_2$','$o_3$']
+  #gf = ['$o_1$','$o_2$','$o_3$']
+  gf = ['o('+c+')' for c in calibration_metrices]
   
   ## 3. Loop metrics. Each metric = new subplot
   for i,m in enumerate(calibration_metrices):
@@ -1286,11 +1299,15 @@ def plotGoalFunctionEverySet(): #DONE
       for scenario in scenarios:
         # set the min and max y axis values:
         axs[i].set_title(gf[i], pad=3)
+
+        # standardize vaules by divinding by std
+        stand_results = results[i,j]/np.std(results[i,j])
+        
         amin = limits[m]['min']
         amax = limits[m]['max']
         axs[i].ticklabel_format(style='sci', axis='y', scilimits=(-2,2))
-        axs[i].set_ylim([amin*0.9,amax*1.1])
-        axs[i].set_yticks([amin,amax])
+        #axs[i].set_ylim([amin*0.9,amax*1.1])
+        #axs[i].set_yticks([amin,amax])
         # Create the labels only for one metric
         if i>0:
           myLabel = {1:None,2:None}
@@ -1300,18 +1317,18 @@ def plotGoalFunctionEverySet(): #DONE
         # plot
         axs[i].plot(
           parameters,
-          results[i,j],
+          stand_results,
           fmt[scenario],
           linewidth = 0.5,
           label = myLabel[scenario],
           c = countryColors[country])
-        # Plot a line showing mean metric vaue in the parameter space and the value
-        axs[i].axhline(y=limits[m]['mean'], alpha=0.2,c='black',linestyle='--', linewidth=0.8)
-        axs[i].text(axs[i].get_xlim()[1]+1,
-                    limits[m]['mean'],
-                    'mean = '+str(np.format_float_scientific(limits[m]['mean'],precision=2)),
-                    fontsize=6,
-                    va='center')
+##        # Plot a line showing mean metric vaue in the parameter space and the value
+##        axs[i].axhline(y=limits[m]['mean'], alpha=0.2,c='black',linestyle='--', linewidth=0.8)
+##        axs[i].text(axs[i].get_xlim()[1]+1,
+##                    limits[m]['mean'],
+##                    'mean = '+str(np.format_float_scientific(limits[m]['mean'],precision=2)),
+##                    fontsize=6,
+##                    va='center')
         j+=1
 
   # Create the legend
@@ -1325,7 +1342,8 @@ def plotGoalFunctionEverySet(): #DONE
     frameon = False)
   
   # Set the name and clear the directory if needed
-  setNameClearSave('Figure X Goal functions values', scenario=None)#, fileformat='png')
+  setNameClearSave('Figure X Goal functions values - Values for each case study and metric (every plotted line) are divided by their std', scenario=None)#, fileformat='png')
+  #setNameClearSave('Figure X Goal functions values', scenario=None)#, fileformat='png')
 
 ### FIGURE X (additional) ###    
 def getSpearmanrResult():
@@ -1375,32 +1393,34 @@ def getSpearmanrResult():
   
 def main():
   # Setting used in the article:
-  solution_space = 'all'
-  objectives = 'nd_solutions'
+  solution_space = 'nondominated'
+  objectives = 'n_objectives'
   # Variables for testing:
-  country = 'IE'
-  thisMetric = 'wfdi'
-  aim='calibration'
+##  country = 'IE'
+##  thisMetric = 'wfdi'
+##  aim='calibration'
   
   print('Plotting...')
-  # plotDemand()
-  # print('Figure 2 plotted')
-  plotNonDominatedSolutions_multibar(solution_space, objectives, trade_off = False)
-  print('Figure 3 plotted')
-  # plotWeights(solution_space, objectives, trade_off = False)
-  # print('Figure 4 or 7 plotted')
-  # plotUrbanChanges(solution_space, objectives)
-  # print('Figure 5 or 6 plotted')
-  # plotMetrics(country, thisMetric)
-  # print('Figure X plotted')
-  # plotAllocationDisagreement(country)
-  # print('Figure X plotted')
-  # plotGoalFunctionEverySet()
-  # print('Figure X plotted')
-  # getSpearmanrResult()
-  # print('Figure X plotted')
-  # saveNonDominatedPoints_to_excel(aim, solution_space, objectives)
-  # print('Saved metric values')
+##  plotDemand()
+##  print('Figure 2 plotted')
+##  plotNonDominatedSolutions_multibar(solution_space, objectives, trade_off = False)
+##  print('Figure 3 plotted')
+  plotWeights(solution_space, objectives, trade_off = False)
+##  print('Figure 4 or 7 plotted')
+##  plotUrbanChanges(solution_space, objectives)
+##  print('Figure 5 or 6 plotted')
+##  plotMetrics(country, thisMetric)
+##  print('Figure X plotted')
+##  plotAllocationDisagreement(country)
+##  print('Figure X plotted')
+##  plotGoalFunctionEverySet()
+##  print('Figure X plotted')
+##  getSpearmanrResult()
+##  print('Figure X plotted')
+##  saveNonDominatedPoints_to_excel(aim, solution_space, objectives)
+##  print('Saved metric values')
 
 if __name__ == "__main__":
     main()
+
+

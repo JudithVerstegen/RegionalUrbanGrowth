@@ -1,8 +1,8 @@
 import string
 import os, numpy
 import parameters
-from pcraster import *
-from pcraster.framework import *
+##from pcraster import *
+##from pcraster.framework import *
 
 # Get work directory
 work_dir = parameters.getWorkDir()

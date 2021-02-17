@@ -21,8 +21,9 @@ def getObsTimesteps():
 
   e.g. 2000 in time step nr 11.
   In the model 2000 and 2006 data are used for calibration, and 2012 and 2018 are used for validation."""
-  
+
   obsTimeSteps = [1,11,17,23,29]
+  
   return obsTimeSteps
 
 def getObsYears():
@@ -40,19 +41,30 @@ def getCalibrationScenarios():
 
 def getCalibrationPeriod():
   """Returns the indexes of years for calibration and validation from getObsYears().values():
-  e.g. [1990, 2000, 2006, 2012, 2018]
+  0:1990, 1:2000, 2:2006, 3:2012, 4:2018
   Scenario 1: calibration period 2000 - 2006, validation period 2012 - 2018
   Scenario 2: calibration period 2012 - 2018, validation period 2000 - 2006"""
 
   period = {
     1: {
-      'calibration': [1,2],
-      'validation': [3,4]
+      'calibration': [1],
+      'validation': [2]
       },
     2: {
-      'calibration': [3,4],
-      'validation': [1,2]
+      'calibration': [2],
+      'validation': [1]
       }}
+
+##  period = {
+##    1: {
+##      'calibration': [1,2],
+##      'validation': [3,4]]
+##      },
+##    2: {
+##      'calibration': [3,4],,
+##      'validation': [1,2]
+##      }}
+  
   return period
 
 def getNumberOfZones():
@@ -108,12 +120,14 @@ def getSumStats():
   # 'lpi': # Largest Patch Index
   # 'contag': # Contagion Index 
   
-  sumStats = ['wfdi','cohes'] #['cilp', 'fdi', 'wfdi', 'pd', 'cohes', 'ed', 'lpi', 'contag']
+  sumStats = ['cohes','wfdi']
+  #sumStats = ['cilp','cohes','contag','ed','fdi','lpi','pd','wfdi']
   return sumStats
 
 def getLocationalAccuracyMetric():
   """ Returns locational metric used in the calibration """
-  # Locational metrics: 'K', 'Ks', 'A'
+  # Locational metrics:
+  # K: standard Kappa, Ks: Kappa Simulation, A: Allocation Disagreement
 
   locationalMetric = ['A']
   return locationalMetric

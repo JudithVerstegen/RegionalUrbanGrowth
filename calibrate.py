@@ -5,8 +5,8 @@ import os
 import metrics
 import numpy as np
 import parameters
-from pcraster.framework import *
-from numba import njit
+##from pcraster.framework import *
+##from numba import njit
 from scipy.spatial import distance
 
 #### Script to find calibrate LU model
@@ -132,7 +132,7 @@ def saveArray(array,name):
   # Save the data  
   np.save(fileName, array)
   
-@njit(parallel=True)
+#@njit(parallel=True)
 def getValidCells(u_array):
   # Get the number of valid cells in the map 
   cells = len(u_array)
@@ -140,7 +140,7 @@ def getValidCells(u_array):
   validCells = cells - nanCells
   return validCells
 
-@njit(parallel=True)
+#@njit(parallel=True)
 def K_calculations(row,col,obs0,obs1,mod0,mod1,cArray,allocationArray,kappaArray,validCells):
   # Find states. Each cell has only one of four states.
   # Observed -> modelled
@@ -276,7 +276,7 @@ def calculateKappaSimulation(scenario=None, aim=None):
   # Save the data  
   saveArray(kappaSimulation,'kappa_simulation')
 
-@njit(parallel=True)
+#@njit(parallel=True)
 def getOriginal(urb_array, validCells):
   # Define conditions (urban and non-urban cells) in the original map (1990 or 2006):
   original_0 = (urb_array == 0) #non-urban
@@ -285,7 +285,7 @@ def getOriginal(urb_array, validCells):
   p_org1 = float(np.sum(original_1)/validCells)
   return original_0,original_1,p_org0,p_org1
 
-@njit(parallel=True)
+#@njit(parallel=True)
 def getTransitions(obs0,obs1,original_0,original_1,validCells):
   # Define conditions and calculate the transitions:
   act_0_0 = np.where(obs0 & original_0,1,0)
@@ -298,14 +298,14 @@ def getTransitions(obs0,obs1,original_0,original_1,validCells):
   p_act_1_1 = float(np.sum(act_1_1)/validCells)
   return p_act_0_0,p_act_0_1,p_act_1_0,p_act_1_1
  
-@njit(parallel=True)
+#@njit(parallel=True)
 def getPO(obs0,obs1,mod0,mod1,validCells):
   PO_urban = float(np.sum(obs1 & mod1)/validCells)
   PO_non_urban = float(np.sum(obs0 & mod0)/validCells)
   PO = PO_urban + PO_non_urban
   return PO
 
-@njit(parallel=True)
+#@njit(parallel=True)
 def getPE_transition(mod0,mod1,originals,validCells,transitions):
   # Get proportion of LU classes in original map
   original_0,original_1,p_org0,p_org1 = originals
@@ -326,7 +326,7 @@ def getPE_transition(mod0,mod1,originals,validCells,transitions):
                   p_org1 * (p_act_1_0 * p_sim_1_0 + p_act_1_1 * p_sim_1_1)
   return PE_transition
 
-@njit()
+#@njit()
 def Ks_values(row,col,kappaSimulation,PO,PE_transition): 
   # Calculate Kappa Simulation (Van Vliet, 2013, Eq. 2.9):
   K_simulation = (PO - PE_transition) / (1 - PE_transition)
@@ -349,7 +349,7 @@ def calcRMSE(metric, scenario, aim, case=None):
       # Create a list containing difference between the modelled and observed metric for the zones
       x = diffArray[row,col].flatten()
       # Remove nan values
-      x = x[~numpy.isnan(x)]
+      x = x[~np.isnan(x)]
       # Calculate RMSE for each zones
       rmseArray[row,col] = np.sqrt(np.mean(x**2))
       
@@ -728,11 +728,26 @@ def get_ND_n_masks(case, scenario, trade_off = False, eps=0.9):
   in_results = get_ND(case, scenario, aim='calibration')
   # Create an array to store condition boolean arrays
   c_list =[]
-  # Save a boolean list
+  # Save a boolean list of lists masking the minimum errors from ND domain
   for i, col in enumerate(in_results.T):
-    c_list.append(in_results[:,i] == in_results.min(axis=0)[i])
-
-  # Change into an array 
+    # Get the masking list
+    b_mask = in_results[:,i] == in_results.min(axis=0)[i]
+    # If more than one solution provides minimum error, select randomly
+    if sum(b_mask) > 1:
+      # Get indexes of true values
+      true_i = [i for i, x in enumerate(b_mask) if x]
+      # Select one random index
+      random_i = np.random.choice(true_i)
+      # Leave only the random true value
+      random_b_mask = [False for i in b_mask]
+      # Change one value to True
+      random_b_mask[random_i] = True
+      # Append the list of masks
+      c_list.append(random_b_mask)
+    else:
+      #append the list of masks
+      c_list.append(b_mask)
+  # Change into an array
   c_array = np.array(c_list)
 
   return c_array
@@ -800,6 +815,9 @@ def get_ND_n_1_indices(case, scenario, solution_space, objectives):
   nd_n_indices = get_ND_n_indices(case, scenario)
   # Get the index of the multiobjective solution
   av_index = get_av_index(case, scenario, solution_space, objectives)
+  # If there is more than one closest point, randomly select one only
+  if len(av_index) > 0:
+    av_index = [np.random.choice(av_index)]
   # Get the array of the selected indices
   nd_n_1_indices = np.append(nd_n_indices, av_index)
   
