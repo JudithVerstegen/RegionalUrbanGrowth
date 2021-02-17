@@ -64,6 +64,7 @@ driverColors = [ (x[0]/256,x[1]/256,x[2]/256) for x in driverColors ]
 # Time steps relate to the year of the CLC data, where 1990 was time step 0.
 obsTimeSteps = parameters.getObsTimesteps()
 observedYears = [parameters.getObsYears()[y] for y in obsTimeSteps]
+calValYears = parameters.getCalibrationPeriod()
 
 # Path to the folder with the metrics stored
 workDir = parameters.getWorkDir()
@@ -403,9 +404,7 @@ def plotDemand():
     d = d/100 # Change ha to km2
     #demand[ic] = d
     axs[0].plot(d, label = cities[c], c = countryColors[c])
-    axs[0].set_xticks(ticks=range(len(d)))
-    axs[0].set_xticklabels(observedYears)
-    ind = len(obsTimeSteps)+1
+    
     
     d_d = np.empty_like(d)
     for x in range(len(d)):
@@ -413,16 +412,40 @@ def plotDemand():
         d_d[x+1] = (d[x+1]-d[x])/d[0]*100 #[%]
     d_d[0] = 0
     axs[1].bar(
-      np.array([1,2])+ic/4,
+      np.array([0,1,2,3])+ic/4,
       d_d[1:],
       label = cities[c],
       width=0.2,
       color = countryColors[c])
-    # Put the y axis to the right
-    axs[1].yaxis.set_label_position("right")
-    axs[1].yaxis.tick_right()
-    axs[1].set_xticks(np.array([1,2])+0.25)
-    axs[1].set_xticklabels(['1990-2000','2000-2006'])#,'2006-2012','2012-2018'])
+    
+
+  # Axes ranges and lines for cal/val
+  axs0lims = axs[0].get_ylim()
+  axs1lims = axs[1].get_ylim()
+  axs[0].set_ylim(0, axs0lims[1])
+  axs[0].set_xlim(0, axs[0].get_xlim()[1])
+  axs0lims = axs[0].get_ylim()
+  
+  cal = calValYears.get(1).get('calibration')
+  val = calValYears.get(1).get('validation')
+  
+  axs[0].set_xticks(ticks=range(len(d)))
+  axs[0].set_xticklabels(observedYears)
+  axs[0].vlines(cal, axs0lims[0], axs0lims[1], colors='grey', linestyles = 'dashed')
+  axs[0].vlines(val, axs0lims[0], axs0lims[1], colors='grey', linestyles = 'dashed')
+  axs[0].text(cal[0]-0.75, 200, 'cal')
+  axs[0].text(val[0]-0.75, 200, 'val')
+  
+  # Put the y axis to the right
+  axs[1].yaxis.set_label_position("right")
+  axs[1].yaxis.tick_right()
+  axs[1].set_xticks(np.array([0,1,2,3])+0.25)
+  axs[1].set_xticklabels(['1990-2000','2000-2006','2006-2012','2012-2018'])
+  axs[1].vlines([cal[0] - 0.25], axs1lims[0], axs1lims[1], colors='grey', linestyles = 'dashed')
+  axs[1].vlines([val[0] - 0.25], axs1lims[0], axs1lims[1], colors='grey', linestyles = 'dashed')
+  axs[1].text(cal[0]-0.9, -8, 'cal')
+  axs[1].text(val[0]-0.9, -8, 'val')
+  
 
   # Assign labels
   axs[0].set_ylabel("Urban areas [km$^2$]")
@@ -668,7 +691,7 @@ def plotNonDominatedSolutions_multibar(solution_space, objectives, trade_off = F
   Find non-dominated combinations of metric values (for each parameter set)
   Plot 1 plot for a country in scenario 1
   x and y axis show values of two metrics
-  thrid metric value is presented with shape color
+  thrid metric value is presented with color
 
   Multi-objective approach parameters:
   solution_space: selection of points closest to the 'ideal' point in ['all', 'nondominated'] 
@@ -1401,11 +1424,11 @@ def main():
 ##  aim='calibration'
   
   print('Plotting...')
-##  plotDemand()
-##  print('Figure 2 plotted')
+  plotDemand()
+  print('Figure 2 plotted')
 ##  plotNonDominatedSolutions_multibar(solution_space, objectives, trade_off = False)
 ##  print('Figure 3 plotted')
-  plotWeights(solution_space, objectives, trade_off = False)
+##  plotWeights(solution_space, objectives, trade_off = False)
 ##  print('Figure 4 or 7 plotted')
 ##  plotUrbanChanges(solution_space, objectives)
 ##  print('Figure 5 or 6 plotted')
