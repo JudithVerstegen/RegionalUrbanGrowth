@@ -4,7 +4,7 @@ import os
 import metrics
 import numpy as np
 import parameters
-#import pcraster as pcr
+import pcraster as pcr
 import calibrate
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
@@ -28,6 +28,9 @@ print("This is a script to plot figures presenting outputs of the urban growth m
 metricNames = parameters.getSumStats()
 locationalMetric = parameters.getLocationalAccuracyMetric()
 all_metrices = metricNames+locationalMetric
+
+all_optional_metrics = ['cilp','cohes','contag','ed','fdi','lpi','pd','wfdi'] \
+    + locationalMetric
 
 
 # Get case studies
@@ -117,14 +120,19 @@ def setNameClearSave(figName, scenario=None): #ok
               bbox_inches = "tight")
   plt.close('all')
 
-def getAverageResultsArrayEverySet(aim): #ok
-  results = np.empty((len(all_metrices),
+def getAverageResultsArrayEverySet(aim, use_all): #ok
+  # plot all optional metrics or just the ones used in calibration and validation
+  if use_all:
+    metrics_to_use = all_optional_metrics
+  else:
+    metrics_to_use = all_metrices
+  
+  results = np.empty((len(metrics_to_use),
                       len(case_studies)*len(scenarios),
                       numberOfParameters))
-  for i,m in enumerate(all_metrices):
+  for i,m in enumerate(metrics_to_use):
     j=0
     for country in case_studies:
-      print('scenario',scenarios)
       for scenario in scenarios:
         # an_array is an array of arrays (contains rmse/kappa arrays for every p set)
         if m == 'kappa':
@@ -887,7 +895,7 @@ def plotNonDominatedSolutions_multibar(solution_space, objectives, trade_off = F
         p_mask[m,0] = 1
     print(cities[country])
     print(spearmanMatrix)
-    print(p_mask)
+    ##print(p_mask)
     # Plot the heatmaps for every case study
     ax = fig.add_subplot(spec[i,2])
     im = heatmap(spearmanMatrix, all_metrices, [''], ax=ax,
@@ -901,7 +909,8 @@ def plotNonDominatedSolutions_multibar(solution_space, objectives, trade_off = F
     cbar = fig.colorbar(im, ax=ax, orientation='horizontal')
     
     if i == 2:
-      cbar.set_label("\n\nSpearman coeff.", rotation=0, va="bottom", labelpad=4)
+      #cbar.set_label("\n\n\n\nSpearman coeff.", rotation=0, va="bottom", labelpad=4)
+      ax.set_xlabel("\n\n\n\nSpearman coeff.")
     
     i+=1
       
@@ -1244,7 +1253,7 @@ def plotMetrics(country, thisMetric):
     fontsize=6)
   
   # Set the name and clear the directory if needed
-  setNameClearSave('Figure X Unscaled metrics '+country+'_'+str(thisMetric), fileformat='png')
+  setNameClearSave('Figure X Unscaled metrics '+country+'_'+str(thisMetric))
 
 ### FIGURE X (additional) ###
 def plotAllocationDisagreement(country):
@@ -1271,20 +1280,26 @@ def plotAllocationDisagreement(country):
 
 
 ### FIGURE X (additional) ###
-def plotGoalFunctionEverySet(): #DONE
+def plotGoalFunctionEverySet(use_all): #DONE
   """
   Plot the values for a goal function durnig calibration.
   Values for every parameter set tested, plotted in subplots stacked vertically,
   one for every metric
   """
 
+  # Get the metrics, all or only the ones used in the goal function
+  if use_all:
+    calibration_metrices = all_optional_metrics
+    metric_units = [ 'RMSE/std' for i in 
+                    ['cilp','cohes','contag','ed','fdi','lpi','pd','wfdi'] ] + locationalMetric
+  else:    
+    calibration_metrices = [ m.upper() for m in metricNames ] + locationalMetric
+    metric_units = [ 'RMSE/std' for i in metricNames ] + locationalMetric
+    
   # First, get all results
-  results = getAverageResultsArrayEverySet('calibration')
+  results = getAverageResultsArrayEverySet('calibration', True)
   # Loop the data for all metrics to get minimum and maximum goal function values
   limits = {}
-  # Get the metrics
-  calibration_metrices = [ m.upper() for m in metricNames ] + locationalMetric
-  metric_units = [ 'RMSE/std' for i in metricNames ] + locationalMetric
   # Get metric stats
   for i,m in enumerate(calibration_metrices):
     limits[m] = {
@@ -1299,14 +1314,12 @@ def plotGoalFunctionEverySet(): #DONE
   ## 1. Get the parameter sets
   parameterSets = calibrate.getParameterConfigurations()
   parameters=np.arange(0,len(parameterSets),1)
-  n = len(metricNames)+1 # number of subplots
+  n = len(calibration_metrices)# number of subplots
   
   ## 2. Prepare the plot  
-  fig, axs = plt.subplots(n, figsize=(5,8), sharex = True)
-  plt.xlabel('parameter set')
+  fig, axs = plt.subplots(n, 2, figsize=(6,8), sharex = 'col')
   xticks = np.arange(0, parameters[-1]+10, 15.0)
   xticks=xticks.tolist()+[parameters[-1]]
-  plt.xticks(xticks,[int(x) for x in xticks])
   fig.align_ylabels()
   plt.subplots_adjust(hspace=0.4)
   #gf = ['$o_1$','$o_2$','$o_3$']
@@ -1315,20 +1328,23 @@ def plotGoalFunctionEverySet(): #DONE
   ## 3. Loop metrics. Each metric = new subplot
   for i,m in enumerate(calibration_metrices):
     j=0
-    axs[i].set_ylabel(metric_units[i]) 
+    axs[i][1].set_ylabel(metric_units[i])
+    axs[i][1].set_xticks(xticks)
+    axs[i][1].set_xlim(0,max(parameters)+1)
+    
     # Loop all the countries. Each suplot has data for all case studies:
     for country in case_studies:
       # Loop calibration scenarios:
       for scenario in scenarios:
         # set the min and max y axis values:
-        axs[i].set_title(gf[i], pad=3)
+        axs[i][1].set_title(gf[i], pad=3)
 
         # standardize vaules by divinding by std
         stand_results = results[i,j]/np.std(results[i,j])
         
         amin = limits[m]['min']
         amax = limits[m]['max']
-        axs[i].ticklabel_format(style='sci', axis='y', scilimits=(-2,2))
+        axs[i][1].ticklabel_format(style='sci', axis='y', scilimits=(-2,2))
         #axs[i].set_ylim([amin*0.9,amax*1.1])
         #axs[i].set_yticks([amin,amax])
         # Create the labels only for one metric
@@ -1338,13 +1354,14 @@ def plotGoalFunctionEverySet(): #DONE
           myLabel = {1:country+str(scenario),2:country+str(scenario)}
         fmt = {1:'-',2:'--'}
         # plot
-        axs[i].plot(
+        axs[i][1].plot(
           parameters,
           stand_results,
           fmt[scenario],
           linewidth = 0.5,
           label = myLabel[scenario],
           c = countryColors[country])
+        plt.setp(axs[i][1].get_xticklabels(), rotation=90)
 ##        # Plot a line showing mean metric vaue in the parameter space and the value
 ##        axs[i].axhline(y=limits[m]['mean'], alpha=0.2,c='black',linestyle='--', linewidth=0.8)
 ##        axs[i].text(axs[i].get_xlim()[1]+1,
@@ -1353,16 +1370,63 @@ def plotGoalFunctionEverySet(): #DONE
 ##                    fontsize=6,
 ##                    va='center')
         j+=1
+  axs[i][1].set_xlabel('parameter set')
 
+  ## 4. Loop metrics again, now plot over time. Each metric = new subplot
+  calibration_metrices.pop(-1)
+  for i,m in enumerate(calibration_metrices):
+    j=0
+    print(m)
+    axs[i][0].set_ylabel(m)
+    axs[i][0].set_xlim(min(observedYears)-2,max(observedYears)+2)
+    
+    # Loop all the countries. Each suplot has data for all case studies:
+    for country in case_studies:
+      # Loop calibration scenarios:
+      for scenario in scenarios:
+
+        # get results
+        observed = calibrate.getObservedArray(m, case=country)
+        metric_values = []
+        for year in range(len(obsTimeSteps)):
+            metric_values.append(observed[year][0][1])
+        
+        metric_values = np.array(metric_values)[:, :, 0].transpose()
+        metric_values = metric_values[~np.isnan(metric_values).any(axis=1)]
+        
+        print(metric_values.shape)
+        #axs[i].set_ylim([amin*0.9,amax*1.1])
+        #axs[i].set_yticks([amin,amax])
+        # plot
+        c = countryColors[country]
+        axs[i][0].boxplot(
+            metric_values,
+            positions = np.array(observedYears)+j-1,
+            whis = [0,100],
+            widths = 1,
+            patch_artist=True,
+            boxprops=dict(facecolor='w', color=c),
+            capprops=dict(color=c),
+            whiskerprops=dict(color=c),
+            flierprops=dict(color=c, markeredgecolor=c),
+            medianprops=dict(color=c))
+        j+=1
+    axs[i][0].set_xticks(observedYears)
+
+  axs[i+1][0].set_visible(False)  
+  axs[i][0].set_xticklabels([str(x) for x in observedYears])
+  axs[i][0].tick_params(labelbottom=True)
+  axs[i][0].set_xlabel('time')
+
+  
   # Create the legend
   leg = fig.legend(
-    bbox_to_anchor=(0., 1.35, 1, .102),
+    bbox_to_anchor=(0.28, 0.12),
     loc='lower center',
     ncol=len(case_studies),
-    #mode="expand",
-    bbox_transform=axs[0].transAxes,
     borderaxespad=0.,
-    frameon = False)
+    frameon = False,
+    fontsize=9)
   
   # Set the name and clear the directory if needed
   setNameClearSave('Figure X Goal functions values - Values for each case study and metric (every plotted line) are divided by their std', scenario=None)#, fileformat='png')
@@ -1420,27 +1484,25 @@ def main():
   objectives = 'n_objectives'
   # Variables for testing:
 ##  country = 'IE'
-##  thisMetric = 'wfdi'
-##  aim='calibration'
+  thisMetric = 'wfdi'
+  aim='calibration'
   
   print('Plotting...')
   plotDemand()
   print('Figure 2 plotted')
-##  plotNonDominatedSolutions_multibar(solution_space, objectives, trade_off = False)
-##  print('Figure 3 plotted')
-##  plotWeights(solution_space, objectives, trade_off = False)
-##  print('Figure 4 or 7 plotted')
-##  plotUrbanChanges(solution_space, objectives)
+  plotNonDominatedSolutions_multibar(solution_space, objectives, trade_off = False)
+  print('Figure 3 plotted')
+  plotWeights(solution_space, objectives, trade_off = False)
+  print('Figure 4 or 7 plotted')
+##  plotUrbanChanges(solution_space, objectives) # to remove? Not used, ArcGIS
 ##  print('Figure 5 or 6 plotted')
-##  plotMetrics(country, thisMetric)
+##  plotMetrics(country, thisMetric)  # to remove? Not used, and strange layout now
 ##  print('Figure X plotted')
 ##  plotAllocationDisagreement(country)
 ##  print('Figure X plotted')
-##  plotGoalFunctionEverySet()
-##  print('Figure X plotted')
-##  getSpearmanrResult()
-##  print('Figure X plotted')
-##  saveNonDominatedPoints_to_excel(aim, solution_space, objectives)
+  plotGoalFunctionEverySet(True)
+  print('Figure X plotted')
+##  saveNonDominatedPoints_to_excel(aim, solution_space, objectives) # to remove? Not used, and not working now
 ##  print('Saved metric values')
 
 if __name__ == "__main__":
