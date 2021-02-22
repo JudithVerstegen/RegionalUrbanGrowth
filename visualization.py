@@ -1491,7 +1491,7 @@ def main():
   thisMetric = 'wfdi'
   aim='calibration'
   
-##  print('Plotting...')
+  print('Plotting...')
 ##  plotDemand()
 ##  print('Figure 2 plotted')
   plotNonDominatedSolutions_multibar(solution_space, objectives, trade_off = False)
