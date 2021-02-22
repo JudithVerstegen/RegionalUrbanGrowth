@@ -785,8 +785,24 @@ def get_av_mask(case, scenario, solution_space, objectives):
     [distance.euclidean(n_weights_av, col) for col in weights[solution_space].T])
   
   # Find the closest point
-  theMask = distance_to_averaged==distance_to_averaged.min()
-
+  # condition: if in the averaged weights, none has a zero-weight, this should
+  # be the case in the closest point too; i.e. we disregard zero-weights
+  if np.min(n_weights_av) > 0.0:
+    ##print('weights', weights[solution_space])
+    condition = (weights[solution_space] < 0.05)
+    idx = condition.any(axis=0)
+    if np.any(idx):
+      ##print(idx)
+      ##print(weights[solution_space][:, ~idx])
+      ##print(distance_to_averaged.min())
+      ##print(distance_to_averaged[~idx].min())
+      ##print(distance_to_averaged == np.amin(distance_to_averaged))
+      ##print(np.logical_and(distance_to_averaged == np.amin(distance_to_averaged[~idx]), ~idx))
+      theMask = np.logical_and(distance_to_averaged == np.amin(distance_to_averaged[~idx]), ~idx)
+    else:
+      theMask = distance_to_averaged==distance_to_averaged.min()
+  else:
+    theMask = distance_to_averaged==distance_to_averaged.min()
   return theMask
 
 def get_av_index(case, scenario, solution_space, objectives):
@@ -817,6 +833,7 @@ def get_ND_n_1_indices(case, scenario, solution_space, objectives):
   av_index = get_av_index(case, scenario, solution_space, objectives)
   # If there is more than one closest point, randomly select one only
   if len(av_index) > 0:
+    ##print('points', av_index)
     av_index = [np.random.choice(av_index)]
   # Get the array of the selected indices
   nd_n_1_indices = np.append(nd_n_indices, av_index)

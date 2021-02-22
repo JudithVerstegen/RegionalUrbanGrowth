@@ -1355,7 +1355,7 @@ def plotGoalFunctionEverySet(use_all): #DONE
         if i>0:
           myLabel = {1:None,2:None}
         else:
-          myLabel = {1:country+str(scenario),2:country+str(scenario)}
+          myLabel = {1:cities[country],2:cities[country]}
         fmt = {1:'-',2:'--'}
         # plot
         axs[i][1].plot(
@@ -1398,7 +1398,7 @@ def plotGoalFunctionEverySet(use_all): #DONE
         metric_values = np.array(metric_values)[:, :, 0].transpose()
         metric_values = metric_values[~np.isnan(metric_values).any(axis=1)]
         
-        print(metric_values.shape)
+        ##print(metric_values.shape)
         #axs[i].set_ylim([amin*0.9,amax*1.1])
         #axs[i].set_yticks([amin,amax])
         # plot
@@ -1430,7 +1430,7 @@ def plotGoalFunctionEverySet(use_all): #DONE
     ncol=len(case_studies),
     borderaxespad=0.,
     frameon = False,
-    fontsize=9)
+    fontsize=8)
   
   # Set the name and clear the directory if needed
   setNameClearSave('Figure X Goal functions values - Values for each case study and metric (every plotted line) are divided by their std', scenario=None)#, fileformat='png')
@@ -1494,12 +1494,12 @@ def main():
 ##  print('Plotting...')
 ##  plotDemand()
 ##  print('Figure 2 plotted')
-##  plotNonDominatedSolutions_multibar(solution_space, objectives, trade_off = False)
-##  print('Figure 3 plotted')
-##  plotWeights(solution_space, objectives, trade_off = False)
-##  print('Figure 4 or 7 plotted')
-  plotUrbanChanges(solution_space, objectives) # to remove? Not used, ArcGIS
-  print('Figure 5 or 6 plotted')
+  plotNonDominatedSolutions_multibar(solution_space, objectives, trade_off = False)
+  print('Figure 3 plotted')
+  plotWeights(solution_space, objectives, trade_off = False)
+  print('Figure 4 or 7 plotted')
+##  plotUrbanChanges(solution_space, objectives) # to remove? Not used, ArcGIS
+##  print('Figure 5 or 6 plotted')
 ##  plotMetrics(country, thisMetric)  # to remove? Not used, and strange layout now
 ##  print('Figure X plotted')
 ##  plotAllocationDisagreement(country)

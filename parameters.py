@@ -36,7 +36,7 @@ def getCalibrationScenarios():
   2: calibration on time step 3 and 4
   3: calibation over area"""
 
-  scenarios = [2]
+  scenarios = [1]
   return scenarios
 
 def getCalibrationPeriod():
