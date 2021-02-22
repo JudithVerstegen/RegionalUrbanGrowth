@@ -120,7 +120,7 @@ def getSumStats():
   # 'lpi': # Largest Patch Index
   # 'contag': # Contagion Index 
   
-  sumStats = ['cohes','wfdi']
+  sumStats = ['wfdi','cohes']
   #sumStats = ['cilp','cohes','contag','ed','fdi','lpi','pd','wfdi']
   return sumStats
 
