@@ -21,7 +21,7 @@ import scipy.stats as stats
 print("This is a script to plot figures presenting outputs of the urban growth model")
 
 #########################
-#### Global variables ###
+### Global variables ###
 #########################
 
 # Get metrics
@@ -110,7 +110,7 @@ def setNameClearSave(figName, scenario=None): #ok
     name = ''
   else:
     name = '_scenario_'+str(scenario)
-  fig_dir = os.path.join(os.getcwd(),'results','figures_calibration_1990-2000')
+  fig_dir = os.path.join(os.getcwd(),'results','figures_calibration_1990_2000')
   wPath1 = clearCreatePath(fig_dir, figName+name+'.png')
   wPath2 = clearCreatePath(fig_dir, figName+name+'.pdf')
   # Save plot and clear    
@@ -1073,17 +1073,18 @@ def plotUrbanChanges(solution_space, objectives): #DONE
   years = [
     str(np.array(observedYears)[period[0]-1]),
     str(np.array(observedYears)[period[0]])]
-
+  print('observed years:',years)
   
   i=0
   
   for country in case_studies:
     # Create an empty list to store observed maps
     obs_maps = []
-    # Get the observed changes
-    for x in [0,1]:#,2]:
+    # Get the observed changes for each observed time step defined in 'period'
+    for x in np.arange(len(period)+1):
       # Add the map for the observed change! Get the observed maps from CLC data:
       obs_maps.append(os.path.join(os.getcwd(),'observations',country, 'urb'+years[x][-2:]))
+      print(country,os.path.join(os.getcwd(),'observations',country, 'urb'+years[x][-2:]))
       # Red the PCRaster format
       obs_maps[x] = pcr.readmap(obs_maps[x])
       # Convert the maps to the numpy arrays
@@ -1092,13 +1093,15 @@ def plotUrbanChanges(solution_space, objectives): #DONE
       obs_maps[x] = obs_maps[x].astype('float')
       # Change the nodata cells to nans
       obs_maps[x][obs_maps[x] == 99] = np.nan
-
-    # Create the transition matrix between first two times steps
-    d_obs_0 = np.subtract(obs_maps[1], obs_maps[0])
-    # Create the transition matrix between first two times steps
-    d_obs_1 = np.subtract(obs_maps[2], obs_maps[1])
-    # Add the changes to get the total transition
-    d_obs = np.add(d_obs_0,d_obs_1)
+## UNCOMMENT AND ADAPT FOR MORE THAN ONE TIME STEP IN CALIBRATION
+##    # Create the transition matrix between first two times steps
+##    d_obs_0 = np.subtract(obs_maps[1], obs_maps[0])
+##    # Create the transition matrix between first two times steps
+##    d_obs_1 = np.subtract(obs_maps[2], obs_maps[1])
+##    # Add the changes to get the total transition
+##    d_obs = np.add(d_obs_0,d_obs_1)
+    # Create the transition matrix between two times steps
+    d_obs = np.subtract(obs_maps[1], obs_maps[0])
     # Get the unique values
     u_obs = np.unique(d_obs[~np.isnan(d_obs)])
     # Create a colormap for every unique value
@@ -1113,24 +1116,25 @@ def plotUrbanChanges(solution_space, objectives): #DONE
     # First, get the solutions
     n_1_indices = calibrate.get_ND_n_1_indices(country, scenario, solution_space, objectives)
     
-    
-    
     for m, inx in enumerate(n_1_indices):
       # Create an empty list to store observed maps
       mod_maps = []
-      # Get the data for period:
-      for k in [0,1]:
+      # Get the modelled changes between the observed time step defined in 'period' and start of the simulation
+      for k in np.arange(len(period)):
         # Add the map for the observed change! Get the observed maps from CLC data:
-        mod_array = calibrate.getModelledArray('urb_subset_'+str(selected_time_steps[k]),case=country)
+        mod_array = calibrate.getModelledArray(
+          'urb_subset_'+str(selected_time_steps[k]),case=country)
         mod_array = mod_array[0,inx,1]
         mod_maps.append(mod_array)
         # Reshape it into a size of a map
         mod_maps[k] = np.reshape(mod_maps[k], (1600,1600))
-      # Calculate the change between modelled and observed
-      d_mod_0 = np.subtract(mod_maps[0], obs_maps[0])
-      d_mod_1 = np.subtract(mod_maps[1], obs_maps[1])
-      # Add the changes to get the full transition
-      d_mod = np.add(d_mod_0, d_mod_1)
+## UNCOMMENT AND ADAPT FOR MORE THAN ONE TIME STEP IN CALIBRATION
+##      # Calculate the change between modelled and observed
+##      d_mod_0 = np.subtract(mod_maps[0], obs_maps[0])
+##      d_mod_1 = np.subtract(mod_maps[1], obs_maps[1])
+##      # Add the changes to get the full transition
+##      d_mod = np.add(d_mod_0, d_mod_1)
+      d_mod = np.subtract(mod_maps[0], obs_maps[0])
       # Find states in the map to adjust the colors:
       u = np.unique(d_mod[~np.isnan(d_mod)])
       cmapL = [colorsModelledChange[v] for v in u]
@@ -1159,7 +1163,7 @@ def plotUrbanChanges(solution_space, objectives): #DONE
     # Create a legend
     leg = axs[0,0].legend(
       handles=patches,
-      title = 'Urban areas transitions: '+years[0]+' to '+years[2],
+      title = 'Urban areas transitions: '+years[0]+' to '+years[1],
       bbox_to_anchor=(0., 1.3, 5+5*0.1, .102),
       ncol = 4,
       mode="expand",
@@ -1168,7 +1172,7 @@ def plotUrbanChanges(solution_space, objectives): #DONE
   # Set name
   aname = ['Figure 6 Validation maps','Figure 5 Calibration maps']
   # Use this usually:
-  setNameClearSave(aname[scenario-1],scenario=None, fileformat='png')
+  setNameClearSave(aname[scenario-1],scenario=None)#, fileformat='png')
 
 ### FIGURE X (additional) ###
 def plotMetrics(country, thisMetric):
@@ -1487,21 +1491,21 @@ def main():
   thisMetric = 'wfdi'
   aim='calibration'
   
-  print('Plotting...')
-  plotDemand()
-  print('Figure 2 plotted')
-  plotNonDominatedSolutions_multibar(solution_space, objectives, trade_off = False)
-  print('Figure 3 plotted')
-  plotWeights(solution_space, objectives, trade_off = False)
-  print('Figure 4 or 7 plotted')
-##  plotUrbanChanges(solution_space, objectives) # to remove? Not used, ArcGIS
-##  print('Figure 5 or 6 plotted')
+##  print('Plotting...')
+##  plotDemand()
+##  print('Figure 2 plotted')
+##  plotNonDominatedSolutions_multibar(solution_space, objectives, trade_off = False)
+##  print('Figure 3 plotted')
+##  plotWeights(solution_space, objectives, trade_off = False)
+##  print('Figure 4 or 7 plotted')
+  plotUrbanChanges(solution_space, objectives) # to remove? Not used, ArcGIS
+  print('Figure 5 or 6 plotted')
 ##  plotMetrics(country, thisMetric)  # to remove? Not used, and strange layout now
 ##  print('Figure X plotted')
 ##  plotAllocationDisagreement(country)
 ##  print('Figure X plotted')
-  plotGoalFunctionEverySet(True)
-  print('Figure X plotted')
+##  plotGoalFunctionEverySet(True)
+##  print('Figure X plotted')
 ##  saveNonDominatedPoints_to_excel(aim, solution_space, objectives) # to remove? Not used, and not working now
 ##  print('Saved metric values')
 
