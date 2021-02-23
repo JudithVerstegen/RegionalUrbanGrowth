@@ -726,6 +726,8 @@ def plotNonDominatedSolutions_multibar(solution_space, objectives, trade_off = F
   for i,country in enumerate(case_studies): 
     i = i
     print(i)
+    r_nd = None
+    mx = None
 
     ## 4. Get calibration values
     # Get metric values
@@ -760,32 +762,64 @@ def plotNonDominatedSolutions_multibar(solution_space, objectives, trade_off = F
       print('j ' + str(j))
       # Add an axis for all non dominated results
       ax_all = fig.add_subplot(spec[i,j])
-      # Plot a scatter plot
-      scat = ax_all.scatter(
-        r_nd[:,0],
-        r_nd[:,1],
-        marker='x',
-        s=20,
-        linewidth=0.5,
-        c = r_nd[:,2],#a_cmap(np.split(scale,2)[j]),
-        #cmap=a_cmap,
-        alpha=0.7,
-        label="-".join([country,str(j)]))
       
-      # Plot (again) the point with the minimum errors for 4 objectives
-      s_r_nd = r_nd[c_mask]
-      # Add an axis for seected points
-      # Plot the selected solutions
-      ax_all.scatter(
-        s_r_nd[:,0],
-        s_r_nd[:,1],
-        s=60,
-        linewidths=6,
-        marker='x',
-        c = s_r_nd[:,2], #a_cmap(np.split(scale,2)[j][inx]),
-        #cmap=a_cmap,
-        alpha=0.9,
-        label="-".join([country,str(j)]))
+      # test: plot non-dominated of the non-dominated for validation
+      if j == 1:
+        is_efficient = np.ones(r_nd.shape[0], dtype = bool)
+        for k, l in enumerate(r_nd):
+          if is_efficient[k]:
+            # Keep any point with a lower cost
+            is_efficient[is_efficient] = np.any(r_nd[is_efficient]<l, axis=1)  
+            is_efficient[k] = True  # And keep self
+        mask_eff = np.tile(is_efficient, (3,1))
+        # Plot a scatter plot
+        scat = ax_all.scatter(
+          r_nd[:,0],
+          r_nd[:,1],
+          marker='x',
+          s=20,
+          linewidth=0.5,
+          c = r_nd[:,2],#a_cmap(np.split(scale,2)[j]),
+          #cmap=a_cmap,
+          alpha=0.7,
+          label="-".join([country,str(j)]))
+        ax_all.scatter(
+          r_nd[is_efficient,0],
+          r_nd[is_efficient,1],
+          marker='o',
+          s=30,
+          linewidth=0.5,
+          c = r_nd[is_efficient,2],#a_cmap(np.split(scale,2)[j]),
+          #cmap=a_cmap,
+          alpha=0.7)
+      else:
+        # Plot a scatter plot
+        scat = ax_all.scatter(
+          r_nd[:,0],
+          r_nd[:,1],
+          marker='x',
+          s=20,
+          linewidth=0.5,
+          c = r_nd[:,2],#a_cmap(np.split(scale,2)[j]),
+          #cmap=a_cmap,
+          alpha=0.7,
+          label="-".join([country,str(j)]))
+
+      
+      # # Plot (again) the point with the minimum errors for 4 objectives
+      # s_r_nd = r_nd[c_mask]
+      # # Add an axis for seected points
+      # # Plot the selected solutions
+      # ax_all.scatter(
+      #   s_r_nd[:,0],
+      #   s_r_nd[:,1],
+      #   s=60,
+      #   linewidths=6,
+      #   marker='x',
+      #   c = s_r_nd[:,2], #a_cmap(np.split(scale,2)[j][inx]),
+      #   #cmap=a_cmap,
+      #   alpha=0.9,
+      #   label="-".join([country,str(j)]))
       
       ## 6. Print the number of the selected solution next to the point
       # Get the array of points
@@ -802,39 +836,17 @@ def plotNonDominatedSolutions_multibar(solution_space, objectives, trade_off = F
                     a_point[1],
                     'P'+str(p+1),
                     va='center',
-                    ha='center')
+                    ha='center',
+                    weight='bold')
      
         
-      ## 7. Adjust the plot
-      # # Find the maximum values
-      # max0_r_nd, max1_r_nd, max2_r_nd = r_nd.max(axis=0)
-      # #print(country, j, 'max WFDI', r_nd.max(axis=0)[0], 'max COHESION', r_nd.max(axis=0)[1])
-      # # Find the minimum values
-      # min0_r_nd, min1_r_nd, min2_r_nd = r_nd.min(axis=0)
-      # #print(country, j, 'min WFDI', r_nd.min(axis=0)[0], 'min COHESION', r_nd.min(axis=0)[1])
-      # ### Remove the common scale:
-      # # Set the limits
-      # ax_all.set_xlim(left=min0_r_nd-(max0_r_nd-min0_r_nd)*0.1,right=max0_r_nd+(max0_r_nd-min0_r_nd)*0.1)
-      # ax_all.set_ylim(bottom=min1_r_nd-(max1_r_nd-min1_r_nd)*0.1,top=max1_r_nd+(max1_r_nd-min1_r_nd)*0.1)
-      
-      # Specify the number of ticks on both or any single axes
-      ##ax_all.locator_params(tight=True, nbins=4)
-      ##ax_all.locator_params(tight=True, nbins=4)
+      ## 7. Adjust the plot      
       # Print the number of the non-dominated solutions on the left subplot
       # Get the limits of the ax
       x0=ax_all.get_xlim()[0]
       x1=ax_all.get_xlim()[1]
       y0=ax_all.get_ylim()[0]
       y1=ax_all.get_ylim()[1]
-      
-      # ### Remove the common scale:
-      # # create ticks positions for x,y, and z axis
-      # x_ticks = np.linspace(min0_r_nd, max0_r_nd, 3)
-      # y_ticks = np.linspace(min1_r_nd, max1_r_nd, 3)
-      # # Assign 4 ticks and labels to the x, y and z (colorbar)axis.
-      # ax_all.set_xticks(x_ticks)
-      # ax_all.set_xticklabels('%.4f' % x for x in x_ticks)
-      # ax_all.set_yticks(y_ticks)
       
       xfmt = ScalarFormatterForceFormat()
       xfmt.set_powerlimits((0,0))
@@ -900,10 +912,8 @@ def plotNonDominatedSolutions_multibar(solution_space, objectives, trade_off = F
     ax = fig.add_subplot(spec[i,2])
     im = heatmap(spearmanMatrix, all_metrices, [''], ax=ax,
                 cmap="PRGn", vmin=-1, vmax=1,cbarlabel="Spearman coeff.")
-    # Add coeff. values. The ones with p_val > 0.01 are black, other are white
     # "The p-values are not entirely reliable but are probably reasonable for datasets larger than 500 or so."
     # from: https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.spearmanr.html
-    # annotate_heatmap(im, p_mask, valfmt=matplotlib.ticker.FuncFormatter(func), size=7)
     annotate_heatmap(im, np.ones((len(all_metrices), 1)), 
                      valfmt=matplotlib.ticker.FuncFormatter(func), size=7)
     cbar = fig.colorbar(im, ax=ax, orientation='horizontal')
@@ -1174,90 +1184,6 @@ def plotUrbanChanges(solution_space, objectives): #DONE
   # Use this usually:
   setNameClearSave(aname[scenario-1],scenario=None)#, fileformat='png')
 
-### FIGURE X (additional) ###
-def plotMetrics(country, thisMetric):
-  """
-  # Plots two subplots for each metric
-  # Plot the observed values of metrics in one subplot
-  # and the modelled metric values for the calibrated parameters on the other subplot
-  # All landscape metrics = 4 plots, 2 subplots each, stacked vertically
-  # For FDI and WFDI plots values for zones on the diagonal of the case study area (zones: 0,5,10,15)
-  """
-  scenario = scenarios[0] 
-  ## 1. Create the figure
-  fig, axs = plt.subplots(4,4, sharex=True, figsize=(4,4))
-  # Adjust the plot
-  #plt.subplots_adjust(wspace=0.05, hspace=0.05)
-
-  # Set linestyle for each scenario
-  linestyle={'obs':'o-','mod':'o--'}
-
-  # Add title
-  fig.suptitle(str(thisMetric).upper())
-  
-  for m,metric in enumerate([thisMetric]):
-    # Get the observed values of a metric
-    zonesObserved = calibrate.getObservedArray(metric,case=country)
-    zonesModelled = calibrate.getModelledArray(metric,scenario,case=country)
-    indexCalibratedSet = calibrate.getCalibratedIndeks(metric,scenario,case=country)
-    nd_n_1_indices = calibrate.get_ND_n_1_indices(country, scenario, 'all', 'n_objectives')
-
-    ## 3. Plot the values        
-    # Select the zones for plottong. Some metric are calculted for 16 zones. Other for one zone only:
-    zonesNumber = len(zonesModelled[0][0][1])
-    selected_zones = range(zonesNumber)
-      
-    # Loop the zones and the flattend axes:
-    for z, ax in enumerate(axs.ravel()):
-      # Plot observed values. Create and array and fill with values for each observed time step:
-      metricValues = []
-      for year in range(len(obsTimeSteps)):
-        metricValues.append(zonesObserved[year][0][1][z][0])
-      ax.plot(
-        observedYears,
-        metricValues,
-        linestyle['obs'],
-        linewidth = 0.7,
-        markersize=1,
-        label = cities[country] + ' observed',
-        c='k')
-      
-      # Plot modelled values for each selected solution.
-      for an_i, an_index in enumerate(nd_n_1_indices):
-        # Create and array and fill with values for each time step:
-        modelledValues = []
-        for year in range(len(zonesModelled[:,0])):
-          modelledValues.append(zonesModelled[year,an_index,1][z][0])
-        ax.plot(
-          np.arange(observedYears[0],observedYears[-1:][0]+1),
-          modelledValues,
-          linestyle['mod'],
-          linewidth = 0.7,
-          markersize=0,
-          label = 'P'+str(an_i+1),
-          c=solutionColors[an_i+1])
-
-  # Iterate axes and add labels
-  for zone, a in enumerate(axs.flat):
-    # Add a zone number
-    a.text(observedYears[0],ax.get_ylim()[1],'zone '+str(zone+1), fontsize=6)
-    # Adjust x ticks
-    a.set_xticks(observedYears[::2])
-    a.set_xticklabels([str(x)[-2:]+"'" for x in observedYears[::2]])
-    # Adjust y ticks
-    plt.locator_params(axis='y', nbins=3)
-    #a.set_yticks(np.linspace(ax.get_ylim()[0],ax.get_ylim()[1],3))
-    #a.set_yticklabels(np.linspace(ax.get_ylim()[0],ax.get_ylim()[1],3))
-
-  # Create a legend
-  leg = axs[0,0].legend(
-    bbox_to_anchor=(0., 1.35, 4.5, .102),
-    ncol = 5,
-    mode="expand",
-    fontsize=6)
-  
-  # Set the name and clear the directory if needed
-  setNameClearSave('Figure X Unscaled metrics '+country+'_'+str(thisMetric))
 
 ### FIGURE X (additional) ###
 def plotAllocationDisagreement(country):
@@ -1366,13 +1292,6 @@ def plotGoalFunctionEverySet(use_all): #DONE
           label = myLabel[scenario],
           c = countryColors[country])
         plt.setp(axs[i][1].get_xticklabels(), rotation=90)
-##        # Plot a line showing mean metric vaue in the parameter space and the value
-##        axs[i].axhline(y=limits[m]['mean'], alpha=0.2,c='black',linestyle='--', linewidth=0.8)
-##        axs[i].text(axs[i].get_xlim()[1]+1,
-##                    limits[m]['mean'],
-##                    'mean = '+str(np.format_float_scientific(limits[m]['mean'],precision=2)),
-##                    fontsize=6,
-##                    va='center')
         j+=1
   axs[i][1].set_xlabel('parameter set')
 
@@ -1487,7 +1406,6 @@ def main():
   solution_space = 'nondominated'
   objectives = 'n_objectives'
   # Variables for testing:
-##  country = 'IE'
   thisMetric = 'wfdi'
   aim='calibration'
   
@@ -1500,8 +1418,6 @@ def main():
   print('Figure 4 or 7 plotted')
 ##  plotUrbanChanges(solution_space, objectives) # to remove? Not used, ArcGIS
 ##  print('Figure 5 or 6 plotted')
-##  plotMetrics(country, thisMetric)  # to remove? Not used, and strange layout now
-##  print('Figure X plotted')
 ##  plotAllocationDisagreement(country)
 ##  print('Figure X plotted')
 ##  plotGoalFunctionEverySet(True)
